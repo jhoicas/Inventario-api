@@ -1,0 +1,31 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: inventory-pro-api
+    ports:
+      - "8080:8080"
+    environment:
+      # App
+      - APP_ENV=production
+      - APP_NAME=inventory-pro
+      
+      # Database: connection string de Supabase (password URL-encoded: # %23, * %2A, & %26, % %25)
+      - DATABASE_URL=postgresql://postgres:xF%23%2AW3%26%25mDceWPL@db.ghewngonrvknaqdvigkp.supabase.co:5432/postgres?sslmode=require
+      
+      # HTTP
+      - HTTP_HOST=0.0.0.0
+      - HTTP_PORT=8080
+      
+      # JWT
+      - JWT_SECRET=${JWT_SECRET:-cambiar-este-secret-en-produccion}
+      - JWT_EXPIRATION_MINUTES=60
+      - JWT_ISSUER=inventory-pro
+    restart: unless-stopped
+    networks:
+      - inventory-network
+
+networks:
+  inventory-network:
+    driver: bridge

@@ -1,0 +1,43 @@
+# Binarios
+*.exe
+*.dll
+*.so
+*.dylib
+api
+
+# Archivos de test
+*_test.go
+**/*_test.go
+
+# Archivos de desarrollo
+.env.local
+.env.*.local
+*.log
+*.tmp
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Documentación
+README.md
+*.md
+
+# Scripts
+*.ps1
+*.sh
+
+# Migraciones (opcional, si quieres incluirlas en la imagen, comenta esta línea)
+# internal/infrastructure/postgres/migrations/

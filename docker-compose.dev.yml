@@ -1,0 +1,41 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: inventory-pro-api-dev
+    ports:
+      - "8080:8080"
+    volumes:
+      # Montar código fuente para desarrollo (opcional, requiere rebuild)
+      - ./cmd:/app/cmd:ro
+      - ./internal:/app/internal:ro
+      - ./pkg:/app/pkg:ro
+    environment:
+      # Cargar desde .env si existe
+      - APP_ENV=development
+      - APP_NAME=inventory-pro
+      
+      # Database (Supabase)
+      - DB_HOST=${DB_HOST:-db.ghewngonrvknaqdvigkp.supabase.co}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:-xF#*W3&%mDceWPL}
+      - DB_NAME=${DB_NAME:-postgres}
+      - DB_SSLMODE=${DB_SSLMODE:-require}
+      
+      # HTTP
+      - HTTP_HOST=0.0.0.0
+      - HTTP_PORT=8080
+      
+      # JWT
+      - JWT_SECRET=${JWT_SECRET:-dev-secret-key}
+      - JWT_EXPIRATION_MINUTES=60
+      - JWT_ISSUER=inventory-pro
+    restart: unless-stopped
+    networks:
+      - inventory-network
+
+networks:
+  inventory-network:
+    driver: bridge

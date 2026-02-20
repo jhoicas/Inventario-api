@@ -1,0 +1,119 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Invorya API",
+    "description": "API del backend de inventario y facturación (Colombia)",
+    "version": "1.0"
+  },
+  "host": "localhost:3000",
+  "basePath": "/",
+  "schemes": ["http"],
+  "securityDefinitions": {
+    "Bearer": {
+      "type": "apiKey",
+      "name": "Authorization",
+      "in": "header",
+      "description": "Token JWT: Bearer &lt;token&gt;"
+    }
+  },
+  "security": [{ "Bearer": [] }],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Health check",
+        "security": [],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/auth/register": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Registrar usuario",
+        "security": [],
+        "parameters": [
+          { "in": "body", "name": "body", "required": true, "schema": { "type": "object" } }
+        ],
+        "responses": { "201": { "description": "Creado" }, "400": { "description": "Bad request" }, "409": { "description": "Email ya existe" } }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Login",
+        "security": [],
+        "parameters": [
+          { "in": "body", "name": "body", "required": true, "schema": { "type": "object" } }
+        ],
+        "responses": { "200": { "description": "Token JWT" }, "401": { "description": "Credenciales inválidas" } }
+      }
+    },
+    "/api/companies": {
+      "get": { "tags": ["Companies"], "summary": "Listar empresas", "security": [], "responses": { "200": { "description": "OK" } } },
+      "post": { "tags": ["Companies"], "summary": "Crear empresa", "security": [], "parameters": [{ "in": "body", "name": "body", "schema": { "type": "object" } }], "responses": { "201": { "description": "Creado" } } }
+    },
+    "/api/companies/{id}": {
+      "get": { "tags": ["Companies"], "summary": "Obtener empresa por ID", "security": [], "parameters": [{ "in": "path", "name": "id", "type": "string" }], "responses": { "200": { "description": "OK" }, "404": { "description": "No encontrado" } } }
+    },
+    "/api/warehouses": {
+      "get": { "tags": ["Warehouses"], "summary": "Listar bodegas" },
+      "post": { "tags": ["Warehouses"], "summary": "Crear bodega", "parameters": [{ "in": "body", "name": "body", "schema": { "type": "object" } }], "responses": { "201": { "description": "Creado" } } }
+    },
+    "/api/warehouses/{id}": {
+      "get": { "tags": ["Warehouses"], "summary": "Obtener bodega por ID", "parameters": [{ "in": "path", "name": "id", "type": "string" }] }
+    },
+    "/api/products": {
+      "get": { "tags": ["Products"], "summary": "Listar productos" },
+      "post": { "tags": ["Products"], "summary": "Crear producto", "parameters": [{ "in": "body", "name": "body", "schema": { "type": "object" } }], "responses": { "201": { "description": "Creado" } } }
+    },
+    "/api/products/{id}": {
+      "get": { "tags": ["Products"], "summary": "Obtener producto por ID", "parameters": [{ "in": "path", "name": "id", "type": "string" }] },
+      "put": { "tags": ["Products"], "summary": "Actualizar producto", "parameters": [{ "in": "path", "name": "id", "type": "string" }, { "in": "body", "name": "body", "schema": { "type": "object" } }] }
+    },
+    "/api/inventory/movements": {
+      "post": {
+        "tags": ["Inventory"],
+        "summary": "Registrar movimiento de inventario",
+        "parameters": [
+          { "in": "body", "name": "body", "required": true, "schema": {
+            "type": "object",
+            "properties": {
+              "product_id": { "type": "string" },
+              "warehouse_id": { "type": "string" },
+              "type": { "type": "string", "enum": ["IN", "OUT", "ADJUSTMENT", "TRANSFER"] },
+              "quantity": { "type": "number" },
+              "unit_cost": { "type": "number" }
+            }
+          } }
+        ],
+        "responses": { "201": { "description": "Movimiento registrado" }, "409": { "description": "Stock insuficiente" } }
+      }
+    },
+    "/api/customers": {
+      "get": { "tags": ["Customers"], "summary": "Listar clientes", "parameters": [{ "in": "query", "name": "limit", "type": "integer" }, { "in": "query", "name": "offset", "type": "integer" }] },
+      "post": { "tags": ["Customers"], "summary": "Crear cliente", "parameters": [{ "in": "body", "name": "body", "schema": { "type": "object", "properties": { "name": {}, "tax_id": {}, "email": {}, "phone": {} } } }], "responses": { "201": { "description": "Creado" } } }
+    },
+    "/api/invoices": {
+      "post": {
+        "tags": ["Invoices"],
+        "summary": "Crear factura (descuenta inventario)",
+        "parameters": [
+          { "in": "body", "name": "body", "required": true, "schema": {
+            "type": "object",
+            "properties": {
+              "customer_id": { "type": "string" },
+              "warehouse_id": { "type": "string" },
+              "prefix": { "type": "string" },
+              "number": { "type": "string" },
+              "items": { "type": "array", "items": { "type": "object", "properties": { "product_id": {}, "quantity": {}, "unit_price": {} } } }
+            }
+          } }
+        ],
+        "responses": { "201": { "description": "Factura creada" }, "409": { "description": "Stock insuficiente" } }
+      }
+    },
+    "/api/invoices/{id}": {
+      "get": { "tags": ["Invoices"], "summary": "Obtener factura con detalle", "parameters": [{ "in": "path", "name": "id", "type": "string" }], "responses": { "200": { "description": "OK" }, "404": { "description": "No encontrada" } } }
+    }
+  }
+}
