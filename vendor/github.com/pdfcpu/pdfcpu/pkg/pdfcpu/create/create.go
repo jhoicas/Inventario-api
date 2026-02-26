@@ -54,7 +54,7 @@ func ensureFontIndRef(xRefTable *model.XRefTable, fontName string, frPage model.
 
 	} else {
 
-		ir, err := pdffont.EnsureFontDict(xRefTable, fontName, frPage.Lang, "", true, false, frPage.Res.IndRef)
+		ir, err := pdffont.EnsureFontDict(xRefTable, fontName, frPage.Lang, "", false, frPage.Res.IndRef)
 		if err != nil {
 			return nil, err
 		}
@@ -332,7 +332,7 @@ func CreatePage(
 	}
 
 	for _, la := range p.LinkAnnots {
-		d, err := la.RenderDict(xRefTable, *pageDictIndRef)
+		d, err := la.RenderDict(xRefTable, pageDictIndRef)
 		if err != nil {
 			return nil, nil, &json.UnsupportedTypeError{}
 		}
@@ -382,7 +382,7 @@ func UpdatePage(xRefTable *model.XRefTable, dIndRef types.IndirectRef, d, res ty
 	}
 
 	for _, la := range p.LinkAnnots {
-		d, err := la.RenderDict(xRefTable, dIndRef)
+		d, err := la.RenderDict(xRefTable, &dIndRef)
 		if err != nil {
 			return err
 		}
@@ -510,6 +510,10 @@ func appendPage(
 		return err
 	}
 
+	if err := ctx.SetValid(*ir); err != nil {
+		return err
+	}
+
 	if err := model.AppendPageTree(ir, 1, pagesDict); err != nil {
 		return err
 	}
@@ -590,7 +594,7 @@ func prepareFormFontResDict(ctx *model.Context, pdf *primitives.PDF, fonts model
 				d.Insert(id, *frGlobal.Res.IndRef)
 				continue
 			}
-			ir, err := pdffont.EnsureFontDict(ctx.XRefTable, f.Name, "", "", false, false, nil)
+			ir, err := pdffont.EnsureFontDict(ctx.XRefTable, f.Name, "", "", true, nil)
 			if err != nil {
 				return nil, err
 			}
@@ -604,7 +608,7 @@ func prepareFormFontResDict(ctx *model.Context, pdf *primitives.PDF, fonts model
 			ir = frGlobal.Res.IndRef
 		}
 
-		ir, err := pdffont.EnsureFontDict(ctx.XRefTable, f.Name, f.Lang, f.Script, false, true, ir)
+		ir, err := pdffont.EnsureFontDict(ctx.XRefTable, f.Name, f.Lang, f.Script, true, ir)
 		if err != nil {
 			return nil, err
 		}
@@ -714,7 +718,7 @@ func handleForm(
 
 	for fName, frGlobal := range fonts {
 		if !strings.HasPrefix(fName, "cjk:") && font.IsUserFont(fName) {
-			_, err := pdffont.EnsureFontDict(ctx.XRefTable, fName, frGlobal.Lang, "", true, false, frGlobal.Res.IndRef)
+			_, err := pdffont.EnsureFontDict(ctx.XRefTable, fName, frGlobal.Lang, "", false, frGlobal.Res.IndRef)
 			if err != nil {
 				return err
 			}

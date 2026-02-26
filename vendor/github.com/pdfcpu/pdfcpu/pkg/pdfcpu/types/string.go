@@ -19,7 +19,6 @@ package types
 import (
 	"bytes"
 	"encoding/hex"
-	"fmt"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -27,6 +26,17 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/text/unicode/norm"
 )
+
+func RemoveControlChars(s string) string {
+	return strings.Map(func(r rune) rune {
+		switch r {
+		case '\n', '\r', '\t', '\b', '\f':
+			return -1
+		default:
+			return r
+		}
+	}, s)
+}
 
 // NewStringSet returns a new StringSet for slice.
 func NewStringSet(slice []string) StringSet {
@@ -107,10 +117,7 @@ func regularChar(c byte, esc bool) bool {
 }
 
 // Unescape resolves all escape sequences of s.
-func Unescape(s string, enc bool) ([]byte, error) {
-
-	// TODO remove "enc" parameter.
-
+func Unescape(s string) ([]byte, error) {
 	var esc bool
 	var longEol bool
 	var octalCode string
@@ -127,6 +134,21 @@ func Unescape(s string, enc bool) ([]byte, error) {
 			if c == 0x0A {
 				continue
 			}
+		}
+
+		if len(octalCode) > 0 {
+			if strings.ContainsRune("01234567", rune(c)) {
+				octalCode = octalCode + string(c)
+				if len(octalCode) == 3 {
+					b.WriteByte(ByteForOctalString(octalCode))
+					octalCode = ""
+					esc = false
+				}
+				continue
+			}
+			b.WriteByte(ByteForOctalString(octalCode))
+			octalCode = ""
+			esc = false
 		}
 
 		if regularChar(c, esc) {
@@ -148,19 +170,6 @@ func Unescape(s string, enc bool) ([]byte, error) {
 		}
 
 		// escaped = true && any other than \
-
-		if len(octalCode) > 0 {
-			if !strings.ContainsRune("01234567", rune(c)) {
-				return nil, errors.Errorf("Unescape: illegal octal sequence detected %X", octalCode)
-			}
-			octalCode = octalCode + string(c)
-			if len(octalCode) == 3 {
-				b.WriteByte(ByteForOctalString(octalCode))
-				octalCode = ""
-				esc = false
-			}
-			continue
-		}
 
 		// Ignore \eol line breaks.
 		if c == 0x0A {
@@ -189,10 +198,14 @@ func Unescape(s string, enc bool) ([]byte, error) {
 		esc = false
 	}
 
+	if len(octalCode) > 0 {
+		b.WriteByte(ByteForOctalString(octalCode))
+	}
+
 	return b.Bytes(), nil
 }
 
-// UTF8ToCP1252 converts UTF-8 to CP1252.
+// UTF8ToCP1252 converts UTF-8 to CP1252. Unused
 func UTF8ToCP1252(s string) string {
 	bb := []byte{}
 	for _, r := range s {
@@ -201,7 +214,7 @@ func UTF8ToCP1252(s string) string {
 	return string(bb)
 }
 
-// CP1252ToUTF8 converts CP1252 to UTF-8.
+// CP1252ToUTF8 converts CP1252 to UTF-8. Unused
 func CP1252ToUTF8(s string) string {
 	utf8Buf := make([]byte, utf8.UTFMax)
 	bb := []byte{}
@@ -223,33 +236,96 @@ func Reverse(s string) string {
 	return string(outRunes)
 }
 
+// needsHexSequence checks if a given character must be hex-encoded.
+// See "7.3.5 Name Objects" for details.
+func needsHexSequence(c byte) bool {
+	switch c {
+	case '(', ')', '<', '>', '[', ']', '{', '}', '/', '%', '#':
+		// Delimiter characters (see "7.2.2 Character Set")
+		return true
+	}
+	return c < '!' || c > '~'
+}
+
 // EncodeName applies name encoding according to PDF spec.
 func EncodeName(s string) string {
-	bb := []byte{}
+	replaced := false
+	var sb strings.Builder // will be used only if replacements are necessary
 	for i := 0; i < len(s); i++ {
-		bb = append(bb, []byte(fmt.Sprintf("#%x", s[i]))...)
+		ch := s[i]
+		// TODO: Handle invalid character 0x00, 2nd error return value
+		if needsHexSequence(ch) {
+			if !replaced {
+				sb.WriteString(s[:i])
+			}
+			sb.WriteByte('#')
+			sb.WriteString(hex.EncodeToString([]byte{ch}))
+			replaced = true
+		} else if replaced {
+			sb.WriteByte(ch)
+		}
 	}
-	return string(bb)
+	if !replaced {
+		return s
+	}
+	return sb.String()
 }
 
 // DecodeName applies name decoding according to PDF spec.
 func DecodeName(s string) (string, error) {
-	if len(s) == 0 || strings.IndexByte(s, '#') < 0 {
-		return s, nil
-	}
-	var bb []byte
-	for i := 0; i < len(s); {
-		if s[i] == '#' {
-			hb, err := hex.DecodeString(s[i+1 : i+3])
-			if err != nil {
-				return "", err
+	replaced := false
+	var sb strings.Builder // will be used only if replacements are necessary
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c == 0 {
+			return "", errors.New("a name may not contain a null byte")
+		} else if c != '#' {
+			if replaced {
+				sb.WriteByte(c)
 			}
-			bb = append(bb, hb...)
-			i += 3
 			continue
 		}
-		bb = append(bb, s[i])
-		i++
+
+		// # detected, next 2 chars have to exist.
+		if len(s) < i+3 {
+			return "", errors.New("not enough characters after #")
+		}
+
+		s1 := s[i+1 : i+3]
+
+		// And they have to be hex characters.
+		decoded, err := hex.DecodeString(s1)
+		if err != nil {
+			return "", err
+		}
+
+		if decoded[0] == 0 {
+			return "", errors.New("a name may not contain a null byte")
+		}
+
+		if !replaced {
+			sb.WriteString(s[:i])
+			replaced = true
+		}
+		sb.Write(decoded)
+		i += 2
 	}
-	return string(bb), nil
+	if !replaced {
+		return s, nil
+	}
+	return sb.String(), nil
+}
+
+func TrimLeadingComment(s string) string {
+	for i := 0; i < len(s); i++ {
+		switch s[i] {
+		case ' ', '\t', '\r', '\n', '\f':
+			continue
+		case '%':
+			return ""
+		default:
+			return s
+		}
+	}
+	return ""
 }

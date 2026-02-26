@@ -33,14 +33,11 @@ const eodASCII85 = "~>"
 // Encode implements encoding for an ASCII85Decode filter.
 func (f ascii85Decode) Encode(r io.Reader) (io.Reader, error) {
 
-	var b1 bytes.Buffer
-	if _, err := io.Copy(&b1, r); err != nil {
-		return nil, err
-	}
-
 	b2 := &bytes.Buffer{}
 	encoder := ascii85.NewEncoder(b2)
-	encoder.Write(b1.Bytes())
+	if _, err := io.Copy(encoder, r); err != nil {
+		return nil, err
+	}
 	encoder.Close()
 
 	// Add eod sequence
@@ -51,20 +48,21 @@ func (f ascii85Decode) Encode(r io.Reader) (io.Reader, error) {
 
 // Decode implements decoding for an ASCII85Decode filter.
 func (f ascii85Decode) Decode(r io.Reader) (io.Reader, error) {
+	return f.DecodeLength(r, -1)
+}
 
-	var b1 bytes.Buffer
-	if _, err := io.Copy(&b1, r); err != nil {
+func (f ascii85Decode) DecodeLength(r io.Reader, maxLen int64) (io.Reader, error) {
+
+	bb, err := getReaderBytes(r)
+	if err != nil {
 		return nil, err
 	}
 
-	bb := b1.Bytes()
-
 	// fmt.Printf("dump:\n%s", hex.Dump(bb))
 
-	l := len(bb)
-	if bb[l-1] == 0x0A || bb[l-1] == 0x0D {
-		bb = bb[:l-1]
-	}
+	// Strip trailing whitespace (CR, LF, CRLF, etc.)
+	// Per PDF spec, whitespace should be ignored in ASCII85 encoding
+	bb = bytes.TrimRight(bb, "\r\n")
 
 	if !bytes.HasSuffix(bb, []byte(eodASCII85)) {
 		return nil, errors.New("pdfcpu: Decode: missing eod marker")
@@ -76,14 +74,15 @@ func (f ascii85Decode) Decode(r io.Reader) (io.Reader, error) {
 	decoder := ascii85.NewDecoder(bytes.NewReader(bb))
 
 	var b2 bytes.Buffer
-	if _, err := io.Copy(&b2, decoder); err != nil {
-		return nil, err
+	if maxLen < 0 {
+		if _, err := io.Copy(&b2, decoder); err != nil {
+			return nil, err
+		}
+	} else {
+		if _, err := io.CopyN(&b2, decoder, maxLen); err != nil {
+			return nil, err
+		}
 	}
-
-	// buf, err := io.ReadAll(decoder)
-	// if err != nil {
-	// 	return nil, err
-	// }
 
 	return &b2, nil
 }

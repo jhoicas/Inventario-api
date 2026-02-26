@@ -234,7 +234,7 @@ func (cb *CheckBox) ensureZapfDingbats(fonts model.FontMap) (*types.IndirectRef,
 		if font.Res.IndRef != nil {
 			return font.Res.IndRef, nil
 		}
-		ir, err := pdffont.EnsureFontDict(pdf.XRefTable, fontName, "", "", false, false, nil)
+		ir, err := pdffont.EnsureFontDict(pdf.XRefTable, fontName, "", "", false, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -261,9 +261,7 @@ func (cb *CheckBox) ensureZapfDingbats(fonts model.FontMap) (*types.IndirectRef,
 
 		if indRef == nil {
 			for objNr, fo := range pdf.Optimize.FontObjects {
-				//fmt.Printf("searching for %s - obj:%d fontName:%s prefix:%s\n", fontName, objNr, fo.FontName, fo.Prefix)
 				if fontName == fo.FontName {
-					//fmt.Println("Match!")
 					indRef = types.NewIndirectRef(objNr, 0)
 					break
 				}
@@ -272,7 +270,7 @@ func (cb *CheckBox) ensureZapfDingbats(fonts model.FontMap) (*types.IndirectRef,
 	}
 
 	if indRef == nil {
-		indRef, err = pdffont.EnsureFontDict(pdf.XRefTable, fontName, "", "", false, false, nil)
+		indRef, err = pdffont.EnsureFontDict(pdf.XRefTable, fontName, "", "", false, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -535,7 +533,7 @@ func (cb *CheckBox) appearanceIndRefs(fonts model.FontMap, bgCol *color.SimpleCo
 
 func (cb *CheckBox) prepareDict(fonts model.FontMap) (types.Dict, error) {
 
-	id, err := types.EscapeUTF16String(cb.ID)
+	id, err := types.EscapedUTF16String(cb.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -597,7 +595,7 @@ func (cb *CheckBox) prepareDict(fonts model.FontMap) (types.Dict, error) {
 	)
 
 	if cb.Tip != "" {
-		tu, err := types.EscapeUTF16String(cb.Tip)
+		tu, err := types.EscapedUTF16String(cb.Tip)
 		if err != nil {
 			return nil, err
 		}
@@ -675,6 +673,7 @@ func (cb *CheckBox) prepLabel(p *model.Page, pageNr int, fonts model.FontMap) er
 	td := model.TextDescriptor{
 		Text:     v,
 		FontName: fontName,
+		Embed:    true,
 		FontKey:  id,
 		FontSize: f.Size,
 		Scale:    1.,
@@ -762,17 +761,31 @@ func (cb *CheckBox) render(p *model.Page, pageNr int, fonts model.FontMap) error
 	return cb.doRender(p, fonts)
 }
 
-func CalcCheckBoxASNames(d types.Dict) (types.Name, types.Name) {
-	apDict := d.DictEntry("AP")
-	d1 := apDict.DictEntry("D")
-	if d1 == nil {
-		d1 = apDict.DictEntry("N")
+func CalcCheckBoxASNames(ctx *model.Context, d types.Dict) (types.Name, types.Name, error) {
+	obj, found := d.Find("AP")
+	if !found {
+		return "", "", errors.New("pdfcpu: corrupt form field: missing entry \"AP\"")
+	}
+	d, err := ctx.DereferenceDict(obj)
+	if err != nil {
+		return "", "", err
+	}
+	obj, found = d.Find("D")
+	if !found {
+		obj, found = d.Find("N")
+	}
+	if !found {
+		return "", "", errors.New("pdfcpu: corrupt form field: missing entries \"N\" and \"N\"")
+	}
+	d, err = ctx.DereferenceDict(obj)
+	if err != nil {
+		return "", "", err
 	}
 	offName, yesName := "Off", "Yes"
-	for k := range d1 {
+	for k := range d {
 		if k != "Off" {
 			yesName = k
 		}
 	}
-	return types.Name(offName), types.Name(yesName)
+	return types.Name(offName), types.Name(yesName), nil
 }

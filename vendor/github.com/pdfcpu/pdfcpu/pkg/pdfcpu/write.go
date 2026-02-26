@@ -60,8 +60,8 @@ func writeObjects(ctx *model.Context) error {
 	return writeEncryptDict(ctx)
 }
 
-// Write generates a PDF file for the cross reference table contained in Context.
-func Write(ctx *model.Context) (err error) {
+// WriteContext generates a PDF file for the cross reference table contained in Context.
+func WriteContext(ctx *model.Context) (err error) {
 	// Create a writer for dirname and filename if not already supplied.
 	if ctx.Write.Writer == nil {
 
@@ -98,9 +98,18 @@ func Write(ctx *model.Context) (err error) {
 		return err
 	}
 
-	// Since we support PDF Collections (since V1.7) for file attachments
-	// we need to generate V1.7 PDF files.
-	if err = writeHeader(ctx.Write, model.V17); err != nil {
+	// if exists metadata, update from info dict
+	// else if v2 create from scratch
+	// else nothing just write info dict
+
+	// We support PDF Collections (since V1.7) for file attachments
+	v := model.V17
+
+	if ctx.XRefTable.Version() == model.V20 {
+		v = model.V20
+	}
+
+	if err = writeHeader(ctx.Write, v); err != nil {
 		return err
 	}
 
@@ -203,8 +212,10 @@ func ensureFileID(ctx *model.Context) error {
 }
 
 func ensureInfoDictAndFileID(ctx *model.Context) error {
-	if err := ensureInfoDict(ctx); err != nil {
-		return err
+	if ctx.XRefTable.Version() < model.V20 {
+		if err := ensureInfoDict(ctx); err != nil {
+			return err
+		}
 	}
 
 	return ensureFileID(ctx)
@@ -256,6 +267,11 @@ func writePages(ctx *model.Context, rootDict types.Dict) error {
 }
 
 func writeRootAttrsBatch1(ctx *model.Context, d types.Dict, dictName string) error {
+
+	if err := writeAcroFormRootEntry(ctx, d, dictName); err != nil {
+		return err
+	}
+
 	for _, e := range []struct {
 		entryName string
 		statsAttr int
@@ -272,7 +288,7 @@ func writeRootAttrsBatch1(ctx *model.Context, d types.Dict, dictName string) err
 		{"OpenAction", model.RootOpenAction},
 		{"AA", model.RootAA},
 		{"URI", model.RootURI},
-		{"AcroForm", model.RootAcroForm},
+		//{"AcroForm", model.RootAcroForm},
 		{"Metadata", model.RootMetadata},
 	} {
 		if err := writeRootEntry(ctx, d, dictName, e.entryName, e.statsAttr); err != nil {
@@ -344,7 +360,6 @@ func writeRootObject(ctx *model.Context) error {
 		d.Delete("Dests")
 		d.Delete("Outlines")
 		d.Delete("OpenAction")
-		//d.Delete("AcroForm")
 		d.Delete("StructTreeRoot")
 		d.Delete("OCProperties")
 	}
@@ -488,7 +503,7 @@ func deleteRedundantObject(ctx *model.Context, objNr int) {
 	}
 
 	if ctx.IsLinearizationObject(objNr) || ctx.Optimize.IsDuplicateInfoObject(objNr) ||
-		ctx.Read.IsObjectStreamObject(objNr) || ctx.Read.IsXRefStreamObject(objNr) {
+		ctx.Read.IsObjectStreamObject(objNr) {
 		ctx.FreeObject(objNr)
 	}
 
@@ -500,7 +515,7 @@ func detectLinearizationObjs(xRefTable *model.XRefTable, entry *model.XRefTableE
 		if *entry.Offset == *xRefTable.OffsetPrimaryHintTable {
 			xRefTable.LinearizationObjs[i] = true
 			if log.WriteEnabled() {
-				log.Write.Printf("deleteRedundantObjects: primaryHintTable at obj #%d\n", i)
+				log.Write.Printf("detectLinearizationObjs: primaryHintTable at obj #%d\n", i)
 			}
 		}
 
@@ -508,7 +523,7 @@ func detectLinearizationObjs(xRefTable *model.XRefTable, entry *model.XRefTableE
 			*entry.Offset == *xRefTable.OffsetOverflowHintTable {
 			xRefTable.LinearizationObjs[i] = true
 			if log.WriteEnabled() {
-				log.Write.Printf("deleteRedundantObjects: overflowHintTable at obj #%d\n", i)
+				log.Write.Printf("detectLinearizationObjs: overflowHintTable at obj #%d\n", i)
 			}
 		}
 
@@ -902,10 +917,11 @@ func setupEncryption(ctx *model.Context) error {
 	var err error
 
 	if ok := validateAlgorithm(ctx); !ok {
-		return errors.New("pdfcpu: unsupported encryption algorithm")
+		return errors.New("pdfcpu: unsupported encryption algorithm (PDF 2.0 assumes AES/256)")
 	}
 
 	d := newEncryptDict(
+		ctx.XRefTable.Version(),
 		ctx.EncryptUsingAES,
 		ctx.EncryptKeyLength,
 		int16(ctx.Permissions),
@@ -973,12 +989,13 @@ func updateEncryption(ctx *model.Context) error {
 		ctx.OwnerPW = *ctx.OwnerPWNew
 	}
 
-	if ctx.E.R == 5 {
+	if ctx.E.R == 5 || ctx.E.R == 6 {
 
 		if err = calcOAndU(ctx, d); err != nil {
 			return err
 		}
 
+		// Calc Perms for rev 5, 6.
 		return writePermissions(ctx, d)
 	}
 
@@ -1001,6 +1018,7 @@ func updateEncryption(ctx *model.Context) error {
 }
 
 func handleEncryption(ctx *model.Context) error {
+
 	if ctx.Cmd == model.ENCRYPT || ctx.Cmd == model.DECRYPT {
 
 		if ctx.Cmd == model.DECRYPT {

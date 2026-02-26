@@ -121,13 +121,13 @@ func EncodeUTF16String(s string) string {
 	return string(bb)
 }
 
-func EscapeUTF16String(s string) (*string, error) {
+func EscapedUTF16String(s string) (*string, error) {
 	return Escape(EncodeUTF16String(s))
 }
 
 // StringLiteralToString returns the best possible string rep for a string literal.
 func StringLiteralToString(sl StringLiteral) (string, error) {
-	bb, err := Unescape(sl.Value(), false)
+	bb, err := Unescape(sl.Value())
 	if err != nil {
 		return "", err
 	}
@@ -152,6 +152,14 @@ func HexLiteralToString(hl HexLiteral) (string, error) {
 	if IsUTF16BE(bb) {
 		return decodeUTF16String(bb)
 	}
+
+	bb, err = Unescape(string(bb))
+	if err != nil {
+		return "", err
+	}
+
+	bb = bytes.TrimPrefix(bb, []byte{239, 187, 191})
+
 	return string(bb), nil
 }
 

@@ -67,10 +67,11 @@ type Watermark struct {
 	InpUnit                   types.DisplayUnit   // input display unit.
 	Pos                       types.Anchor        // position anchor, one of tl,tc,tr,l,c,r,bl,bc,br.
 	Dx, Dy                    float64             // anchor offset.
-	HAlign                    *types.HAlignment   // horizonal alignment for text watermarks.
+	HAlign                    *types.HAlignment   // horizontal alignment for text watermarks.
 	FontName                  string              // supported are Adobe base fonts only. (as of now: Helvetica, Times-Roman, Courier)
 	FontSize                  int                 // font scaling factor.
 	ScaledFontSize            int                 // font scaling factor for a specific page
+	ScriptName                string              // ISO 15924: Hans, Hant, Hira, Kana, Jpan, Hang, Kore: if set, font will not be embedded.
 	RTL                       bool                // if true, render text from right to left
 	Color                     color.SimpleColor   // text fill color(=non stroking color) for backwards compatibility.
 	FillColor                 color.SimpleColor   // text fill color(=non stroking color).

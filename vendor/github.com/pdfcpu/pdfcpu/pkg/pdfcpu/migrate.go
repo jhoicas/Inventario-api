@@ -89,25 +89,26 @@ func migrateObject(o types.Object, ctxSource, ctxDest *model.Context, migrated m
 }
 
 func migrateAnnots(o types.Object, pageIndRef types.IndirectRef, ctxSrc, ctxDest *model.Context, migrated map[int]int) (types.Object, error) {
-	arr, err := ctxSrc.DereferenceArray(o)
-	if err != nil {
-		return nil, err
-	}
-
-	for i, v := range arr {
-		o := v.(types.IndirectRef)
-		objNr := o.ObjectNumber.Value()
-		if migrated[objNr] > 0 {
-			o.ObjectNumber = types.Integer(migrated[objNr])
+	arr := o.(types.Array)
+	for i, v := range o.(types.Array) {
+		var d types.Dict
+		o, ok := v.(types.IndirectRef)
+		if ok {
+			objNr := o.ObjectNumber.Value()
+			if migrated[objNr] > 0 {
+				o.ObjectNumber = types.Integer(migrated[objNr])
+				arr[i] = o
+				continue
+			}
+			o1, err := migrateIndRef(&o, ctxSrc, ctxDest, migrated)
+			if err != nil {
+				return nil, err
+			}
 			arr[i] = o
-			continue
+			d = o1.(types.Dict)
+		} else {
+			d = v.(types.Dict)
 		}
-		o1, err := migrateIndRef(&o, ctxSrc, ctxDest, migrated)
-		if err != nil {
-			return nil, err
-		}
-		arr[i] = o
-		d := o1.(types.Dict)
 		for k, v := range d {
 			if k == "P" {
 				d["P"] = pageIndRef
@@ -125,9 +126,11 @@ func migrateAnnots(o types.Object, pageIndRef types.IndirectRef, ctxSrc, ctxDest
 				}
 				pDict.Delete("Parent")
 			}
-			if d[k], err = migrateObject(v, ctxSrc, ctxDest, migrated); err != nil {
+			o1, err := migrateObject(v, ctxSrc, ctxDest, migrated)
+			if err != nil {
 				return nil, err
 			}
+			d[k] = o1
 		}
 	}
 
@@ -141,6 +144,24 @@ func migratePageDict(d types.Dict, pageIndRef types.IndirectRef, ctxSrc, ctxDest
 			continue
 		}
 		if k == "Annots" {
+			o, ok := d[k].(types.IndirectRef)
+			if ok {
+				objNr := o.ObjectNumber.Value()
+				if migrated[objNr] > 0 {
+					o.ObjectNumber = types.Integer(migrated[objNr])
+					d[k] = o
+					continue
+				}
+				v, err = migrateIndRef(&o, ctxSrc, ctxDest, migrated)
+				if err != nil {
+					return err
+				}
+				d[k] = o
+				if _, err = migrateAnnots(v, pageIndRef, ctxSrc, ctxDest, migrated); err != nil {
+					return err
+				}
+				continue
+			}
 			if d[k], err = migrateAnnots(v, pageIndRef, ctxSrc, ctxDest, migrated); err != nil {
 				return err
 			}
@@ -153,6 +174,40 @@ func migratePageDict(d types.Dict, pageIndRef types.IndirectRef, ctxSrc, ctxDest
 	return nil
 }
 
+func migrateAnnot(indRef *types.IndirectRef, fieldsSrc, fieldsDest *types.Array, ctxSrc *model.Context, migrated map[int]int) error {
+	for _, v := range *fieldsSrc {
+		ir, ok := v.(types.IndirectRef)
+		if !ok {
+			continue
+		}
+		objNr := ir.ObjectNumber.Value()
+		if migrated[objNr] == indRef.ObjectNumber.Value() {
+			*fieldsDest = append(*fieldsDest, *indRef)
+			break
+		}
+		d, err := ctxSrc.DereferenceDict(ir)
+		if err != nil {
+			return err
+		}
+		o, ok := d.Find("Kids")
+		if !ok {
+			continue
+		}
+		kids, err := ctxSrc.DereferenceArray(o)
+		if err != nil {
+			return err
+		}
+		if ok, err = detectMigratedAnnot(ctxSrc, indRef, kids, migrated); err != nil {
+			return err
+		}
+		if ok {
+			*fieldsDest = append(*fieldsDest, *indRef)
+		}
+	}
+
+	return nil
+}
+
 func migrateFields(d types.Dict, fieldsSrc, fieldsDest *types.Array, ctxSrc, ctxDest *model.Context, migrated map[int]int) error {
 	o, _ := d.Find("Annots")
 	annots, err := ctxDest.DereferenceArray(o)
@@ -160,7 +215,10 @@ func migrateFields(d types.Dict, fieldsSrc, fieldsDest *types.Array, ctxSrc, ctx
 		return err
 	}
 	for _, v := range annots {
-		indRef := v.(types.IndirectRef)
+		indRef, ok := v.(types.IndirectRef)
+		if !ok {
+			continue
+		}
 		d, err := ctxDest.DereferenceDict(indRef)
 		if err != nil {
 			return err
@@ -178,33 +236,11 @@ func migrateFields(d types.Dict, fieldsSrc, fieldsDest *types.Array, ctxSrc, ctx
 		if found {
 			continue
 		}
-		for _, v := range *fieldsSrc {
-			ir := v.(types.IndirectRef)
-			objNr := ir.ObjectNumber.Value()
-			if migrated[objNr] == indRef.ObjectNumber.Value() {
-				*fieldsDest = append(*fieldsDest, indRef)
-				break
-			}
-			d, err := ctxSrc.DereferenceDict(ir)
-			if err != nil {
-				return err
-			}
-			o, ok := d.Find("Kids")
-			if !ok {
-				continue
-			}
-			kids, err := ctxSrc.DereferenceArray(o)
-			if err != nil {
-				return err
-			}
-			if ok, err = detectMigratedAnnot(ctxSrc, &indRef, kids, migrated); err != nil {
-				return err
-			}
-			if ok {
-				*fieldsDest = append(*fieldsDest, indRef)
-			}
+		if err := migrateAnnot(&indRef, fieldsSrc, fieldsDest, ctxSrc, migrated); err != nil {
+			return err
 		}
 	}
+
 	return nil
 }
 
@@ -224,7 +260,10 @@ func migrateFormDict(d types.Dict, fields types.Array, ctxSrc, ctxDest *model.Co
 
 func detectMigratedAnnot(ctxSrc *model.Context, indRef *types.IndirectRef, kids types.Array, migrated map[int]int) (bool, error) {
 	for _, v := range kids {
-		ir := v.(types.IndirectRef)
+		ir, ok := v.(types.IndirectRef)
+		if !ok {
+			continue
+		}
 		objNr := ir.ObjectNumber.Value()
 		if migrated[objNr] == indRef.ObjectNumber.Value() {
 			return true, nil

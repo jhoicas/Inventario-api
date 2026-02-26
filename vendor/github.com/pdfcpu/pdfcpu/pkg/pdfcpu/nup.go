@@ -35,13 +35,12 @@ import (
 )
 
 var (
-	errInvalidNUpVal    = errors.New("pdfcpu nup: n must be one of 2, 3, 4, 6, 8, 9, 12, 16")
 	errInvalidGridDims  = errors.New("pdfcpu grid: dimensions must be: m > 0, n > 0")
 	errInvalidNUpConfig = errors.New("pdfcpu: invalid configuration string")
 )
 
 var (
-	nUpValues = []int{2, 3, 4, 6, 8, 9, 12, 16}
+	NUpValues = []int{2, 3, 4, 6, 8, 9, 12, 16}
 	nUpDims   = map[int]types.Dim{
 		2:  {Width: 2, Height: 1},
 		3:  {Width: 3, Height: 1},
@@ -62,12 +61,16 @@ var nupParamMap = nUpParamMap{
 	"papersize":       parsePageFormatNUp,
 	"orientation":     parseOrientation,
 	"border":          parseElementBorder,
+	"cropboxborder":   parseElementBorderOnCropbox,
 	"margin":          parseElementMargin,
 	"backgroundcolor": parseSheetBackgroundColor,
 	"bgcolor":         parseSheetBackgroundColor,
 	"guides":          parseBookletGuides,
 	"multifolio":      parseBookletMultifolio,
 	"foliosize":       parseBookletFolioSize,
+	"btype":           parseBookletType,
+	"binding":         parseBookletBinding,
+	"enforce":         parseEnforce,
 }
 
 // Handle applies parameter completion and if successful
@@ -106,7 +109,7 @@ func parseDimensionsNUp(s string, nup *model.NUp) (err error) {
 	if nup.UserDim {
 		return errors.New("pdfcpu: only one of formsize(papersize) or dimensions allowed")
 	}
-	nup.PageDim, nup.PageSize, err = parsePageDim(s, nup.InpUnit)
+	nup.PageDim, nup.PageSize, err = ParsePageDim(s, nup.InpUnit)
 	nup.UserDim = true
 
 	return err
@@ -129,6 +132,19 @@ func parseOrientation(s string, nup *model.NUp) error {
 	return nil
 }
 
+func parseEnforce(s string, nup *model.NUp) error {
+	switch strings.ToLower(s) {
+	case "on", "true", "t":
+		nup.Enforce = true
+	case "off", "false", "f":
+		nup.Enforce = false
+	default:
+		return errors.New("pdfcpu: enforce best-fit orientation of content, please provide one of: on/off true/false")
+	}
+
+	return nil
+}
+
 func parseElementBorder(s string, nup *model.NUp) error {
 	switch strings.ToLower(s) {
 	case "on", "true", "t":
@@ -140,6 +156,58 @@ func parseElementBorder(s string, nup *model.NUp) error {
 	}
 
 	return nil
+}
+
+func parseElementBorderOnCropbox(s string, nup *model.NUp) error {
+	// w
+	// w r g b
+	// w #c
+	// w round
+	// w round r g b
+	// w round #c
+
+	var err error
+
+	b := strings.Split(s, " ")
+	if len(b) == 0 || len(b) > 5 {
+		return errors.Errorf("pdfcpu: borders: need 1,2,3,4 or 5 int values, %s\n", s)
+	}
+
+	switch b[0] {
+	case "off", "false", "f":
+		return nil
+	case "on", "true", "t":
+		nup.BorderOnCropbox = &model.BorderStyling{Width: 1}
+		return nil
+	}
+
+	nup.BorderOnCropbox = &model.BorderStyling{}
+	width, err := strconv.ParseFloat(b[0], 64)
+	if err != nil {
+		return err
+	}
+	if width == 0 {
+		return errors.New("pdfcpu: borders: need width > 0")
+	}
+	nup.BorderOnCropbox.Width = width
+
+	if len(b) == 1 {
+		return nil
+	}
+	if strings.HasPrefix("round", b[1]) {
+		style := types.LJRound
+		nup.BorderOnCropbox.LineStyle = &style
+		if len(b) == 2 {
+			return nil
+		}
+		c, err := color.ParseColor(strings.Join(b[2:], " "))
+		nup.BorderOnCropbox.Color = &c
+		return err
+	}
+
+	c, err := color.ParseColor(strings.Join(b[1:], " "))
+	nup.BorderOnCropbox.Color = &c
+	return err
 }
 
 func parseBookletGuides(s string, nup *model.NUp) error {
@@ -175,6 +243,32 @@ func parseBookletFolioSize(s string, nup *model.NUp) error {
 	}
 
 	nup.FolioSize = i
+	return nil
+}
+
+func parseBookletType(s string, nup *model.NUp) error {
+	switch strings.ToLower(s) {
+	case "booklet":
+		nup.BookletType = model.Booklet
+	case "bookletadvanced":
+		nup.BookletType = model.BookletAdvanced
+	case "perfectbound":
+		nup.BookletType = model.BookletPerfectBound
+	default:
+		return errors.New("pdfcpu: booklet type, please provide one of: booklet perfectbound")
+	}
+	return nil
+}
+
+func parseBookletBinding(s string, nup *model.NUp) error {
+	switch strings.ToLower(s) {
+	case "short":
+		nup.BookletBinding = model.ShortEdge
+	case "long":
+		nup.BookletBinding = model.LongEdge
+	default:
+		return errors.New("pdfcpu: booklet binding, please provide one of: short long")
+	}
 	return nil
 }
 
@@ -240,6 +334,13 @@ func PDFNUpConfig(val int, desc string, conf *model.Configuration) (*model.NUp, 
 			return nil, err
 		}
 	}
+	if !types.IntMemberOf(val, NUpValues) {
+		ss := make([]string, len(NUpValues))
+		for i, v := range NUpValues {
+			ss[i] = strconv.Itoa(v)
+		}
+		return nil, errors.Errorf("pdfcpu: n must be one of %s", strings.Join(ss, ", "))
+	}
 	return nup, ParseNUpValue(val, nup)
 }
 
@@ -281,10 +382,6 @@ func ImageGridConfig(rows, cols int, desc string, conf *model.Configuration) (*m
 
 // ParseNUpValue parses the NUp value into an internal structure.
 func ParseNUpValue(n int, nUp *model.NUp) error {
-	if !types.IntMemberOf(n, nUpValues) {
-		return errInvalidNUpVal
-	}
-
 	// The n-Up layout depends on the orientation of the chosen output paper size.
 	// This optional paper size may also be specified by dimensions in user unit.
 	// The default paper size is A4 or A4P (A4 in portrait mode) respectively.
@@ -325,7 +422,7 @@ func ParseNUpGridDefinition(rows, cols int, nUp *model.NUp) error {
 func nUpImagePDFBytes(w io.Writer, imgWidth, imgHeight int, nup *model.NUp, formResID string) {
 	for _, r := range nup.RectsForGrid() {
 		// Append to content stream.
-		model.NUpTilePDFBytes(w, types.RectForDim(float64(imgWidth), float64(imgHeight)), r, formResID, nup, false, true)
+		model.NUpTilePDFBytes(w, types.RectForDim(float64(imgWidth), float64(imgHeight)), r, formResID, nup, false)
 	}
 }
 
@@ -380,7 +477,7 @@ func NewNUpPageForImage(xRefTable *model.XRefTable, fileName string, parentIndRe
 	defer f.Close()
 
 	// create image dict.
-	imgIndRef, w, h, err := model.CreateImageResource(xRefTable, f, false, false)
+	imgIndRef, w, h, err := model.CreateImageResource(xRefTable, f)
 	if err != nil {
 		return nil, err
 	}
@@ -437,6 +534,10 @@ func NewNUpPageForImage(xRefTable *model.XRefTable, fileName string, parentIndRe
 func NUpFromOneImage(ctx *model.Context, fileName string, nup *model.NUp, pagesDict types.Dict, pagesIndRef *types.IndirectRef) error {
 	indRef, err := NewNUpPageForImage(ctx.XRefTable, fileName, pagesIndRef, nup)
 	if err != nil {
+		return err
+	}
+
+	if err := ctx.SetValid(*indRef); err != nil {
 		return err
 	}
 
@@ -503,6 +604,10 @@ func wrapUpPage(ctx *model.Context, nup *model.NUp, d types.Dict, buf bytes.Buff
 
 	indRef, err := xRefTable.IndRefForNewObject(pageDict)
 	if err != nil {
+		return err
+	}
+
+	if err := ctx.SetValid(*indRef); err != nil {
 		return err
 	}
 
@@ -634,7 +739,7 @@ func NUpFromMultipleImages(ctx *model.Context, fileNames []string, nup *model.NU
 			return err
 		}
 
-		imgIndRef, w, h, err := model.CreateImageResource(xRefTable, f, false, false)
+		imgIndRef, w, h, err := model.CreateImageResource(xRefTable, f)
 		if err != nil {
 			return err
 		}
@@ -652,7 +757,7 @@ func NUpFromMultipleImages(ctx *model.Context, fileNames []string, nup *model.NU
 		formsResDict.Insert(formResID, *formIndRef)
 
 		// Append to content stream of page i.
-		model.NUpTilePDFBytes(&buf, types.RectForDim(float64(w), float64(h)), rr[i%len(rr)], formResID, nup, false, true)
+		model.NUpTilePDFBytes(&buf, types.RectForDim(float64(w), float64(h)), rr[i%len(rr)], formResID, nup, false)
 	}
 
 	// Wrap incomplete nUp page.

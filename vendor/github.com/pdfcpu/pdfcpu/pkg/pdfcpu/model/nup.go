@@ -61,22 +61,32 @@ const (
 	DownLeft
 )
 
+type BorderStyling struct {
+	Color     *color.SimpleColor
+	LineStyle *types.LineJoinStyle
+	Width     float64
+}
+
 // NUp represents the command details for the command "NUp".
 type NUp struct {
-	PageDim       *types.Dim         // Page dimensions in display unit.
-	PageSize      string             // Paper size eg. A4L, A4P, A4(=default=A4P), see paperSize.go
-	UserDim       bool               // true if one of dimensions or paperSize provided overriding the default.
-	Orient        orientation        // One of rd(=default),dr,ld,dl
-	Grid          *types.Dim         // Intra page grid dimensions eg (2,2)
-	PageGrid      bool               // Create a m x n grid of pages for PDF inputfiles only (think "extra page n-Up").
-	ImgInputFile  bool               // Process image or PDF input files.
-	Margin        float64            // Cropbox for n-Up content.
-	Border        bool               // Draw bounding box.
-	BookletGuides bool               // Draw folding and cutting lines.
-	MultiFolio    bool               // Render booklet as sequence of folios.
-	FolioSize     int                // Booklet multifolio folio size: default: 8
-	InpUnit       types.DisplayUnit  // input display unit.
-	BgColor       *color.SimpleColor // background color
+	PageDim         *types.Dim         // Page dimensions in display unit.
+	PageSize        string             // Paper size eg. A4L, A4P, A4(=default=A4P), see paperSize.go
+	UserDim         bool               // true if one of dimensions or paperSize provided overriding the default.
+	Orient          orientation        // One of rd(=default),dr,ld,dl - grid orientation
+	Enforce         bool               // enforce best-fit orientation of individual content on grid.
+	Grid            *types.Dim         // Intra page grid dimensions eg (2,2)
+	PageGrid        bool               // Create a m x n grid of pages for PDF inputfiles only (think "extra page n-Up").
+	ImgInputFile    bool               // Process image or PDF input files.
+	Margin          float64            // Cropbox for n-Up content.
+	Border          bool               // Draw bounding box.
+	BorderOnCropbox *BorderStyling     // Draw bounding box around crop box.
+	BookletGuides   bool               // Draw folding and cutting lines.
+	MultiFolio      bool               // Render booklet as sequence of folios.
+	FolioSize       int                // Booklet multifolio folio size: default: 8
+	BookletType     BookletType        // Is this a booklet or booklet cover layout
+	BookletBinding  BookletBinding     // Does the booklet have short or long-edge binding
+	InpUnit         types.DisplayUnit  // input display unit.
+	BgColor         *color.SimpleColor // background color
 }
 
 // DefaultNUpConfig returns the default NUp configuration.
@@ -86,6 +96,7 @@ func DefaultNUpConfig() *NUp {
 		Orient:   RightDown,
 		Margin:   3,
 		Border:   true,
+		Enforce:  true,
 	}
 }
 
@@ -97,6 +108,14 @@ func (nup NUp) String() string {
 // N returns the nUp value.
 func (nup NUp) N() int {
 	return int(nup.Grid.Height * nup.Grid.Width)
+}
+
+func (nup NUp) IsTopFoldBinding() bool {
+	return (nup.PageDim.Portrait() && nup.BookletBinding == ShortEdge) || (nup.PageDim.Landscape() && nup.BookletBinding == LongEdge)
+}
+
+func (nup NUp) IsBooklet() bool {
+	return nup.BookletType == Booklet || nup.BookletType == BookletAdvanced
 }
 
 // RectsForGrid calculates dest rectangles for given grid.
@@ -180,7 +199,7 @@ func createNUpFormForPDF(xRefTable *XRefTable, resDict *types.IndirectRef, conte
 }
 
 // NUpTilePDFBytesForPDF applies nup tiles to content bytes.
-func NUpTilePDFBytes(wr io.Writer, rSrc, rDest *types.Rectangle, formResID string, nup *NUp, rotate, enforceOrient bool) {
+func NUpTilePDFBytes(wr io.Writer, rSrc, rDest *types.Rectangle, formResID string, nup *NUp, rotate bool) {
 
 	// rScr is a rectangular region represented by form formResID in form space.
 
@@ -210,7 +229,7 @@ func NUpTilePDFBytes(wr io.Writer, rSrc, rDest *types.Rectangle, formResID strin
 	// Best fit translation of a source rectangle into a destination rectangle.
 	// For nup we enforce the dest orientation,
 	// whereas in cases where the original orientation needs to be preserved eg. for booklets, we don't.
-	w, h, dx, dy, r := types.BestFitRectIntoRect(rSrc, rDestCr, enforceOrient, false)
+	w, h, dx, dy, r := types.BestFitRectIntoRect(rSrc, rDestCr, nup.Enforce, false)
 
 	if nup.BgColor != nil {
 		if nup.ImgInputFile {
@@ -302,7 +321,7 @@ func (ctx *Context) NUpTilePDFBytesForPDF(
 	}
 
 	// Retrieve content stream bytes.
-	bb, err := ctx.PageContent(d)
+	bb, err := ctx.PageContent(d, pageNr)
 	if err == ErrNoContent {
 		// TODO render if has annotations.
 		return nil
@@ -341,7 +360,7 @@ func (ctx *Context) NUpTilePDFBytesForPDF(
 	formsResDict.Insert(formResID, *formIndRef)
 
 	// Append to content stream buf of destination page.
-	NUpTilePDFBytes(buf, cropBox, rDest, formResID, nup, rotate, true)
+	NUpTilePDFBytes(buf, cropBox, rDest, formResID, nup, rotate)
 
 	return nil
 }

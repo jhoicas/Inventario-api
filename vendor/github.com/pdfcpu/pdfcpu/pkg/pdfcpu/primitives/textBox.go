@@ -311,6 +311,7 @@ func (tb *TextBox) prepareTextDescriptor(p *model.Page, pageNr int, fonts model.
 		HAlign:   tb.horAlign,
 		VAlign:   types.AlignBottom,
 		FontName: fontName,
+		Embed:    true,
 		FontKey:  id,
 		FontSize: fontSize,
 		Scale:    1.,
@@ -408,6 +409,10 @@ func (tb *TextBox) render(p *model.Page, pageNr int, fonts model.FontMap) error 
 	td, err := tb.prepareTextDescriptor(p, pageNr, fonts)
 	if err != nil {
 		return err
+	}
+
+	if len(td.Text) == 0 {
+		return nil
 	}
 
 	mTop, mRight, mBottom, mLeft, err := tb.calcMargin()

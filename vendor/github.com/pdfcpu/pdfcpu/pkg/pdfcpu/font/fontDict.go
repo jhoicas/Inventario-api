@@ -30,6 +30,7 @@ import (
 	"unicode/utf16"
 
 	"github.com/pdfcpu/pdfcpu/pkg/font"
+	"github.com/pdfcpu/pdfcpu/pkg/log"
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/model"
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/types"
 	"github.com/pkg/errors"
@@ -41,22 +42,38 @@ type cjk struct {
 	supplement int
 }
 
+// Mapping of supported ISO-15924 font script code keys to corresponding encoding and CIDSystemInfo.
 var cjkParms = map[string]cjk{
 	// C
-	"HANS": {"UniGB-UTF16-H", "GB1", 4},
-	"HANT": {"UniCNS-UTF16-H", "CNS1", 4},
+	"HANS": {"UniGB-UTF16-H", "GB1", 5},
+	"HANT": {"UniCNS-UTF16-H", "CNS1", 7},
 	// J
-	"HIRA": {"UniJIS-UTF16-H", "Japan1", 5},
-	"KANA": {"UniJIS-UTF16-H", "Japan1", 5},
-	"JPAN": {"UniJIS-UTF16-H", "Japan1", 5},
+	"HIRA": {"UniJIS-UTF16-H", "Japan1", 7},
+	"KANA": {"UniJIS-UTF16-H", "Japan1", 7},
+	"JPAN": {"UniJIS-UTF16-H", "Japan1", 7},
 	// K
 	"HANG": {"UniKS-UTF16-H", "Korea1", 1},
 	"KORE": {"UniKS-UTF16-H", "Korea1", 1},
+	//"HANG": {"UniKS-UTF16-H", "KR", 9},
+	//"KORE": {"UniKS-UTF16-H", "KR", 9},
+}
+
+func SupportedScript(s string) bool {
+	return types.MemberOf(s, []string{"HANS", "HANT", "HIRA", "KANA", "JPAN", "HANG", "KORE"})
 }
 
 // CJKEncodings returns true for supported encodings.
 func CJKEncoding(s string) bool {
 	return types.MemberOf(s, []string{"UniGB-UTF16-H", "UniCNS-UTF16-H", "UniJIS-UTF16-H", "UniKS-UTF16-H"})
+}
+
+func ScriptForEncoding(enc string) string {
+	for k, v := range cjkParms {
+		if v.encoding == enc {
+			return k
+		}
+	}
+	return ""
 }
 
 func fontDescriptorIndRefs(fd types.Dict, lang string, font *model.FontResource) error {
@@ -83,7 +100,6 @@ func fontDescriptorIndRefs(fd types.Dict, lang string, font *model.FontResource)
 
 // IndRefsForUserfontUpdate detects used indirect references for a possible user font update.
 func IndRefsForUserfontUpdate(xRefTable *model.XRefTable, d types.Dict, lang string, font *model.FontResource) error {
-
 	if enc := d.NameEntry("Encoding"); enc == nil || *enc != "Identity-H" {
 		return ErrCorruptFontDict
 	}
@@ -141,7 +157,7 @@ func flateEncodedStreamIndRef(xRefTable *model.XRefTable, data []byte) (*types.I
 	return xRefTable.IndRefForNewObject(*sd)
 }
 
-func ttfFontFile(xRefTable *model.XRefTable, ttf font.TTFLight, fontName string) (*types.IndirectRef, error) {
+func ttfFontFile(xRefTable *model.XRefTable, fontName string) (*types.IndirectRef, error) {
 	bb, err := font.Read(fontName)
 	if err != nil {
 		return nil, err
@@ -149,7 +165,7 @@ func ttfFontFile(xRefTable *model.XRefTable, ttf font.TTFLight, fontName string)
 	return flateEncodedStreamIndRef(xRefTable, bb)
 }
 
-func ttfSubFontFile(xRefTable *model.XRefTable, ttf font.TTFLight, fontName string, indRef *types.IndirectRef) (*types.IndirectRef, error) {
+func ttfSubFontFile(xRefTable *model.XRefTable, fontName string, indRef *types.IndirectRef) (*types.IndirectRef, error) {
 	bb, err := font.Subset(fontName, xRefTable.UsedGIDs[fontName])
 	if err != nil {
 		return nil, err
@@ -166,6 +182,56 @@ func ttfSubFontFile(xRefTable *model.XRefTable, ttf font.TTFLight, fontName stri
 	}
 	entry.Object = sd
 	return indRef, nil
+}
+
+func PDFDocEncoding(xRefTable *model.XRefTable) (*types.IndirectRef, error) {
+	arr := types.Array{
+		types.Integer(24),
+		types.Name("breve"), types.Name("caron"), types.Name("circumflex"), types.Name("dotaccent"),
+		types.Name("hungarumlaut"), types.Name("ogonek"), types.Name("ring"), types.Name("tilde"),
+		types.Integer(39),
+		types.Name("quotesingle"),
+		types.Integer(96),
+		types.Name("grave"),
+		types.Integer(128),
+		types.Name("bullet"), types.Name("dagger"), types.Name("daggerdbl"), types.Name("ellipsis"), types.Name("emdash"), types.Name("endash"),
+		types.Name("florin"), types.Name("fraction"), types.Name("guilsinglleft"), types.Name("guilsinglright"), types.Name("minus"), types.Name("perthousand"),
+		types.Name("quotedblbase"), types.Name("quotedblleft"), types.Name("quotedblright"), types.Name("quoteleft"), types.Name("quoteright"), types.Name("quotesinglbase"),
+		types.Name("trademark"), types.Name("fi"), types.Name("fl"), types.Name("Lslash"), types.Name("OE"), types.Name("Scaron"), types.Name("Ydieresis"),
+		types.Name("Zcaron"), types.Name("dotlessi"), types.Name("lslash"), types.Name("oe"), types.Name("scaron"), types.Name("zcaron"),
+		types.Integer(160),
+		types.Name("Euro"),
+		types.Integer(164),
+		types.Name("currency"),
+		types.Integer(166),
+		types.Name("brokenbar"), types.Integer(168), types.Name("dieresis"), types.Name("copyright"), types.Name("ordfeminine"),
+		types.Integer(172),
+		types.Name("logicalnot"), types.Name(".notdef"), types.Name("registered"), types.Name("macron"), types.Name("degree"),
+		types.Name("plusminus"), types.Name("twosuperior"), types.Name("threesuperior"), types.Name("acute"), types.Name("mu"),
+		types.Integer(183),
+		types.Name("periodcentered"), types.Name("cedilla"), types.Name("onesuperior"), types.Name("ordmasculine"),
+		types.Integer(188),
+		types.Name("onequarter"), types.Name("onehalf"), types.Name("threequarters"),
+		types.Integer(192),
+		types.Name("Agrave"), types.Name("Aacute"), types.Name("Acircumflex"), types.Name("Atilde"), types.Name("Adieresis"), types.Name("Aring"), types.Name("AE"),
+		types.Name("Ccedilla"), types.Name("Egrave"), types.Name("Eacute"), types.Name("Ecircumflex"), types.Name("Edieresis"), types.Name("Igrave"), types.Name("Iacute"),
+		types.Name("Icircumflex"), types.Name("Idieresis"), types.Name("Eth"), types.Name("Ntilde"), types.Name("Ograve"), types.Name("Oacute"), types.Name("Ocircumflex"),
+		types.Name("Otilde"), types.Name("Odieresis"), types.Name("multiply"), types.Name("Oslash"), types.Name("Ugrave"), types.Name("Uacute"), types.Name("Ucircumflex"),
+		types.Name("Udieresis"), types.Name("Yacute"), types.Name("Thorn"), types.Name("germandbls"), types.Name("agrave"), types.Name("aacute"), types.Name("acircumflex"),
+		types.Name("atilde"), types.Name("adieresis"), types.Name("aring"), types.Name("ae"), types.Name("ccedilla"), types.Name("egrave"), types.Name("eacute"), types.Name("ecircumflex"),
+		types.Name("edieresis"), types.Name("igrave"), types.Name("iacute"), types.Name("icircumflex"), types.Name("idieresis"), types.Name("eth"), types.Name("ntilde"),
+		types.Name("ograve"), types.Name("oacute"), types.Name("ocircumflex"), types.Name("otilde"), types.Name("odieresis"), types.Name("divide"), types.Name("oslash"),
+		types.Name("ugrave"), types.Name("uacute"), types.Name("ucircumflex"), types.Name("udieresis"), types.Name("yacute"), types.Name("thorn"), types.Name("ydieresis"),
+	}
+
+	d := types.Dict(
+		map[string]types.Object{
+			"Type":        types.Name("Encoding"),
+			"Differences": arr,
+		},
+	)
+
+	return xRefTable.IndRefForNewObject(d)
 }
 
 func coreFontDict(xRefTable *model.XRefTable, coreFontName string) (*types.IndirectRef, error) {
@@ -236,27 +302,19 @@ func ttfFontDescriptorFlags(ttf font.TTFLight) uint32 {
 }
 
 // CIDFontFile returns a TrueType font file or subfont file for fontName.
-func CIDFontFile(xRefTable *model.XRefTable, ttf font.TTFLight, fontName string, subFont bool) (*types.IndirectRef, error) {
+func CIDFontFile(xRefTable *model.XRefTable, fontName string, subFont bool) (*types.IndirectRef, error) {
 	if subFont {
-		return ttfSubFontFile(xRefTable, ttf, fontName, nil)
+		return ttfSubFontFile(xRefTable, fontName, nil)
 	}
-	return ttfFontFile(xRefTable, ttf, fontName)
+	return ttfFontFile(xRefTable, fontName)
 }
 
 // CIDFontDescriptor returns a font descriptor describing the CIDFont’s default metrics other than its glyph widths.
-func CIDFontDescriptor(xRefTable *model.XRefTable, ttf font.TTFLight, fontName, baseFontName, fontLang string, subFont, cjk bool) (*types.IndirectRef, error) {
-
+func CIDFontDescriptor(xRefTable *model.XRefTable, ttf font.TTFLight, fontName, baseFontName, fontLang string, embed bool) (*types.IndirectRef, error) {
 	var (
 		fontFile *types.IndirectRef
 		err      error
 	)
-
-	if !cjk {
-		fontFile, err = CIDFontFile(xRefTable, ttf, fontName, subFont)
-		if err != nil {
-			return nil, err
-		}
-	}
 
 	d := types.Dict(
 		map[string]types.Object{
@@ -272,11 +330,15 @@ func CIDFontDescriptor(xRefTable *model.XRefTable, ttf font.TTFLight, fontName, 
 		},
 	)
 
-	if !cjk {
+	if embed {
+		fontFile, err = CIDFontFile(xRefTable, fontName, true)
+		if err != nil {
+			return nil, err
+		}
 		d["FontFile2"] = *fontFile
 	}
 
-	if subFont {
+	if embed {
 		// (Optional)
 		// A stream identifying which CIDs are present in the CIDFont file. If this entry is present,
 		// the CIDFont shall contain only a subset of the glyphs in the character collection defined by the CIDSystemInfo dictionary.
@@ -299,9 +361,8 @@ func CIDFontDescriptor(xRefTable *model.XRefTable, ttf font.TTFLight, fontName, 
 }
 
 // FontDescriptor returns a TrueType font descriptor describing font’s default metrics other than its glyph widths.
-func FontDescriptor(xRefTable *model.XRefTable, ttf font.TTFLight, fontName, fontLang string) (*types.IndirectRef, error) {
-
-	fontFile, err := ttfFontFile(xRefTable, ttf, fontName)
+func NewFontDescriptor(xRefTable *model.XRefTable, ttf font.TTFLight, fontName, fontLang string) (*types.IndirectRef, error) {
+	fontFile, err := ttfFontFile(xRefTable, fontName)
 	if err != nil {
 		return nil, err
 	}
@@ -500,72 +561,7 @@ func Widths(xRefTable *model.XRefTable, ttf font.TTFLight, first, last int) (*ty
 	return xRefTable.IndRefForNewObject(a)
 }
 
-// CIDFontDict returns the descendant font dict for Type0 fonts.
-func CIDFontDict(xRefTable *model.XRefTable, ttf font.TTFLight, fontName, baseFontName, lang string, subFont bool) (*types.IndirectRef, error) {
-	fdIndRef, err := CIDFontDescriptor(xRefTable, ttf, fontName, baseFontName, lang, subFont, false)
-	if err != nil {
-		return nil, err
-	}
-
-	wIndRef, err := CIDWidths(xRefTable, ttf, fontName, subFont, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	d := types.Dict(
-		map[string]types.Object{
-			"Type":     types.Name("Font"),
-			"Subtype":  types.Name("CIDFontType2"),
-			"BaseFont": types.Name(baseFontName),
-			"CIDSystemInfo": types.Dict(
-				map[string]types.Object{
-					"Ordering":   types.StringLiteral("Identity"),
-					"Registry":   types.StringLiteral("Adobe"),
-					"Supplement": types.Integer(0),
-				},
-			),
-			"FontDescriptor": *fdIndRef,
-
-			// (Optional)
-			// The default width for glyphs in the CIDFont (see 9.7.4.3, "Glyph Metrics in CIDFonts").
-			// Default value: 1000 (defined in user units).
-			"DW": types.Integer(1000),
-
-			// (Optional)
-			// A description of the widths for the glyphs in the CIDFont.
-			// The array’s elements have a variable format that can specify individual widths for consecutive CIDs
-			// or one width for a range of CIDs (see 9.7.4.3, "Glyph Metrics in CIDFonts").
-			// Default value: none (the DW value shall be used for all glyphs).
-			//"W": *wIndRef,
-
-			// (Optional; applies only to CIDFonts used for vertical writing)
-			// An array of two numbers specifying the default metrics for vertical writing (see 9.7.4.3, "Glyph Metrics in CIDFonts").
-			// Default value: [880 −1000].
-			// "DW2":             Integer(1000),
-
-			// (Optional; applies only to CIDFonts used for vertical writing)
-			// A description of the metrics for vertical writing for the glyphs in the CIDFont (see 9.7.4.3, "Glyph Metrics in CIDFonts").
-			// Default value: none (the DW2 value shall be used for all glyphs).
-			// "W2": nil
-
-			// (Optional; Type 2 CIDFonts only)
-			// A specification of the mapping from CIDs to glyph indices.
-			// maps CIDs to the glyph indices for the appropriate glyph descriptions in that font program.
-			// if stream: the glyph index for a particular CID value c shall be a 2-byte value stored in bytes 2 × c and 2 × c + 1,
-			// where the first byte shall be the high-order byte.))
-			"CIDToGIDMap": types.Name("Identity"),
-		},
-	)
-
-	if wIndRef != nil {
-		d["W"] = *wIndRef
-	}
-
-	return xRefTable.IndRefForNewObject(d)
-}
-
 func bf(b *bytes.Buffer, ttf font.TTFLight, usedGIDs map[uint16]bool, subFont bool) {
-
 	var gids []int
 	if subFont {
 		gids = make([]int, 0, len(usedGIDs))
@@ -608,7 +604,6 @@ func bf(b *bytes.Buffer, ttf font.TTFLight, usedGIDs map[uint16]bool, subFont bo
 
 // toUnicodeCMap returns a stream dict containing a CMap file that maps character codes to Unicode values (see 9.10).
 func toUnicodeCMap(xRefTable *model.XRefTable, ttf font.TTFLight, fontName string, subFont bool, indRef *types.IndirectRef) (*types.IndirectRef, error) {
-
 	// n beginbfchar
 	// srcCode dstString
 	// <003A>  <0037>                                            : 003a:0037
@@ -737,7 +732,6 @@ func usedGIDsFromCMap(cMap string) ([]uint16, error) {
 
 // UpdateUserfont updates the fontdict for fontName via supplied font resource.
 func UpdateUserfont(xRefTable *model.XRefTable, fontName string, f model.FontResource) error {
-
 	font.UserFontMetricsLock.RLock()
 	ttf, ok := font.UserFontMetrics[fontName]
 	font.UserFontMetricsLock.RUnlock()
@@ -754,7 +748,7 @@ func UpdateUserfont(xRefTable *model.XRefTable, fontName string, f model.FontRes
 		return err
 	}
 
-	if _, err := ttfSubFontFile(xRefTable, ttf, fontName, f.FontFile); err != nil {
+	if _, err := ttfSubFontFile(xRefTable, fontName, f.FontFile); err != nil {
 		return err
 	}
 
@@ -802,18 +796,22 @@ func subFontPrefix() string {
 	return string(bb)
 }
 
-// CIDFontSpecialEncDict returns the descendant font dict with special encoding for Type0 fonts.
-func CIDFontSpecialEncDict(xRefTable *model.XRefTable, ttf font.TTFLight, baseFontName, lang string, parms cjk) (*types.IndirectRef, error) {
-
-	fdIndRef, err := CIDFontDescriptor(xRefTable, ttf, "", baseFontName, lang, false, true)
+// CIDFontDict returns the descendant font dict with special encoding for Type0 fonts.
+func CIDFontDict(xRefTable *model.XRefTable, ttf font.TTFLight, fontName, baseFontName, lang string, parms *cjk) (*types.IndirectRef, error) {
+	fdIndRef, err := CIDFontDescriptor(xRefTable, ttf, fontName, baseFontName, lang, parms == nil)
 	if err != nil {
 		return nil, err
 	}
 
-	// wIndRef, err := CIDWidths(xRefTable, ttf, false, nil)
-	// if err != nil {
-	// 	return nil, err
-	// }
+	ordering := "Identity"
+	if parms != nil {
+		ordering = parms.ordering
+	}
+
+	supplement := 0
+	if parms != nil {
+		supplement = parms.supplement
+	}
 
 	d := types.Dict(
 		map[string]types.Object{
@@ -822,25 +820,60 @@ func CIDFontSpecialEncDict(xRefTable *model.XRefTable, ttf font.TTFLight, baseFo
 			"BaseFont": types.Name(baseFontName),
 			"CIDSystemInfo": types.Dict(
 				map[string]types.Object{
-					"Ordering":   types.StringLiteral(parms.ordering),
+					"Ordering":   types.StringLiteral(ordering),
 					"Registry":   types.StringLiteral("Adobe"),
-					"Supplement": types.Integer(parms.supplement),
+					"Supplement": types.Integer(supplement),
 				},
 			),
 			"FontDescriptor": *fdIndRef,
-			//"DW":             types.Integer(1000),
+
+			// (Optional)
+			// The default width for glyphs in the CIDFont (see 9.7.4.3, "Glyph Metrics in CIDFonts").
+			// Default value: 1000 (defined in user units).
+			// "DW": types.Integer(1000),
+
+			// (Optional)
+			// A description of the widths for the glyphs in the CIDFont.
+			// The array’s elements have a variable format that can specify individual widths for consecutive CIDs
+			// or one width for a range of CIDs (see 9.7.4.3, "Glyph Metrics in CIDFonts").
+			// Default value: none (the DW value shall be used for all glyphs).
+			//"W": *wIndRef,
+
+			// (Optional; applies only to CIDFonts used for vertical writing)
+			// An array of two numbers specifying the default metrics for vertical writing (see 9.7.4.3, "Glyph Metrics in CIDFonts").
+			// Default value: [880 −1000].
+			// "DW2":             Integer(1000),
+
+			// (Optional; applies only to CIDFonts used for vertical writing)
+			// A description of the metrics for vertical writing for the glyphs in the CIDFont (see 9.7.4.3, "Glyph Metrics in CIDFonts").
+			// Default value: none (the DW2 value shall be used for all glyphs).
+			// "W2": nil,
 		},
 	)
 
-	// if wIndRef != nil {
-	// 	d["W"] = *wIndRef
-	// }
+	// (Optional; Type 2 CIDFonts only)
+	// A specification of the mapping from CIDs to glyph indices.
+	// maps CIDs to the glyph indices for the appropriate glyph descriptions in that font program.
+	// if stream: the glyph index for a particular CID value c shall be a 2-byte value stored in bytes 2 × c and 2 × c + 1,
+	// where the first byte shall be the high-order byte.))
+	if ordering == "Identity" {
+		d["CIDToGIDMap"] = types.Name("Identity")
+	}
+
+	if parms == nil {
+		wIndRef, err := CIDWidths(xRefTable, ttf, fontName, parms == nil, nil)
+		if err != nil {
+			return nil, err
+		}
+		if wIndRef != nil {
+			d["W"] = *wIndRef
+		}
+	}
 
 	return xRefTable.IndRefForNewObject(d)
 }
 
-func type0CJKFontDict(xRefTable *model.XRefTable, fontName, lang, script string, indRef *types.IndirectRef) (*types.IndirectRef, error) {
-
+func type0FontDict(xRefTable *model.XRefTable, fontName, lang, script string, indRef *types.IndirectRef) (*types.IndirectRef, error) {
 	font.UserFontMetricsLock.RLock()
 	ttf, ok := font.UserFontMetrics[fontName]
 	font.UserFontMetricsLock.RUnlock()
@@ -848,48 +881,13 @@ func type0CJKFontDict(xRefTable *model.XRefTable, fontName, lang, script string,
 		return nil, errors.Errorf("pdfcpu: font %s not available", fontName)
 	}
 
-	parms, ok := cjkParms[script]
-	if !ok {
-		return nil, errors.Errorf("pdfcpu: %s - unable to detect cjk encoding ", fontName)
-	}
-
-	descendentFontIndRef, err := CIDFontSpecialEncDict(xRefTable, ttf, fontName, lang, parms)
-	if err != nil {
-		return nil, err
-	}
-
-	d := types.NewDict()
-	d.InsertName("Type", "Font")
-	d.InsertName("Subtype", "Type0")
-	d.InsertName("BaseFont", fontName)
-	d.InsertName("Name", fontName)
-	d.InsertName("Encoding", parms.encoding)
-	d.Insert("DescendantFonts", types.Array{*descendentFontIndRef})
-
-	if indRef == nil {
-		return xRefTable.IndRefForNewObject(d)
-	}
-
-	entry, _ := xRefTable.FindTableEntryForIndRef(indRef)
-	entry.Object = d
-
-	return indRef, nil
-}
-
-func type0FontDict(xRefTable *model.XRefTable, fontName, lang string, subFont bool, indRef *types.IndirectRef) (*types.IndirectRef, error) {
-	// Combines a CIDFont and a CMap to produce a font whose glyphs may be accessed
-	// by means of variable-length character codes in a string to be shown.
-
-	font.UserFontMetricsLock.RLock()
-	ttf, ok := font.UserFontMetrics[fontName]
-	font.UserFontMetricsLock.RUnlock()
-	if !ok {
-		return nil, errors.Errorf("pdfcpu: font %s not available", fontName)
-	}
+	subFont := script == ""
 
 	// For consecutive pages or if no AP present using this font.
-	if !xRefTable.HasUsedGIDs(fontName) {
-		return indRef, nil
+	if indRef != nil && subFont && !xRefTable.HasUsedGIDs(fontName) {
+		if obj, _ := xRefTable.Dereference(*indRef); obj != nil {
+			return indRef, nil
+		}
 	}
 
 	baseFontName := fontName
@@ -897,7 +895,17 @@ func type0FontDict(xRefTable *model.XRefTable, fontName, lang string, subFont bo
 		baseFontName = subFontPrefix() + "+" + fontName
 	}
 
-	descendentFontIndRef, err := CIDFontDict(xRefTable, ttf, fontName, baseFontName, lang, subFont)
+	var parms *cjk
+	if p, ok := cjkParms[script]; ok {
+		parms = &p
+	}
+
+	encoding := "Identity-H"
+	if parms != nil {
+		encoding = parms.encoding
+	}
+
+	descendentFontIndRef, err := CIDFontDict(xRefTable, ttf, fontName, baseFontName, lang, parms)
 	if err != nil {
 		return nil, err
 	}
@@ -906,17 +914,22 @@ func type0FontDict(xRefTable *model.XRefTable, fontName, lang string, subFont bo
 	d.InsertName("Type", "Font")
 	d.InsertName("Subtype", "Type0")
 	d.InsertName("BaseFont", baseFontName)
-	d.InsertName("Encoding", "Identity-H")
+	d.InsertName("Name", fontName)
+	d.InsertName("Encoding", encoding)
 	d.Insert("DescendantFonts", types.Array{*descendentFontIndRef})
 
-	toUnicodeIndRef, err := toUnicodeCMap(xRefTable, ttf, fontName, subFont, nil)
-	if err != nil {
-		return nil, err
+	if subFont {
+		toUnicodeIndRef, err := toUnicodeCMap(xRefTable, ttf, fontName, subFont, nil)
+		if err != nil {
+			return nil, err
+		}
+		d.Insert("ToUnicode", *toUnicodeIndRef)
 	}
-	d.Insert("ToUnicode", *toUnicodeIndRef)
 
-	// Reset used glyph ids.
-	delete(xRefTable.UsedGIDs, fontName)
+	if subFont {
+		// Reset used glyph ids.
+		delete(xRefTable.UsedGIDs, fontName)
+	}
 
 	if indRef == nil {
 		return xRefTable.IndRefForNewObject(d)
@@ -942,7 +955,7 @@ func trueTypeFontDict(xRefTable *model.XRefTable, fontName, fontLang string) (*t
 		return nil, err
 	}
 
-	fdIndRef, err := FontDescriptor(xRefTable, ttf, fontName, fontLang)
+	fdIndRef, err := NewFontDescriptor(xRefTable, ttf, fontName, fontLang)
 	if err != nil {
 		return nil, err
 	}
@@ -976,29 +989,25 @@ func RTL(lang string) bool {
 }
 
 // EnsureFontDict ensures a font dict for fontName, lang, script.
-func EnsureFontDict(xRefTable *model.XRefTable, fontName, lang, script string, subDict, field bool, indRef *types.IndirectRef) (*types.IndirectRef, error) {
+func EnsureFontDict(xRefTable *model.XRefTable, fontName, lang, script string, field bool, indRef *types.IndirectRef) (*types.IndirectRef, error) {
 	if font.IsCoreFont(fontName) {
 		if indRef != nil {
 			return indRef, nil
 		}
 		return coreFontDict(xRefTable, fontName)
 	}
-	if field {
-		if CJK(script, lang) {
-			return type0CJKFontDict(xRefTable, fontName, lang, script, indRef)
-		}
+	if field && (script == "" || !CJK(script, lang)) {
 		return trueTypeFontDict(xRefTable, fontName, lang)
 	}
-	return type0FontDict(xRefTable, fontName, lang, subDict, indRef)
+	return type0FontDict(xRefTable, fontName, lang, script, indRef)
 }
 
 // FontResources returns a font resource dict for a font map.
 func FontResources(xRefTable *model.XRefTable, fm model.FontMap) (types.Dict, error) {
-
 	d := types.Dict{}
 
 	for fontName, font := range fm {
-		ir, err := EnsureFontDict(xRefTable, fontName, "", "", true, false, nil)
+		ir, err := EnsureFontDict(xRefTable, fontName, "", "", false, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -1060,9 +1069,8 @@ func Name(xRefTable *model.XRefTable, fontDict types.Dict, objNumber int) (prefi
 }
 
 // Lang detects the optional language indicator in a font dict.
-func Lang(xRefTable *model.XRefTable, d types.Dict) (string, error) {
-
-	o, found := d.Find("FontDescriptor")
+func Lang(xRefTable *model.XRefTable, fontDict types.Dict) (string, error) {
+	o, found := fontDict.Find("FontDescriptor")
 	if found {
 		fd, err := xRefTable.DereferenceDict(o)
 		if err != nil {
@@ -1076,9 +1084,21 @@ func Lang(xRefTable *model.XRefTable, d types.Dict) (string, error) {
 		return s, nil
 	}
 
-	arr := d.ArrayEntry("DescendantFonts")
-	indRef := arr[0].(types.IndirectRef)
-	d1, err := xRefTable.DereferenceDict(indRef)
+	o, found = fontDict.Find("DescendantFonts")
+	if !found {
+		return "", ErrCorruptFontDict
+	}
+
+	arr, err := xRefTable.DereferenceArray(o)
+	if err != nil {
+		return "", err
+	}
+
+	if len(arr) != 1 {
+		return "", ErrCorruptFontDict
+	}
+
+	d1, err := xRefTable.DereferenceDict(arr[0])
 	if err != nil {
 		return "", err
 	}
@@ -1097,4 +1117,108 @@ func Lang(xRefTable *model.XRefTable, d types.Dict) (string, error) {
 	}
 
 	return "", nil
+}
+
+func trivialFontDescriptor(xRefTable *model.XRefTable, fontDict types.Dict, objNr int) (types.Dict, error) {
+	o, ok := fontDict.Find("FontDescriptor")
+	if !ok {
+		return nil, nil
+	}
+
+	// fontDescriptor directly available.
+
+	d, err := xRefTable.DereferenceDict(o)
+	if err != nil {
+		return nil, err
+	}
+
+	if d == nil {
+		return nil, errors.Errorf("pdfcpu: trivialFontDescriptor: FontDescriptor is null for font object %d\n", objNr)
+	}
+
+	if d.Type() != nil && *d.Type() != "FontDescriptor" {
+		return nil, errors.Errorf("pdfcpu: trivialFontDescriptor: FontDescriptor dict incorrect dict type for font object %d\n", objNr)
+	}
+
+	return d, nil
+}
+
+// FontDescriptor gets the font descriptor for this font.
+func FontDescriptor(xRefTable *model.XRefTable, fontDict types.Dict, objNr int) (types.Dict, error) {
+	if log.OptimizeEnabled() {
+		log.Optimize.Println("fontDescriptor begin")
+	}
+
+	d, err := trivialFontDescriptor(xRefTable, fontDict, objNr)
+	if err != nil {
+		return nil, err
+	}
+	if d != nil {
+		return d, nil
+	}
+
+	// Try to access a fontDescriptor in a Descendent font for Type0 fonts.
+
+	o, ok := fontDict.Find("DescendantFonts")
+	if !ok {
+		//logErrorOptimize.Printf("FontDescriptor: Neither FontDescriptor nor DescendantFonts for font object %d\n", objectNumber)
+		return nil, nil
+	}
+
+	// A descendant font is contained in an array of size 1.
+
+	a, err := xRefTable.DereferenceArray(o)
+	if err != nil || a == nil {
+		return nil, errors.Errorf("pdfcpu: fontDescriptor: DescendantFonts: IndirectRef or Array with length 1 expected for font object %d\n", objNr)
+	}
+	if len(a) != 1 {
+		return nil, errors.Errorf("pdfcpu: fontDescriptor: DescendantFonts Array length <> 1 %v\n", a)
+	}
+
+	// dict is the fontDict of the descendant font.
+	d, err = xRefTable.DereferenceDict(a[0])
+	if err != nil {
+		return nil, errors.Errorf("pdfcpu: fontDescriptor: No descendant font dict for %v\n", a)
+	}
+	if d == nil {
+		return nil, errors.Errorf("pdfcpu: fontDescriptor: descendant font dict is null for %v\n", a)
+	}
+
+	if *d.Type() != "Font" {
+		return nil, errors.Errorf("pdfcpu: fontDescriptor: font dict with incorrect dict type for %v\n", d)
+	}
+
+	o, ok = d.Find("FontDescriptor")
+	if !ok {
+		log.Optimize.Printf("fontDescriptor: descendant font not embedded %s\n", d)
+		return nil, nil
+	}
+
+	d, err = xRefTable.DereferenceDict(o)
+	if err != nil {
+		return nil, errors.Errorf("pdfcpu: fontDescriptor: No FontDescriptor dict for font object %d\n", objNr)
+	}
+
+	if log.OptimizeEnabled() {
+		log.Optimize.Println("fontDescriptor end")
+	}
+
+	return d, nil
+}
+
+func Embedded(xRefTable *model.XRefTable, fontDict types.Dict, objNr int) (bool, error) {
+	fd, err := FontDescriptor(xRefTable, fontDict, objNr)
+	if err != nil {
+		return false, err
+	}
+	if _, ok := fd.Find("FontFile"); ok {
+		return true, nil
+	}
+	if _, ok := fd.Find("FontFile2"); ok {
+		return true, nil
+	}
+	if _, ok := fd.Find("FontFile3"); ok {
+		return true, nil
+	}
+	return false, nil
 }

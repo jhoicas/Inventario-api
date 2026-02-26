@@ -115,6 +115,8 @@ type PDF struct {
 	RadioBtnAPs     map[float64]*AP            `json:"-"`
 	HasForm         bool                       `json:"-"`
 	OldFieldIDs     types.StringSet            `json:"-"`
+	Offline         bool                       `json:"-"`
+	Timeout         int                        `json:"-"`
 	httpClient      *http.Client
 }
 
@@ -492,7 +494,7 @@ func (pdf *PDF) DuplicateField(ID string) bool {
 	if pdf.FieldIDs[ID] || pdf.OldFieldIDs[ID] {
 		return true
 	}
-	oldID, err := types.EscapeUTF16String(ID)
+	oldID, err := types.EscapedUTF16String(ID)
 	if err != nil {
 		return true
 	}
@@ -627,7 +629,7 @@ func fontIndRef(xRefTable *model.XRefTable, fontName, fontLang string) (*types.I
 		// Postpone font creation.
 		return xRefTable.IndRefForNewObject(nil)
 	}
-	return pdffont.EnsureFontDict(xRefTable, fName, fontLang, "", false, false, nil)
+	return pdffont.EnsureFontDict(xRefTable, fName, fontLang, "", false, nil)
 }
 
 func (pdf *PDF) ensureFont(fontID, fontName, fontLang string, fonts model.FontMap) (*types.IndirectRef, error) {
@@ -645,7 +647,7 @@ func (pdf *PDF) ensureFont(fontID, fontName, fontLang string, fonts model.FontMa
 			// Postpone font creation.
 			ir, err = pdf.XRefTable.IndRefForNewObject(nil)
 		} else {
-			ir, err = pdffont.EnsureFontDict(pdf.XRefTable, fontName, fr.Lang, "", false, false, nil)
+			ir, err = pdffont.EnsureFontDict(pdf.XRefTable, fontName, fr.Lang, "", false, nil)
 		}
 		if err != nil {
 			return nil, err

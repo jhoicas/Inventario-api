@@ -52,13 +52,12 @@ func (d Dict) Clone() Object {
 }
 
 // Insert adds a new entry to this PDFDict.
-func (d Dict) Insert(key string, value Object) (ok bool) {
-	_, found := d.Find(key)
-	if !found {
-		d[key] = value
-		ok = true
+func (d Dict) Insert(k string, v Object) bool {
+	if _, found := d.Find(k); !found {
+		d[k] = v
+		return true
 	}
-	return ok
+	return false
 }
 
 // InsertBool adds a new bool entry to this PDFDict.
@@ -133,17 +132,23 @@ func (d Dict) NewIDForPrefix(prefix string, i int) string {
 	return id
 }
 
-// Entry returns the value for given key.
-func (d Dict) Entry(dictName, key string, required bool) (Object, error) {
+// Entry returns the value for a given key and if the entry was found.
+func (d Dict) Entry(dictName, key string, required bool) (Object, bool, error) {
 	obj, found := d.Find(key)
-	if !found || obj == nil {
+	if !found {
 		if required {
-			return nil, errors.Errorf("dict=%s required entry=%s missing", dictName, key)
+			return nil, false, errors.Errorf("dict=%s required entry=%s missing", dictName, key)
 		}
-		//log.Trace.Printf("dict=%s entry %s is nil\n", dictName, key)
-		return nil, nil
+		return nil, false, nil
 	}
-	return obj, nil
+
+	if obj == nil {
+		if required {
+			return nil, true, errors.Errorf("dict=%s required entry=%s corrupt", dictName, key)
+		}
+	}
+
+	return obj, found, nil
 }
 
 // BooleanEntry expects and returns a BooleanEntry for given key.
@@ -372,6 +377,10 @@ func (d Dict) Size() *int {
 	return d.IntEntry("Size")
 }
 
+func (d Dict) IsPage() bool {
+	return d.Type() != nil && *d.Type() == "Page"
+}
+
 // IsObjStm returns true if given PDFDict is an object stream.
 func (d Dict) IsObjStm() bool {
 	return d.Type() != nil && *d.Type() == "ObjStm"
@@ -437,30 +446,25 @@ func (d Dict) indentedString(level int) string {
 	for _, k := range keys {
 
 		v := d[k]
-		key, _ := DecodeName(k)
 
-		if subdict, ok := v.(Dict); ok {
-			dictStr := subdict.indentedString(level + 1)
-			logstr = append(logstr, fmt.Sprintf("%s<%s, %s>\n", tabstr, key, dictStr))
-			continue
-		}
-
-		if a, ok := v.(Array); ok {
-			arrStr := a.indentedString(level + 1)
-			logstr = append(logstr, fmt.Sprintf("%s<%s, %s>\n", tabstr, key, arrStr))
-			continue
-		}
-
-		val := "null"
-		if v != nil {
-			val = v.String()
-			if n, ok := v.(Name); ok {
-				val, _ = DecodeName(string(n))
+		switch v := v.(type) {
+		case Dict:
+			dictStr := v.indentedString(level + 1)
+			logstr = append(logstr, fmt.Sprintf("%s<%s, %s>\n", tabstr, k, dictStr))
+		case Array:
+			arrStr := v.indentedString(level + 1)
+			logstr = append(logstr, fmt.Sprintf("%s<%s, %s>\n", tabstr, k, arrStr))
+		default:
+			val := "null"
+			if v != nil {
+				val = v.String()
+				if n, ok := v.(Name); ok {
+					val, _ = DecodeName(string(n))
+				}
 			}
+
+			logstr = append(logstr, fmt.Sprintf("%s<%s, %v>\n", tabstr, k, val))
 		}
-
-		logstr = append(logstr, fmt.Sprintf("%s<%s, %v>\n", tabstr, key, val))
-
 	}
 
 	logstr = append(logstr, fmt.Sprintf("%s%s", strings.Repeat("\t", level-1), ">>"))
@@ -483,68 +487,33 @@ func (d Dict) PDFString() string {
 	for _, k := range keys {
 
 		v := d[k]
+		keyName := EncodeName(k)
 
-		if v == nil {
-			logstr = append(logstr, fmt.Sprintf("/%s null", k))
-			continue
-		}
-
-		d, ok := v.(Dict)
-		if ok {
-			logstr = append(logstr, fmt.Sprintf("/%s%s", k, d.PDFString()))
-			continue
-		}
-
-		a, ok := v.(Array)
-		if ok {
-			logstr = append(logstr, fmt.Sprintf("/%s%s", k, a.PDFString()))
-			continue
-		}
-
-		ir, ok := v.(IndirectRef)
-		if ok {
-			logstr = append(logstr, fmt.Sprintf("/%s %s", k, ir.PDFString()))
-			continue
-		}
-
-		n, ok := v.(Name)
-		if ok {
-			logstr = append(logstr, fmt.Sprintf("/%s%s", k, n.PDFString()))
-			continue
-		}
-
-		i, ok := v.(Integer)
-		if ok {
-			logstr = append(logstr, fmt.Sprintf("/%s %s", k, i.PDFString()))
-			continue
-		}
-
-		f, ok := v.(Float)
-		if ok {
-			logstr = append(logstr, fmt.Sprintf("/%s %s", k, f.PDFString()))
-			continue
-		}
-
-		b, ok := v.(Boolean)
-		if ok {
-			logstr = append(logstr, fmt.Sprintf("/%s %s", k, b.PDFString()))
-			continue
-		}
-
-		sl, ok := v.(StringLiteral)
-		if ok {
-			logstr = append(logstr, fmt.Sprintf("/%s%s", k, sl.PDFString()))
-			continue
-		}
-
-		hl, ok := v.(HexLiteral)
-		if ok {
-			logstr = append(logstr, fmt.Sprintf("/%s%s", k, hl.PDFString()))
-			continue
-		}
-
-		if log.InfoEnabled() {
-			log.Info.Fatalf("PDFDict.PDFString(): entry of unknown object type: %T %[1]v\n", v)
+		switch v := v.(type) {
+		case nil:
+			logstr = append(logstr, fmt.Sprintf("/%s null", keyName))
+		case Dict:
+			logstr = append(logstr, fmt.Sprintf("/%s%s", keyName, v.PDFString()))
+		case Array:
+			logstr = append(logstr, fmt.Sprintf("/%s%s", keyName, v.PDFString()))
+		case IndirectRef:
+			logstr = append(logstr, fmt.Sprintf("/%s %s", keyName, v.PDFString()))
+		case Name:
+			logstr = append(logstr, fmt.Sprintf("/%s%s", keyName, v.PDFString()))
+		case Integer:
+			logstr = append(logstr, fmt.Sprintf("/%s %s", keyName, v.PDFString()))
+		case Float:
+			logstr = append(logstr, fmt.Sprintf("/%s %s", keyName, v.PDFString()))
+		case Boolean:
+			logstr = append(logstr, fmt.Sprintf("/%s %s", keyName, v.PDFString()))
+		case StringLiteral:
+			logstr = append(logstr, fmt.Sprintf("/%s%s", keyName, v.PDFString()))
+		case HexLiteral:
+			logstr = append(logstr, fmt.Sprintf("/%s%s", keyName, v.PDFString()))
+		default:
+			if log.InfoEnabled() {
+				log.Info.Fatalf("PDFDict.PDFString(): entry of unknown object type: %T %[1]v\n", v)
+			}
 		}
 	}
 
@@ -561,7 +530,7 @@ func (d Dict) StringEntryBytes(key string) ([]byte, error) {
 
 	s := d.StringLiteralEntry(key)
 	if s != nil {
-		bb, err := Unescape(s.Value(), false)
+		bb, err := Unescape(s.Value())
 		if err != nil {
 			return nil, err
 		}

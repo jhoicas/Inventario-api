@@ -306,6 +306,7 @@ func (rbg *RadioButtonGroup) renderButtonLabels(p *model.Page, pageNr int, fonts
 
 	td := model.TextDescriptor{
 		FontName: fontName,
+		Embed:    true,
 		FontKey:  id,
 		FontSize: fontSize,
 		Scale:    1.,
@@ -932,6 +933,7 @@ func (rbg *RadioButtonGroup) prepLabel(p *model.Page, pageNr int, fonts model.Fo
 	td := model.TextDescriptor{
 		Text:     v,
 		FontName: fontName,
+		Embed:    true,
 		FontKey:  id,
 		FontSize: f.Size,
 		HAlign:   l.HorAlign,
@@ -993,7 +995,7 @@ func (rbg *RadioButtonGroup) prepareDict(p *model.Page, pageNr int, fonts model.
 
 	rbg.renderButtonLabels(p, pageNr, fonts)
 
-	id, err := types.EscapeUTF16String(rbg.ID)
+	id, err := types.EscapedUTF16String(rbg.ID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1029,7 +1031,7 @@ func (rbg *RadioButtonGroup) prepareDict(p *model.Page, pageNr int, fonts model.
 	d["V"] = v
 
 	if rbg.Tip != "" {
-		tu, err := types.EscapeUTF16String(rbg.Tip)
+		tu, err := types.EscapedUTF16String(rbg.Tip)
 		if err != nil {
 			return nil, nil, err
 		}

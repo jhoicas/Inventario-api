@@ -25,7 +25,8 @@ type runLengthDecode struct {
 	baseFilter
 }
 
-func (f runLengthDecode) decode(w io.ByteWriter, src []byte) {
+func (f runLengthDecode) decode(w io.ByteWriter, src []byte, maxLen int64) {
+	var written int64
 
 	for i := 0; i < len(src); {
 		b := src[i]
@@ -37,14 +38,24 @@ func (f runLengthDecode) decode(w io.ByteWriter, src []byte) {
 		if b < 0x80 {
 			c := int(b) + 1
 			for j := 0; j < c; j++ {
+				if maxLen >= 0 && maxLen == written {
+					break
+				}
+
 				w.WriteByte(src[i])
+				written++
 				i++
 			}
 			continue
 		}
 		c := 257 - int(b)
 		for j := 0; j < c; j++ {
+			if maxLen >= 0 && maxLen == written {
+				break
+			}
+
 			w.WriteByte(src[i])
+			written++
 		}
 		i++
 	}
@@ -112,27 +123,31 @@ func (f runLengthDecode) encode(w io.ByteWriter, src []byte) {
 // Encode implements encoding for a RunLengthDecode filter.
 func (f runLengthDecode) Encode(r io.Reader) (io.Reader, error) {
 
-	var b1 bytes.Buffer
-	if _, err := io.Copy(&b1, r); err != nil {
+	b1, err := getReaderBytes(r)
+	if err != nil {
 		return nil, err
 	}
 
 	var b2 bytes.Buffer
-	f.encode(&b2, b1.Bytes())
+	f.encode(&b2, b1)
 
 	return &b2, nil
 }
 
 // Decode implements decoding for an RunLengthDecode filter.
 func (f runLengthDecode) Decode(r io.Reader) (io.Reader, error) {
+	return f.DecodeLength(r, -1)
+}
 
-	var b1 bytes.Buffer
-	if _, err := io.Copy(&b1, r); err != nil {
+func (f runLengthDecode) DecodeLength(r io.Reader, maxLen int64) (io.Reader, error) {
+
+	b1, err := getReaderBytes(r)
+	if err != nil {
 		return nil, err
 	}
 
 	var b2 bytes.Buffer
-	f.decode(&b2, b1.Bytes())
+	f.decode(&b2, b1, maxLen)
 
 	return &b2, nil
 }

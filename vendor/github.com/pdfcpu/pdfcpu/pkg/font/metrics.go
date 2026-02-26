@@ -23,6 +23,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -277,6 +278,7 @@ func CharWidth(fontName string, r rune) int {
 	ttf, ok := UserFontMetrics[fontName]
 	if !ok {
 		fmt.Fprintf(os.Stderr, "pdfcpu: user font not loaded: %s\n", fontName)
+		debug.PrintStack()
 		os.Exit(1)
 	}
 
@@ -345,6 +347,13 @@ func TextWidth(text, fontName string, fontSize int) float64 {
 func Size(text, fontName string, width float64) int {
 	w := glyphSpaceWidth(text, fontName)
 	return fontScalingFactor(float64(w), width)
+}
+
+// SizeForLineHeight returns the needed font size in points
+// for rendering using a given font name fitting into given line height lh.
+func SizeForLineHeight(fontName string, lh float64) int {
+	fbb := BoundingBox(fontName)
+	return int(math.Round(lh / (fbb.Height() / 1000)))
 }
 
 // UserSpaceFontBBox returns the font box for given font name and font size in user space coordinates.
