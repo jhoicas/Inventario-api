@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/shopspring/decimal"
-	domdian "github.com/tu-usuario/inventory-pro/internal/domain/dian"
-	"github.com/tu-usuario/inventory-pro/internal/domain/entity"
+	domdian "github.com/jhoicas/Inventario-api/internal/domain/dian"
+	"github.com/jhoicas/Inventario-api/internal/domain/entity"
 )
 
 // CufeContext agrupa factura, emisor, cliente y datos de resolución para calcular el CUFE.

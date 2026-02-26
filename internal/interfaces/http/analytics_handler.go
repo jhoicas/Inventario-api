@@ -2,8 +2,8 @@ package http
 
 import (
 	"github.com/gofiber/fiber/v2"
-	"github.com/tu-usuario/inventory-pro/internal/application/dto"
-	"github.com/tu-usuario/inventory-pro/internal/application/usecase"
+	"github.com/jhoicas/Inventario-api/internal/application/dto"
+	"github.com/jhoicas/Inventario-api/internal/application/usecase"
 )
 
 // AnalyticsHandler maneja los endpoints de analítica de rentabilidad.

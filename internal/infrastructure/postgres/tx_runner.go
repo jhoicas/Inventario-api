@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/tu-usuario/inventory-pro/internal/application/billing"
-	"github.com/tu-usuario/inventory-pro/internal/application/inventory"
-	"github.com/tu-usuario/inventory-pro/internal/domain/repository"
+	"github.com/jhoicas/Inventario-api/internal/application/billing"
+	"github.com/jhoicas/Inventario-api/internal/application/inventory"
+	"github.com/jhoicas/Inventario-api/internal/domain/repository"
 )
 
 // Ensure TxRunner implements inventory.TxRunner and billing.BillingTxRunner.

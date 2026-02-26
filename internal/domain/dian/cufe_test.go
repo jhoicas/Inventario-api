@@ -6,7 +6,7 @@ import (
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/tu-usuario/inventory-pro/internal/domain/dian"
+	"github.com/jhoicas/Inventario-api/internal/domain/dian"
 )
 
 // ──────────────────────────────────────────────────────────────────────────────

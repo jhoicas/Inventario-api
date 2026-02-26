@@ -7,9 +7,9 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/tu-usuario/inventory-pro/internal/domain"
-	"github.com/tu-usuario/inventory-pro/internal/domain/entity"
-	"github.com/tu-usuario/inventory-pro/internal/domain/repository"
+	"github.com/jhoicas/Inventario-api/internal/domain"
+	"github.com/jhoicas/Inventario-api/internal/domain/entity"
+	"github.com/jhoicas/Inventario-api/internal/domain/repository"
 )
 
 var _ repository.UserRepository = (*UserRepo)(nil)

@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/shopspring/decimal"
-	"github.com/tu-usuario/inventory-pro/internal/application/dto"
-	"github.com/tu-usuario/inventory-pro/internal/domain/repository"
+	"github.com/jhoicas/Inventario-api/internal/application/dto"
+	"github.com/jhoicas/Inventario-api/internal/domain/repository"
 )
 
 const dashboardTopSKUs = 5 // número de SKUs en el widget del dashboard

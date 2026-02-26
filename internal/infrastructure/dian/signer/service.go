@@ -17,7 +17,7 @@ import (
 	"time"
 
 	"github.com/beevik/etree"
-	"github.com/tu-usuario/inventory-pro/pkg/dian"
+	"github.com/jhoicas/Inventario-api/pkg/dian"
 	"github.com/ucarion/c14n"
 )
 

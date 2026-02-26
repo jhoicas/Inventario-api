@@ -1,6 +1,6 @@
 package repository
 
-import "github.com/tu-usuario/inventory-pro/internal/domain/entity"
+import "github.com/jhoicas/Inventario-api/internal/domain/entity"
 
 // CustomerRepository define el puerto de persistencia para Customer (facturación).
 type CustomerRepository interface {

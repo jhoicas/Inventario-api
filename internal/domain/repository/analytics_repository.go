@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/shopspring/decimal"
-	"github.com/tu-usuario/inventory-pro/internal/application/dto"
+	"github.com/jhoicas/Inventario-api/internal/application/dto"
 )
 
 // ChannelSalesResult resultado crudo de la consulta de ventas por canal.

@@ -2,9 +2,9 @@ package http
 
 import (
 	"github.com/gofiber/fiber/v2"
-	"github.com/tu-usuario/inventory-pro/internal/application/auth"
-	"github.com/tu-usuario/inventory-pro/internal/application/dto"
-	"github.com/tu-usuario/inventory-pro/internal/domain"
+	"github.com/jhoicas/Inventario-api/internal/application/auth"
+	"github.com/jhoicas/Inventario-api/internal/application/dto"
+	"github.com/jhoicas/Inventario-api/internal/domain"
 )
 
 // AuthHandler maneja registro y login.

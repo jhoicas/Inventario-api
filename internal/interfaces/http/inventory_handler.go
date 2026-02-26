@@ -2,9 +2,9 @@ package http
 
 import (
 	"github.com/gofiber/fiber/v2"
-	"github.com/tu-usuario/inventory-pro/internal/application/dto"
-	"github.com/tu-usuario/inventory-pro/internal/application/inventory"
-	"github.com/tu-usuario/inventory-pro/internal/domain"
+	"github.com/jhoicas/Inventario-api/internal/application/dto"
+	"github.com/jhoicas/Inventario-api/internal/application/inventory"
+	"github.com/jhoicas/Inventario-api/internal/domain"
 )
 
 // InventoryHandler maneja las peticiones HTTP de movimientos e inventario (protegido).

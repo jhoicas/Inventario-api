@@ -3,7 +3,7 @@ package inventory
 import (
 	"context"
 
-	"github.com/tu-usuario/inventory-pro/internal/domain/repository"
+	"github.com/jhoicas/Inventario-api/internal/domain/repository"
 )
 
 // TxRunner ejecuta una función dentro de una transacción de BD, pasando repositorios atados a esa tx.

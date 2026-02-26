@@ -1,7 +1,7 @@
 package repository
 
 import (
-	"github.com/tu-usuario/inventory-pro/internal/domain/entity"
+	"github.com/jhoicas/Inventario-api/internal/domain/entity"
 	"time"
 )
 

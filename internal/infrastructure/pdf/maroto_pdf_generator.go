@@ -34,8 +34,8 @@ import (
 	"github.com/johnfercher/maroto/v2/pkg/core"
 	"github.com/johnfercher/maroto/v2/pkg/props"
 
-	appbilling "github.com/tu-usuario/inventory-pro/internal/application/billing"
-	"github.com/tu-usuario/inventory-pro/internal/domain/entity"
+	appbilling "github.com/jhoicas/Inventario-api/internal/application/billing"
+	"github.com/jhoicas/Inventario-api/internal/domain/entity"
 )
 
 // ── Paleta de colores ─────────────────────────────────────────────────────────

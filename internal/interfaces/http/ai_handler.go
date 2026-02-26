@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/tu-usuario/inventory-pro/internal/application/dto"
-	"github.com/tu-usuario/inventory-pro/internal/application/usecase"
+	"github.com/jhoicas/Inventario-api/internal/application/dto"
+	"github.com/jhoicas/Inventario-api/internal/application/usecase"
 )
 
 // AIHandler maneja los endpoints de clasificación arancelaria asistida por IA.

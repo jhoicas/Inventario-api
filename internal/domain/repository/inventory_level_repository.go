@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/shopspring/decimal"
-	"github.com/tu-usuario/inventory-pro/internal/domain/entity"
+	"github.com/jhoicas/Inventario-api/internal/domain/entity"
 )
 
 // ReplenishmentItem resultado crudo del repositorio para un producto bajo reorden.

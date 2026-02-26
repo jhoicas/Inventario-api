@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/shopspring/decimal"
-	"github.com/tu-usuario/inventory-pro/internal/application/dto"
-	"github.com/tu-usuario/inventory-pro/internal/application/ports"
+	"github.com/jhoicas/Inventario-api/internal/application/dto"
+	"github.com/jhoicas/Inventario-api/internal/application/ports"
 )
 
 // Verificar en tiempo de compilación que AnthropicService implementa LLMService.

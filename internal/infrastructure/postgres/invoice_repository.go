@@ -7,8 +7,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/tu-usuario/inventory-pro/internal/domain/entity"
-	"github.com/tu-usuario/inventory-pro/internal/domain/repository"
+	"github.com/jhoicas/Inventario-api/internal/domain/entity"
+	"github.com/jhoicas/Inventario-api/internal/domain/repository"
 )
 
 var _ repository.InvoiceRepository = (*InvoiceRepo)(nil)

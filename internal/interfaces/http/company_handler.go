@@ -2,9 +2,9 @@ package http
 
 import (
 	"github.com/gofiber/fiber/v2"
-	"github.com/tu-usuario/inventory-pro/internal/application/dto"
-	"github.com/tu-usuario/inventory-pro/internal/application/usecase"
-	"github.com/tu-usuario/inventory-pro/internal/domain"
+	"github.com/jhoicas/Inventario-api/internal/application/dto"
+	"github.com/jhoicas/Inventario-api/internal/application/usecase"
+	"github.com/jhoicas/Inventario-api/internal/domain"
 )
 
 // CompanyHandler maneja las peticiones HTTP para el recurso Company.

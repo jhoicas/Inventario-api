@@ -3,7 +3,7 @@ package ports
 import (
 	"context"
 
-	"github.com/tu-usuario/inventory-pro/internal/application/dto"
+	"github.com/jhoicas/Inventario-api/internal/application/dto"
 )
 
 // LLMService define el puerto de salida para los servicios de inteligencia artificial.

@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/tu-usuario/inventory-pro/internal/application/dto"
+	"github.com/jhoicas/Inventario-api/internal/application/dto"
 )
 
 // moduleChecker es el contrato mínimo que necesita el middleware para verificar módulos.

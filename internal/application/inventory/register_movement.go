@@ -3,7 +3,7 @@ package inventory
 import (
 	"context"
 
-	"github.com/tu-usuario/inventory-pro/internal/application/dto"
+	"github.com/jhoicas/Inventario-api/internal/application/dto"
 )
 
 // RegisterMovementFromRequest adapta el request HTTP al caso de uso RegisterMovement(ctx, MovementInputDTO).

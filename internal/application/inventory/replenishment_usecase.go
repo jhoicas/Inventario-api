@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/shopspring/decimal"
-	"github.com/tu-usuario/inventory-pro/internal/application/dto"
-	"github.com/tu-usuario/inventory-pro/internal/domain/repository"
+	"github.com/jhoicas/Inventario-api/internal/application/dto"
+	"github.com/jhoicas/Inventario-api/internal/domain/repository"
 )
 
 // ReplenishmentUseCase genera la lista semanal de reposición para una bodega.

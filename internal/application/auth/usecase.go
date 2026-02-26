@@ -4,11 +4,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/tu-usuario/inventory-pro/internal/application/dto"
-	"github.com/tu-usuario/inventory-pro/internal/domain"
-	"github.com/tu-usuario/inventory-pro/internal/domain/entity"
-	"github.com/tu-usuario/inventory-pro/internal/domain/repository"
-	"github.com/tu-usuario/inventory-pro/pkg/jwt"
+	"github.com/jhoicas/Inventario-api/internal/application/dto"
+	"github.com/jhoicas/Inventario-api/internal/domain"
+	"github.com/jhoicas/Inventario-api/internal/domain/entity"
+	"github.com/jhoicas/Inventario-api/internal/domain/repository"
+	"github.com/jhoicas/Inventario-api/pkg/jwt"
 	"golang.org/x/crypto/bcrypt"
 )
 

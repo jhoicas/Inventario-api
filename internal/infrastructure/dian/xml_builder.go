@@ -7,7 +7,7 @@ import (
 	"strconv"
 
 	"github.com/shopspring/decimal"
-	"github.com/tu-usuario/inventory-pro/pkg/dian"
+	"github.com/jhoicas/Inventario-api/pkg/dian"
 )
 
 // Namespaces oficiales UBL 2.1 y DIAN (Anexo Técnico 1.9).

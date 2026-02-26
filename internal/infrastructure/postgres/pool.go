@@ -10,7 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	pgxdecimal "github.com/jackc/pgx-shopspring-decimal"
-	"github.com/tu-usuario/inventory-pro/pkg/config"
+	"github.com/jhoicas/Inventario-api/pkg/config"
 )
 
 // NewPool crea un pool de conexiones PostgreSQL usando la configuración de la app.

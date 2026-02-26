@@ -1,6 +1,6 @@
 package repository
 
-import "github.com/tu-usuario/inventory-pro/internal/domain/entity"
+import "github.com/jhoicas/Inventario-api/internal/domain/entity"
 
 // InvoiceRepository define el puerto de persistencia para Invoice y detalles.
 type InvoiceRepository interface {

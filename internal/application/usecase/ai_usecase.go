@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/tu-usuario/inventory-pro/internal/application/dto"
-	"github.com/tu-usuario/inventory-pro/internal/application/ports"
+	"github.com/jhoicas/Inventario-api/internal/application/dto"
+	"github.com/jhoicas/Inventario-api/internal/application/ports"
 )
 
 // AIUseCase orquesta la clasificación arancelaria asistida por IA.

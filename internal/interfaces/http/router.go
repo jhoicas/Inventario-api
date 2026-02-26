@@ -2,12 +2,12 @@ package http
 
 import (
 	"github.com/gofiber/fiber/v2"
-	appanalytics "github.com/tu-usuario/inventory-pro/internal/application/analytics"
-	"github.com/tu-usuario/inventory-pro/internal/application/auth"
-	"github.com/tu-usuario/inventory-pro/internal/application/billing"
-	"github.com/tu-usuario/inventory-pro/internal/application/inventory"
-	"github.com/tu-usuario/inventory-pro/internal/application/usecase"
-	"github.com/tu-usuario/inventory-pro/internal/domain/entity"
+	appanalytics "github.com/jhoicas/Inventario-api/internal/application/analytics"
+	"github.com/jhoicas/Inventario-api/internal/application/auth"
+	"github.com/jhoicas/Inventario-api/internal/application/billing"
+	"github.com/jhoicas/Inventario-api/internal/application/inventory"
+	"github.com/jhoicas/Inventario-api/internal/application/usecase"
+	"github.com/jhoicas/Inventario-api/internal/domain/entity"
 )
 
 // RouterDeps dependencias para el router.

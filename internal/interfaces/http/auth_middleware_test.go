@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	apphttp "github.com/tu-usuario/inventory-pro/internal/interfaces/http"
-	pkgjwt "github.com/tu-usuario/inventory-pro/pkg/jwt"
+	apphttp "github.com/jhoicas/Inventario-api/internal/interfaces/http"
+	pkgjwt "github.com/jhoicas/Inventario-api/pkg/jwt"
 )
 
 // ──────────────────────────────────────────────────────────────────────────────

@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/tu-usuario/inventory-pro/internal/domain"
-	"github.com/tu-usuario/inventory-pro/internal/domain/entity"
-	"github.com/tu-usuario/inventory-pro/internal/domain/repository"
+	"github.com/jhoicas/Inventario-api/internal/domain"
+	"github.com/jhoicas/Inventario-api/internal/domain/entity"
+	"github.com/jhoicas/Inventario-api/internal/domain/repository"
 )
 
 // PDFUseCase genera la representación gráfica (PDF) de una factura electrónica.

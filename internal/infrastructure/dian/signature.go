@@ -15,7 +15,7 @@ import (
 	"strings"
 
 	"github.com/beevik/etree"
-	"github.com/tu-usuario/inventory-pro/pkg/dian"
+	"github.com/jhoicas/Inventario-api/pkg/dian"
 )
 
 // URL de la política de firma DIAN (XAdES-EPES). Sustituir por la URL oficial si la DIAN la publica.

@@ -8,12 +8,12 @@ import (
 	"strings"
 	"time"
 
-	infradian "github.com/tu-usuario/inventory-pro/internal/infrastructure/dian"
-	"github.com/tu-usuario/inventory-pro/internal/infrastructure/dian/signer"
+	infradian "github.com/jhoicas/Inventario-api/internal/infrastructure/dian"
+	"github.com/jhoicas/Inventario-api/internal/infrastructure/dian/signer"
 
-	"github.com/tu-usuario/inventory-pro/internal/domain/entity"
-	"github.com/tu-usuario/inventory-pro/internal/domain/repository"
-	pkgdian "github.com/tu-usuario/inventory-pro/pkg/dian"
+	"github.com/jhoicas/Inventario-api/internal/domain/entity"
+	"github.com/jhoicas/Inventario-api/internal/domain/repository"
+	pkgdian "github.com/jhoicas/Inventario-api/pkg/dian"
 )
 
 // DIANOrchestrator orquesta el ciclo completo de firma y envío electrónico DIAN:

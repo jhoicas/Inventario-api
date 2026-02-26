@@ -2,8 +2,8 @@ package http
 
 import (
 	"github.com/gofiber/fiber/v2"
-	appanalytics "github.com/tu-usuario/inventory-pro/internal/application/analytics"
-	"github.com/tu-usuario/inventory-pro/internal/application/dto"
+	appanalytics "github.com/jhoicas/Inventario-api/internal/application/analytics"
+	"github.com/jhoicas/Inventario-api/internal/application/dto"
 )
 
 // DashboardHandler maneja los endpoints del módulo de Dashboard.

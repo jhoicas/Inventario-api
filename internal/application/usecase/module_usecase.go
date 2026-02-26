@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/tu-usuario/inventory-pro/internal/domain/repository"
+	"github.com/jhoicas/Inventario-api/internal/domain/repository"
 )
 
 // ModuleService verifica qué módulos SaaS tiene activos una empresa.

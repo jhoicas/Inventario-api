@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/shopspring/decimal"
-	"github.com/tu-usuario/inventory-pro/internal/domain/entity"
+	"github.com/jhoicas/Inventario-api/internal/domain/entity"
 )
 
 // BillingResolutionData datos de la resolución de facturación DIAN (obligatorios en ExtensionContent).

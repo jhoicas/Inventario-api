@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/tu-usuario/inventory-pro/internal/domain/entity"
+	"github.com/jhoicas/Inventario-api/internal/domain/entity"
 )
 
 // CompressXMLToZip empaqueta el XML firmado en un archivo ZIP en memoria.
