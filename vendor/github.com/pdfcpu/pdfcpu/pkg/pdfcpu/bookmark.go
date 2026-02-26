@@ -32,9 +32,9 @@ import (
 )
 
 var (
-	errNoBookmarks       = errors.New("pdfcpu: no bookmarks available")
-	errInvalidBookmark   = errors.New("pdfcpu: invalid bookmark")
-	errExistingBookmarks = errors.New("pdfcpu: existing bookmarks")
+	errNoBookmarks        = errors.New("pdfcpu: no bookmarks available")
+	errCorruptedBookmarks = errors.New("pdfcpu: corrupt bookmark")
+	errExistingBookmarks  = errors.New("pdfcpu: existing bookmarks")
 )
 
 type Header struct {
@@ -113,44 +113,43 @@ func outlineItemTitle(s string) string {
 	return sb.String()
 }
 
-func destArray(ctx *model.Context, dest types.Object) (types.Array, error) {
+// PageObjFromDestinationArray returns an IndirectRef of the destinations page.
+func PageObjFromDestination(ctx *model.Context, dest types.Object) (*types.IndirectRef, error) {
+	var (
+		err error
+		ir  types.IndirectRef
+		arr types.Array
+	)
 	switch dest := dest.(type) {
 	case types.Name:
-		return ctx.DereferenceDestArray(dest.Value())
+		arr, err = ctx.DereferenceDestArray(dest.Value())
+		if err == nil {
+			ir = arr[0].(types.IndirectRef)
+		}
 	case types.StringLiteral:
 		s, err := types.StringLiteralToString(dest)
 		if err != nil {
 			return nil, err
 		}
-		return ctx.DereferenceDestArray(s)
+		arr, err = ctx.DereferenceDestArray(s)
+		if err == nil {
+			ir = arr[0].(types.IndirectRef)
+		}
 	case types.HexLiteral:
 		s, err := types.HexLiteralToString(dest)
 		if err != nil {
 			return nil, err
 		}
-		return ctx.DereferenceDestArray(s)
+		arr, err = ctx.DereferenceDestArray(s)
+		if err == nil {
+			ir = arr[0].(types.IndirectRef)
+		}
 	case types.Array:
-		return dest, nil
+		if dest[0] != nil {
+			ir = dest[0].(types.IndirectRef)
+		}
 	}
-	return nil, errors.Errorf("unable to resolve destination array %v\n", dest)
-}
-
-// PageNrFromDestination returns the page number of a destination.
-func PageNrFromDestination(ctx *model.Context, dest types.Object) (int, error) {
-	arr, err := destArray(ctx, dest)
-	if err != nil && ctx.XRefTable.ValidationMode == model.ValidationRelaxed {
-		return 0, nil
-	}
-
-	if i, ok := arr[0].(types.Integer); ok {
-		return i.Value(), nil
-	}
-
-	if ir, ok := arr[0].(types.IndirectRef); ok {
-		return ctx.PageNumber(ir.ObjectNumber.Value())
-	}
-
-	return 0, errors.Errorf("unable to extract dest pageNr of %v\n", dest)
+	return &ir, err
 }
 
 func title(ctx *model.Context, d types.Dict) (string, error) {
@@ -161,10 +160,7 @@ func title(ctx *model.Context, d types.Dict) (string, error) {
 
 	s, err := model.Text(obj)
 	if err != nil {
-		if ctx.XRefTable.ValidationMode == model.ValidationStrict {
-			return "", err
-		}
-		return "", nil
+		return "", err
 	}
 
 	return outlineItemTitle(s), nil
@@ -213,10 +209,6 @@ func BookmarksForOutlineItem(ctx *model.Context, item *types.IndirectRef, parent
 			return nil, err
 		}
 
-		if title == "" {
-			continue
-		}
-
 		// Retrieve page number out of a destination via "Dest" or "Goto Action".
 		dest, destFound := d["Dest"]
 		if !destFound {
@@ -237,7 +229,15 @@ func BookmarksForOutlineItem(ctx *model.Context, item *types.IndirectRef, parent
 			return nil, err
 		}
 
-		pageFrom, err := PageNrFromDestination(ctx, obj)
+		ir, err := PageObjFromDestination(ctx, obj)
+		if err != nil {
+			return nil, err
+		}
+		if ir == nil {
+			continue
+		}
+
+		pageFrom, err := ctx.PageNumber(ir.ObjectNumber.Value())
 		if err != nil {
 			return nil, err
 		}
@@ -306,7 +306,7 @@ func BookmarkList(ctx *model.Context) ([]string, error) {
 		return nil, err
 	}
 
-	if len(bms) == 0 {
+	if bms == nil {
 		return []string{"no bookmarks available"}, nil
 	}
 
@@ -318,7 +318,7 @@ func ExportBookmarks(ctx *model.Context, source string) (*BookmarkTree, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(bms) == 0 {
+	if bms == nil {
 		return nil, nil
 	}
 
@@ -399,11 +399,11 @@ func createOutlineItemDict(ctx *model.Context, bms []Bookmark, parent *types.Ind
 	for i, bm := range bms {
 
 		if i == 0 && parentPageNr != nil && bm.PageFrom < *parentPageNr {
-			return nil, nil, 0, 0, errInvalidBookmark
+			return nil, nil, 0, 0, errCorruptedBookmarks
 		}
 
 		if i > 0 && bm.PageFrom < bms[i-1].PageFrom {
-			return nil, nil, 0, 0, errInvalidBookmark
+			return nil, nil, 0, 0, errCorruptedBookmarks
 		}
 
 		total++
@@ -458,49 +458,11 @@ func createOutlineItemDict(ctx *model.Context, bms []Bookmark, parent *types.Ind
 	return first, irPrev, total, visible, nil
 }
 
-func cleanupDestinations(ctx *model.Context, dNamesEmpty bool) error {
-	if dNamesEmpty {
-		delete(ctx.Names, "Dests")
-		if err := ctx.RemoveNameTree("Dests"); err != nil {
-			return err
-		}
-	}
-
-	if ctx.Dests != nil && len(ctx.Dests) == 0 {
-		delete(ctx.RootDict, "Dests")
-	}
-
-	return nil
-}
-
-func removeDest(ctx *model.Context, name string) (bool, bool, error) {
-	var (
-		dNamesEmpty, ok bool
-		err             error
-	)
-	if dNames := ctx.Names["Dests"]; dNames != nil {
-		// Remove destName from dest nametree.
-		dNamesEmpty, ok, err = dNames.Remove(ctx.XRefTable, name)
-		if err != nil {
-			return false, false, err
-		}
-	}
-
-	if !ok {
-		if ctx.Dests != nil {
-			// Remove destName from named destinations.
-			ok = ctx.Dests.Delete(name) != nil
-		}
-	}
-
-	return dNamesEmpty, ok, err
-}
-
 func removeNamedDests(ctx *model.Context, item *types.IndirectRef) error {
 	var (
-		d               types.Dict
-		err             error
-		dNamesEmpty, ok bool
+		d         types.Dict
+		err       error
+		empty, ok bool
 	)
 	for ir := item; ir != nil; ir = d.IndirectRefEntry("Next") {
 
@@ -531,7 +493,9 @@ func removeNamedDests(ctx *model.Context, item *types.IndirectRef) error {
 			continue
 		}
 
-		dNamesEmpty, ok, err = removeDest(ctx, s)
+		// Remove destName from dest nametree.
+		// TODO also try to remove from any existing root.Dests
+		empty, ok, err = ctx.Names["Dests"].Remove(ctx.XRefTable, s)
 		if err != nil {
 			return err
 		}
@@ -550,7 +514,14 @@ func removeNamedDests(ctx *model.Context, item *types.IndirectRef) error {
 		}
 	}
 
-	return cleanupDestinations(ctx, dNamesEmpty)
+	if empty {
+		delete(ctx.Names, "Dests")
+		if err := ctx.RemoveNameTree("Dests"); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // RemoveBookmarks erases all outlines from ctx.

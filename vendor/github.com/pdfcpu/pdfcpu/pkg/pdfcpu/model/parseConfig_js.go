@@ -141,39 +141,12 @@ func handleConfEncryptKeyLength(v string, c *Configuration) error {
 	return nil
 }
 
-func handleFormFieldListMaxColWidth(v string, c *Configuration) error {
-	i, err := strconv.Atoi(v)
-	if err != nil || i < 0 {
-		return errors.Errorf("FormFieldListMaxColWidth is numeric >= 0, got: %s", v)
-	}
-	c.FormFieldListMaxColWidth = i
-	return nil
-}
-
 func handleTimeout(v string, c *Configuration) error {
 	i, err := strconv.Atoi(v)
-	if err != nil || i <= 0 {
+	if err != nil {
 		return errors.Errorf("timeout is numeric > 0, got: %s", v)
 	}
 	c.Timeout = i
-	return nil
-}
-
-func handleTimeoutCRL(v string, c *Configuration) error {
-	i, err := strconv.Atoi(v)
-	if err != nil || i <= 0 {
-		return errors.Errorf("timeoutCRL is numeric > 0, got: %s", v)
-	}
-	c.TimeoutCRL = i
-	return nil
-}
-
-func handleTimeoutOCSP(v string, c *Configuration) error {
-	i, err := strconv.Atoi(v)
-	if err != nil || i <= 0 {
-		return errors.Errorf("timeoutOCSP is numeric > 0, got: %s", v)
-	}
-	c.TimeoutOCSP = i
 	return nil
 }
 
@@ -199,21 +172,6 @@ func handleConfUnit(v string, c *Configuration) error {
 		c.Unit = types.MILLIMETRES
 	default:
 		return errors.Errorf("invalid unit: %s", v)
-	}
-	return nil
-}
-
-func handlePreferredCertRevocationChecker(v string, c *Configuration) error {
-	v1 := strings.ToLower(v)
-	switch v1 {
-	case "crl":
-		c.PreferredCertRevocationChecker = CRL
-	case "ocsp":
-		c.PreferredCertRevocationChecker = OCSP
-	case "":
-		c.PreferredCertRevocationChecker = CRL
-	default:
-		return errors.Errorf("invalid preferredCertRevocationChecker: %s", v)
 	}
 	return nil
 }
@@ -273,48 +231,26 @@ func parseKeysPart1(k, v string, c *Configuration) (bool, error) {
 	return false, nil
 }
 
-func parseKeysPart2(k, v string, c *Configuration) (bool, error) {
+func parseKeysPart2(k, v string, c *Configuration) (err error) {
 	switch k {
 
 	case "encryptUsingAES":
-		return true, handleConfEncryptUsingAES(k, v, c)
+		err = handleConfEncryptUsingAES(k, v, c)
 
 	case "encryptKeyLength":
-		return true, handleConfEncryptKeyLength(v, c)
+		err = handleConfEncryptKeyLength(v, c)
 
 	case "permissions":
-		return true, handleConfPermissions(v, c)
+		err = handleConfPermissions(v, c)
 
 	case "unit", "units":
-		return true, handleConfUnit(v, c)
+		err = handleConfUnit(v, c)
 
 	case "timestampFormat":
-		return true, handleTimestampFormat(v, c)
+		err = handleTimestampFormat(v, c)
 
 	case "dateFormat":
-		return true, handleDateFormat(v, c)
-
-	case "timeout":
-		return true, handleTimeout(v, c)
-
-	case "timeoutCRL":
-		return true, handleTimeoutCRL(v, c)
-
-	case "timeoutOCSP":
-		return true, handleTimeoutOCSP(v, c)
-
-	case "formFieldListMaxColWidth":
-		return true, handleFormFieldListMaxColWidth(v, c)
-
-	case "preferredCertRevocationChecker":
-		return true, handlePreferredCertRevocationChecker(v, c)
-	}
-
-	return false, nil
-}
-
-func parseKeysPart3(k, v string, c *Configuration) (err error) {
-	switch k {
+		err = handleDateFormat(v, c)
 
 	case "optimize":
 		c.Optimize, err = boolean(k, v)
@@ -334,6 +270,8 @@ func parseKeysPart3(k, v string, c *Configuration) (err error) {
 	case "offline":
 		c.Offline, err = boolean(k, v)
 
+	case "timeout":
+		handleTimeout(v, c)
 	}
 
 	return err
@@ -347,25 +285,13 @@ func parseKeyValue(k, v string, c *Configuration) error {
 	if ok {
 		return nil
 	}
-
-	ok, err = parseKeysPart2(k, v, c)
-	if err != nil {
-		return err
-	}
-	if ok {
-		return nil
-	}
-
-	return parseKeysPart3(k, v, c)
+	return parseKeysPart2(k, v, c)
 }
 
 func parseConfigFile(r io.Reader, configPath string) error {
 	//fmt.Println("parseConfigFile For JS")
 	var conf Configuration
 	conf.Path = configPath
-
-	// TODO add to config.yml
-	conf.OptimizeBeforeWriting = true
 
 	s := bufio.NewScanner(r)
 	for s.Scan() {

@@ -413,21 +413,13 @@ func validateAlternateImageStreamDicts(xRefTable *model.XRefTable, d types.Dict,
 func validateImageStreamDictPart1(xRefTable *model.XRefTable, sd *types.StreamDict, dictName string) (isImageMask bool, err error) {
 
 	// Width, integer, required
-	required := true
-	if xRefTable.ValidationMode == model.ValidationRelaxed {
-		required = false
-	}
-	_, err = validateIntegerEntry(xRefTable, sd.Dict, dictName, "Width", required, model.V10, nil)
+	_, err = validateIntegerEntry(xRefTable, sd.Dict, dictName, "Width", REQUIRED, model.V10, nil)
 	if err != nil {
 		return false, err
 	}
 
 	// Height, integer, required
-	required = true
-	if xRefTable.ValidationMode == model.ValidationRelaxed {
-		required = false
-	}
-	_, err = validateIntegerEntry(xRefTable, sd.Dict, dictName, "Height", required, model.V10, nil)
+	_, err = validateIntegerEntry(xRefTable, sd.Dict, dictName, "Height", REQUIRED, model.V10, nil)
 	if err != nil {
 		return false, err
 	}
@@ -438,15 +430,12 @@ func validateImageStreamDictPart1(xRefTable *model.XRefTable, sd *types.StreamDi
 		return false, err
 	}
 
-	isImageMask = (imageMask != nil) && *imageMask
+	isImageMask = (imageMask != nil) && *imageMask == true
 
 	// ColorSpace, name or array, required unless used filter is JPXDecode; not allowed for imagemasks.
 	if !isImageMask {
 
-		required = REQUIRED
-		if xRefTable.ValidationMode == model.ValidationRelaxed {
-			required = OPTIONAL
-		}
+		required := REQUIRED
 
 		if sd.HasSoleFilterNamed(filter.JPX) {
 			required = OPTIONAL
@@ -470,10 +459,9 @@ func validateImageStreamDictPart2(xRefTable *model.XRefTable, sd *types.StreamDi
 
 	// BitsPerComponent, integer
 	required := REQUIRED
-	if sd.HasSoleFilterNamed(filter.JPX) || isImageMask || xRefTable.ValidationMode == model.ValidationRelaxed {
+	if sd.HasSoleFilterNamed(filter.JPX) || isImageMask {
 		required = OPTIONAL
 	}
-
 	// For imageMasks BitsPerComponent must be 1.
 	var validateBPC func(i int) bool
 	if isImageMask {
@@ -486,8 +474,11 @@ func validateImageStreamDictPart2(xRefTable *model.XRefTable, sd *types.StreamDi
 		return err
 	}
 
-	// Note 8.6.5.8: If a PDF processor does not recognise the specified name, it shall use the RelativeColorimetric intent by default.
-	_, err = validateNameEntry(xRefTable, sd.Dict, dictName, "Intent", OPTIONAL, model.V11, nil)
+	// Intent, name, optional, since V1.0
+	validate := func(s string) bool {
+		return types.MemberOf(s, []string{"AbsoluteColorimetric", "RelativeColorimetric", "Saturation", "Perceptual"})
+	}
+	_, err = validateNameEntry(xRefTable, sd.Dict, dictName, "Intent", OPTIONAL, model.V11, validate)
 	if err != nil {
 		return err
 	}
@@ -768,10 +759,6 @@ func validateXObjectStreamDict(xRefTable *model.XRefTable, o types.Object) error
 
 	// see 8.8 External Objects
 
-	if o == nil {
-		return nil
-	}
-
 	// Dereference stream dict and ensure it is validated exactly once in order
 	// to handle XObjects(forms) with recursive structures like produced by Microsoft.
 	sd, valid, err := xRefTable.DereferenceStreamDict(o)
@@ -797,7 +784,7 @@ func validateXObjectStreamDict(xRefTable *model.XRefTable, o types.Object) error
 		return err
 	}
 
-	if subtype == nil || len(*subtype) == 0 {
+	if subtype == nil {
 		// relaxed
 		_, found := sd.Find("BBox")
 		if found {

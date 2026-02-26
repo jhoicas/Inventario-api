@@ -109,9 +109,6 @@ github.com/hashicorp/hcl/json/token
 # github.com/hhrutter/lzw v1.0.0
 ## explicit; go 1.19
 github.com/hhrutter/lzw
-# github.com/hhrutter/pkcs7 v0.2.0
-## explicit; go 1.23
-github.com/hhrutter/pkcs7
 # github.com/hhrutter/tiff v1.0.2
 ## explicit; go 1.19
 github.com/hhrutter/tiff
@@ -211,8 +208,8 @@ github.com/mitchellh/mapstructure
 # github.com/oklog/ulid v1.3.1
 ## explicit
 github.com/oklog/ulid
-# github.com/pdfcpu/pdfcpu v0.11.1
-## explicit; go 1.24.0
+# github.com/pdfcpu/pdfcpu v0.9.1
+## explicit; go 1.22
 github.com/pdfcpu/pdfcpu/internal/corefont/metrics
 github.com/pdfcpu/pdfcpu/pkg/api
 github.com/pdfcpu/pdfcpu/pkg/filter
@@ -229,7 +226,6 @@ github.com/pdfcpu/pdfcpu/pkg/pdfcpu/matrix
 github.com/pdfcpu/pdfcpu/pkg/pdfcpu/model
 github.com/pdfcpu/pdfcpu/pkg/pdfcpu/primitives
 github.com/pdfcpu/pdfcpu/pkg/pdfcpu/scan
-github.com/pdfcpu/pdfcpu/pkg/pdfcpu/sign
 github.com/pdfcpu/pdfcpu/pkg/pdfcpu/types
 github.com/pdfcpu/pdfcpu/pkg/pdfcpu/validate
 # github.com/pelletier/go-toml/v2 v2.2.2
@@ -340,7 +336,6 @@ go.uber.org/multierr
 ## explicit; go 1.24.0
 golang.org/x/crypto/bcrypt
 golang.org/x/crypto/blowfish
-golang.org/x/crypto/ocsp
 golang.org/x/crypto/pkcs12
 golang.org/x/crypto/pkcs12/internal/rc2
 # golang.org/x/exp v0.0.0-20230905200255-921286631fa9

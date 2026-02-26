@@ -18,21 +18,16 @@ package model
 
 import (
 	"bytes"
-	"encoding/binary"
-	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
 	"image/jpeg"
 	_ "image/png"
-
 	"io"
 	"math"
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/hhrutter/tiff"
 
 	"github.com/pdfcpu/pdfcpu/pkg/filter"
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/types"
@@ -116,8 +111,7 @@ func createSMaskObject(xRefTable *XRefTable, buf []byte, w, h, bpc int) (*types.
 	return xRefTable.IndRefForNewObject(*sd)
 }
 
-// CreateFlateImageStreamDict returns a flate stream dict.
-func CreateFlateImageStreamDict(xRefTable *XRefTable, buf, sm []byte, w, h, bpc int, cs string) (*types.StreamDict, error) {
+func createFlateImageObject(xRefTable *XRefTable, buf, sm []byte, w, h, bpc int, cs string) (*types.StreamDict, error) {
 	var softMaskIndRef *types.IndirectRef
 	if sm != nil {
 		var err error
@@ -127,22 +121,14 @@ func CreateFlateImageStreamDict(xRefTable *XRefTable, buf, sm []byte, w, h, bpc 
 		}
 	}
 
-	sd := &types.StreamDict{
-		Dict: types.Dict(
-			map[string]types.Object{
-				"Type":             types.Name("XObject"),
-				"Subtype":          types.Name("Image"),
-				"Width":            types.Integer(w),
-				"Height":           types.Integer(h),
-				"BitsPerComponent": types.Integer(bpc),
-				"ColorSpace":       types.Name(cs),
-			},
-		),
-		Content:        buf,
-		FilterPipeline: []types.PDFFilter{{Name: filter.Flate, DecodeParms: nil}},
-	}
-
-	sd.InsertName("Filter", filter.Flate)
+	// Create Flate stream dict.
+	sd, _ := xRefTable.NewStreamDictForBuf(buf)
+	sd.InsertName("Type", "XObject")
+	sd.InsertName("Subtype", "Image")
+	sd.InsertInt("Width", w)
+	sd.InsertInt("Height", h)
+	sd.InsertInt("BitsPerComponent", bpc)
+	sd.InsertName("ColorSpace", cs)
 
 	if softMaskIndRef != nil {
 		sd.Insert("SMask", *softMaskIndRef)
@@ -159,8 +145,8 @@ func CreateFlateImageStreamDict(xRefTable *XRefTable, buf, sm []byte, w, h, bpc 
 	return sd, nil
 }
 
-// CreateDCTImageStreamDict returns a DCT encoded stream dict.
-func CreateDCTImageStreamDict(xRefTable *XRefTable, buf []byte, w, h, bpc int, cs string) (*types.StreamDict, error) {
+// CreateDCTImageObject returns a DCT encoded stream dict.
+func CreateDCTImageObject(xRefTable *XRefTable, buf []byte, w, h, bpc int, cs string) (*types.StreamDict, error) {
 	sd := &types.StreamDict{
 		Dict: types.Dict(
 			map[string]types.Object{
@@ -327,63 +313,6 @@ func writeNRGBA64ImageBuf(xRefTable *XRefTable, img image.Image) ([]byte, []byte
 	return buf, sm
 }
 
-func writeSoftmask16(xRefTable *XRefTable, img *image.Alpha16) []byte {
-	w := img.Bounds().Dx()
-	h := img.Bounds().Dy()
-	var sm []byte
-	var softMask bool
-
-	for y := 0; y < h; y++ {
-		for x := 0; x < w; x++ {
-			c := img.Alpha16At(x, y)
-			if !softMask {
-				if xRefTable != nil && c.A != 0xFFFF {
-					softMask = true
-					sm = []byte{}
-					for j := 0; j < y*w+x; j++ {
-						sm = append(sm, 0xFF)
-						sm = append(sm, 0xFF)
-					}
-					sm = append(sm, uint8(c.A>>8))
-					sm = append(sm, uint8(c.A&0x00FF))
-				}
-			} else {
-				sm = append(sm, uint8(c.A>>8))
-				sm = append(sm, uint8(c.A&0x00FF))
-			}
-		}
-	}
-
-	return sm
-}
-
-func writeSoftmask(xRefTable *XRefTable, img *image.Alpha) []byte {
-	w := img.Bounds().Dx()
-	h := img.Bounds().Dy()
-	var sm []byte
-	var softMask bool
-
-	for y := 0; y < h; y++ {
-		for x := 0; x < w; x++ {
-			c := img.AlphaAt(x, y)
-			if !softMask {
-				if xRefTable != nil && c.A != 0xFF {
-					softMask = true
-					sm = []byte{}
-					for j := 0; j < y*w+x; j++ {
-						sm = append(sm, 0xFF)
-					}
-					sm = append(sm, uint8(c.A))
-				}
-			} else {
-				sm = append(sm, uint8(c.A))
-			}
-		}
-	}
-
-	return sm
-}
-
 func writeGrayImageBuf(img image.Image) []byte {
 	w := img.Bounds().Dx()
 	h := img.Bounds().Dy()
@@ -463,57 +392,11 @@ func convertNYCbCrAToRGBA(img *image.NYCbCrA) *image.RGBA {
 	return m
 }
 
-func extractAlpha(img image.Image) image.Image {
+func convertToGray(img image.Image) *image.Gray {
 	b := img.Bounds()
-	cm := img.ColorModel()
-
-	if cm == color.RGBA64Model || cm == color.NRGBA64Model {
-		m := image.NewAlpha16(image.Rect(0, 0, b.Dx(), b.Dy()))
-		draw.Draw(m, m.Bounds(), img, b.Min, draw.Src)
-		return m
-	} else {
-		m := image.NewAlpha(image.Rect(0, 0, b.Dx(), b.Dy()))
-		draw.Draw(m, m.Bounds(), img, b.Min, draw.Src)
-		return m
-	}
-
-}
-
-func checkIfGray(img image.Image) bool {
-	cm := img.ColorModel()
-	if cm == color.Gray16Model || cm == color.GrayModel {
-		return true
-	}
-
-	m := convertToRGBA(img)
-	b := m.Bounds()
-
-	w := b.Dx()
-	h := b.Dy()
-
-	for y := 0; y < h; y++ {
-		for x := 0; x < w; x++ {
-			c := m.At(x, y).(color.RGBA)
-			if c.B != c.G || c.B != c.R {
-				return false
-			}
-		}
-	}
-	return true
-}
-
-func convertToGray(img image.Image) image.Image {
-	b := img.Bounds()
-	cm := img.ColorModel()
-	if cm == color.RGBA64Model || cm == color.NRGBA64Model {
-		m := image.NewGray16(image.Rect(0, 0, b.Dx(), b.Dy()))
-		draw.Draw(m, m.Bounds(), img, b.Min, draw.Src)
-		return m
-	} else {
-		m := image.NewGray(image.Rect(0, 0, b.Dx(), b.Dy()))
-		draw.Draw(m, m.Bounds(), img, b.Min, draw.Src)
-		return m
-	}
+	m := image.NewGray(image.Rect(0, 0, b.Dx(), b.Dy()))
+	draw.Draw(m, m.Bounds(), img, b.Min, draw.Src)
+	return m
 }
 
 func convertToSepia(img image.Image) *image.RGBA {
@@ -541,18 +424,18 @@ func convertToSepia(img image.Image) *image.RGBA {
 	return m
 }
 
-func createImageStreamDict(xRefTable *XRefTable, buf, softMask []byte, w, h, bpc int, format, cs string) (*types.StreamDict, error) {
+func createImageDict(xRefTable *XRefTable, buf, softMask []byte, w, h, bpc int, format, cs string) (*types.StreamDict, int, int, error) {
 	var (
 		sd  *types.StreamDict
 		err error
 	)
 	switch format {
 	case "jpeg":
-		sd, err = CreateDCTImageStreamDict(xRefTable, buf, w, h, bpc, cs)
+		sd, err = CreateDCTImageObject(xRefTable, buf, w, h, bpc, cs)
 	default:
-		sd, err = CreateFlateImageStreamDict(xRefTable, buf, softMask, w, h, bpc, cs)
+		sd, err = createFlateImageObject(xRefTable, buf, softMask, w, h, bpc, cs)
 	}
-	return sd, err
+	return sd, w, h, err
 }
 
 func encodeJPEG(img image.Image) ([]byte, string, error) {
@@ -572,7 +455,7 @@ func encodeJPEG(img image.Image) ([]byte, string, error) {
 	return buf.Bytes(), cs, err
 }
 
-func createImageBuf(xRefTable *XRefTable, img image.Image, imgA image.Image, format string) ([]byte, []byte, int, string, error) {
+func createImageBuf(xRefTable *XRefTable, img image.Image, format string) ([]byte, []byte, int, string, error) {
 	var buf []byte
 	var sm []byte // soft mask aka alpha mask
 	var bpc int
@@ -622,28 +505,12 @@ func createImageBuf(xRefTable *XRefTable, img image.Image, imgA image.Image, for
 		// 8-bit grayscale color.
 		cs = DeviceGrayCS
 		bpc = 8
-		if imgA != nil {
-			switch imgA := imgA.(type) {
-			case *image.Alpha:
-				sm = writeSoftmask(xRefTable, imgA)
-			case *image.Alpha16:
-				sm = writeSoftmask16(xRefTable, imgA)
-			}
-		}
 		buf = writeGrayImageBuf(img)
 
 	case *image.Gray16:
 		// 16-bit grayscale color.
 		cs = DeviceGrayCS
 		bpc = 16
-		if imgA != nil {
-			switch imgA := imgA.(type) {
-			case *image.Alpha:
-				sm = writeSoftmask(xRefTable, imgA)
-			case *image.Alpha16:
-				sm = writeSoftmask16(xRefTable, imgA)
-			}
-		}
 		buf = writeGray16ImageBuf(img)
 
 	case *image.CMYK:
@@ -687,249 +554,43 @@ func colorSpaceForJPEGColorModel(cm color.Model) string {
 	return ""
 }
 
-func createDCTImageStreamDictForJPEG(xRefTable *XRefTable, c image.Config, bb bytes.Buffer) (*types.StreamDict, error) {
+func createDCTImageObjectForJPEG(xRefTable *XRefTable, c image.Config, bb bytes.Buffer) (*types.StreamDict, int, int, error) {
 	cs := colorSpaceForJPEGColorModel(c.ColorModel)
 	if cs == "" {
-		return nil, errors.New("pdfcpu: unexpected color model for JPEG")
+		return nil, 0, 0, errors.New("pdfcpu: unexpected color model for JPEG")
 	}
 
-	return CreateDCTImageStreamDict(xRefTable, bb.Bytes(), c.Width, c.Height, 8, cs)
+	sd, err := CreateDCTImageObject(xRefTable, bb.Bytes(), c.Width, c.Height, 8, cs)
+
+	return sd, c.Width, c.Height, err
 }
 
-func createImageResourcesForJPEG(xRefTable *XRefTable, c image.Config, bb bytes.Buffer) ([]ImageResource, error) {
-	sd, err := createDCTImageStreamDictForJPEG(xRefTable, c, bb)
-	if err != nil {
-		return nil, err
-	}
-
-	indRef, err := xRefTable.IndRefForNewObject(*sd)
-	if err != nil {
-		return nil, err
-	}
-
-	res := Resource{ID: "Im0", IndRef: indRef}
-	ir := ImageResource{Res: res, Width: c.Width, Height: c.Height}
-	return []ImageResource{ir}, err
-}
-
-func decodeImage(xRefTable *XRefTable, buf *bytes.Reader, currentOffset int64, gray, sepia bool, byteOrder binary.ByteOrder, imgResources *[]ImageResource) (int64, error) {
-	img, err := tiff.DecodeAt(buf, currentOffset)
-	if err != nil {
-		return 0, err
-	}
-
-	if gray {
-		switch img.(type) {
-		case *image.Gray, *image.Gray16:
-		default:
-			img = convertToGray(img)
-		}
-	}
-
-	if sepia {
-		switch img.(type) {
-		case *image.Gray, *image.Gray16:
-		default:
-			img = convertToSepia(img)
-		}
-	}
-
-	imgBuf, softMask, bpc, cs, err := createImageBuf(xRefTable, img, nil, "tiff")
-	if err != nil {
-		return 0, err
-	}
-
-	w, h := img.Bounds().Dx(), img.Bounds().Dy()
-
-	sd, err := createImageStreamDict(xRefTable, imgBuf, softMask, w, h, bpc, "tiff", cs)
-	if err != nil {
-		return 0, err
-	}
-
-	indRef, err := xRefTable.IndRefForNewObject(*sd)
-	if err != nil {
-		return 0, err
-	}
-
-	res := Resource{ID: "Im0", IndRef: indRef}
-	ir := ImageResource{Res: res, Width: w, Height: h}
-	*imgResources = append(*imgResources, ir)
-
-	if _, err := buf.Seek(currentOffset, io.SeekStart); err != nil {
-		return 0, err
-	}
-
-	var numEntries uint16
-	if err := binary.Read(buf, byteOrder, &numEntries); err != nil {
-		return 0, err
-	}
-
-	if _, err := buf.Seek(int64(numEntries)*12, io.SeekCurrent); err != nil {
-		return 0, err
-	}
-
-	var nextIFDOffset uint32
-	if err := binary.Read(buf, byteOrder, &nextIFDOffset); err != nil {
-		return 0, err
-	}
-
-	// if nextIFDOffset >= uint32(bb.Len()) {
-	// 	fmt.Println("Invalid next IFD offset, stopping.")
-	// 	break
-	// }
-
-	return int64(nextIFDOffset), nil
-}
-
-func createImageResourcesForTIFF(xRefTable *XRefTable, bb bytes.Buffer, gray, sepia bool) ([]ImageResource, error) {
-	imgResources := []ImageResource{}
-
-	buf := bytes.NewReader(bb.Bytes())
-
-	var header [8]byte
-	if _, err := io.ReadFull(buf, header[:]); err != nil {
-		return nil, err
-	}
-
-	var byteOrder binary.ByteOrder
-	if string(header[:2]) == "II" {
-		byteOrder = binary.LittleEndian
-	} else if string(header[:2]) == "MM" {
-		byteOrder = binary.BigEndian
-	} else {
-		return nil, fmt.Errorf("invalid TIFF byte order")
-	}
-
-	firstIFDOffset := byteOrder.Uint32(header[4:])
-	if firstIFDOffset < 8 || firstIFDOffset >= uint32(bb.Len()) {
-		return nil, fmt.Errorf("invalid TIFF file: no valid IFD")
-	}
-
-	var err error
-
-	off := int64(firstIFDOffset)
-
-	for off != 0 && off < int64(bb.Len()) {
-		off, err = decodeImage(xRefTable, buf, off, gray, sepia, byteOrder, &imgResources)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return imgResources, nil
-}
-
-func createImageResources(xRefTable *XRefTable, c image.Config, bb bytes.Buffer, gray, sepia bool) ([]ImageResource, error) {
-	img, format, err := image.Decode(&bb)
-	if err != nil {
-		return nil, err
-	}
-
-	if gray {
-		switch img.(type) {
-		case *image.Gray, *image.Gray16:
-		default:
-			img = convertToGray(img)
-		}
-	}
-
-	if sepia {
-		switch img.(type) {
-		case *image.Gray, *image.Gray16:
-		default:
-			img = convertToSepia(img)
-		}
-	}
-
-	imgBuf, softMask, bpc, cs, err := createImageBuf(xRefTable, img, nil, format)
-	if err != nil {
-		return nil, err
-	}
-
-	w, h := img.Bounds().Dx(), img.Bounds().Dy()
-	if w != c.Width || h != c.Height {
-		return nil, errors.New("pdfcpu: unexpected width or height")
-	}
-
-	sd, err := createImageStreamDict(xRefTable, imgBuf, softMask, w, h, bpc, format, cs)
-	if err != nil {
-		return nil, err
-	}
-
-	indRef, err := xRefTable.IndRefForNewObject(*sd)
-	if err != nil {
-		return nil, err
-	}
-
-	res := Resource{ID: "Im0", IndRef: indRef}
-	ir := ImageResource{Res: res, Width: w, Height: h}
-	return []ImageResource{ir}, err
-}
-
-// CreateImageResources creates a new XObject for given image data represented by r and applies optional filters.
-func CreateImageResources(xRefTable *XRefTable, r io.Reader, gray, sepia bool) ([]ImageResource, error) {
+// CreateImageStreamDict returns a stream dict for image data represented by r and applies optional filters.
+func CreateImageStreamDict(xRefTable *XRefTable, r io.Reader, gray, sepia bool) (*types.StreamDict, int, int, error) {
 
 	var bb bytes.Buffer
 	tee := io.TeeReader(r, &bb)
 
 	var sniff bytes.Buffer
 	if _, err := io.Copy(&sniff, tee); err != nil {
-		return nil, err
+		return nil, 0, 0, err
 	}
 
 	c, format, err := image.DecodeConfig(&sniff)
 	if err != nil {
-		return nil, err
-	}
-
-	if format == "tiff" {
-		return createImageResourcesForTIFF(xRefTable, bb, gray, sepia)
+		return nil, 0, 0, err
 	}
 
 	if format == "jpeg" && !gray && !sepia {
-		return createImageResourcesForJPEG(xRefTable, c, bb)
-	}
-
-	return createImageResources(xRefTable, c, bb, gray, sepia)
-}
-
-// CreateImageStreamDict returns a stream dict for image data represented by r and applies optional filters.
-func CreateImageStreamDict(xRefTable *XRefTable, r io.Reader) (*types.StreamDict, int, int, error) {
-
-	var bb bytes.Buffer
-	tee := io.TeeReader(r, &bb)
-
-	var sniff bytes.Buffer
-	if _, err := io.Copy(&sniff, tee); err != nil {
-		return nil, 0, 0, err
-	}
-
-	c, configFormat, err := image.DecodeConfig(&sniff)
-	if err != nil {
-		return nil, 0, 0, err
+		return createDCTImageObjectForJPEG(xRefTable, c, bb)
 	}
 
 	img, format, err := image.Decode(&bb)
 	if err != nil {
 		return nil, 0, 0, err
 	}
-	gray := checkIfGray(img)
 
-	if configFormat == "jpeg" && !gray {
-		sd, err := createDCTImageStreamDictForJPEG(xRefTable, c, bb)
-		if err != nil {
-			return nil, 0, 0, err
-		}
-		return sd, c.Width, c.Height, nil
-	}
-
-	var imgA image.Image
-	if gray { // We could also check if the image is grayscale only by checking RGB / CMYK values
-		cm := img.ColorModel()
-		if hasAlpha(cm) {
-			imgA = extractAlpha(img)
-
-		}
+	if gray {
 		switch img.(type) {
 		case *image.Gray, *image.Gray16:
 		default:
@@ -937,41 +598,27 @@ func CreateImageStreamDict(xRefTable *XRefTable, r io.Reader) (*types.StreamDict
 		}
 	}
 
-	imgBuf, softMask, bpc, cs, err := createImageBuf(xRefTable, img, imgA, format)
+	if sepia {
+		switch img.(type) {
+		case *image.Gray, *image.Gray16:
+		default:
+			img = convertToSepia(img)
+		}
+	}
+
+	imgBuf, softMask, bpc, cs, err := createImageBuf(xRefTable, img, format)
 	if err != nil {
 		return nil, 0, 0, err
 	}
 
 	w, h := img.Bounds().Dx(), img.Bounds().Dy()
-	if w != c.Width || h != c.Height {
-		return nil, 0, 0, errors.New("pdfcpu: unexpected width or height")
-	}
 
-	sd, err := createImageStreamDict(xRefTable, imgBuf, softMask, w, h, bpc, format, cs)
-	if err != nil {
-		return nil, 0, 0, err
-	}
-	return sd, c.Width, c.Height, nil
-}
-
-func hasAlpha(cm color.Model) bool {
-	switch cm {
-	case color.Alpha16Model,
-		color.AlphaModel,
-		color.NYCbCrAModel,
-		color.RGBA64Model,
-		color.NRGBA64Model,
-		color.NRGBAModel,
-		color.RGBAModel:
-		return true
-	default:
-		return false
-	}
+	return createImageDict(xRefTable, imgBuf, softMask, w, h, bpc, format, cs)
 }
 
 // CreateImageResource creates a new XObject for given image data represented by r and applies optional filters.
-func CreateImageResource(xRefTable *XRefTable, r io.Reader) (*types.IndirectRef, int, int, error) {
-	sd, w, h, err := CreateImageStreamDict(xRefTable, r)
+func CreateImageResource(xRefTable *XRefTable, r io.Reader, gray, sepia bool) (*types.IndirectRef, int, int, error) {
+	sd, w, h, err := CreateImageStreamDict(xRefTable, r, gray, sepia)
 	if err != nil {
 		return nil, 0, 0, err
 	}

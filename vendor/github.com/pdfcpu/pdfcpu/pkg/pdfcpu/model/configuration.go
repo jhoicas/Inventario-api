@@ -17,12 +17,10 @@ limitations under the License.
 package model
 
 import (
-	"embed"
 	_ "embed"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/pdfcpu/pdfcpu/pkg/font"
@@ -155,12 +153,6 @@ const (
 	SETVIEWERPREFERENCES
 	RESETVIEWERPREFERENCES
 	ZOOM
-	ADDSIGNATURE
-	VALIDATESIGNATURE
-	LISTCERTIFICATES
-	INSPECTCERTIFICATES
-	IMPORTCERTIFICATES
-	VALIDATESIGNATURES
 )
 
 // Configuration of a Context.
@@ -240,17 +232,13 @@ type Configuration struct {
 	// Date format.
 	DateFormat string
 
-	// Optimize after reading and validating the xreftable but before processing.
+	// Optimize.
 	Optimize bool
 
-	// Optimize after processing but before writing.
-	// TODO add to config.yml
-	OptimizeBeforeWriting bool
-
-	// Optimize page resources via content stream analysis. (assuming Optimize == true || OptimizeBeforeWriting == true)
+	// Optimize page resources via content stream analysis.
 	OptimizeResourceDicts bool
 
-	// Optimize duplicate content streams across pages. (assuming Optimize == true || OptimizeBeforeWriting == true)
+	// Optimize duplicate content streams across pages.
 	OptimizeDuplicateContentStreams bool
 
 	// Merge creates bookmarks.
@@ -264,19 +252,6 @@ type Configuration struct {
 
 	// HTTP timeout in seconds.
 	Timeout int
-
-	// Http timeout in seconds for CRL revocation checking.
-	TimeoutCRL int
-
-	// Http timeout in seconds for OCSP revocation checking.
-	TimeoutOCSP int
-
-	// Preferred certificate revocation checking mechanism: CRL, OSCP
-	PreferredCertRevocationChecker int
-
-	// Limit form field content for display purposes when using pdfcpu form list.
-	// If > 0 affects the columns AltName, Default and Value.
-	FormFieldListMaxColWidth int
 }
 
 // ConfigPath defines the location of pdfcpu's configuration directory.
@@ -297,9 +272,6 @@ var configFileBytes []byte
 
 //go:embed resources/Roboto-Regular.ttf
 var robotoFontFileBytes []byte
-
-//go:embed resources/certs/*.p7c
-var certFilesEU embed.FS
 
 func ensureConfigFileAt(path string, override bool) error {
 	f, err := os.Open(path)
@@ -335,115 +307,38 @@ version: %s
 	return parseConfigFile(f, path)
 }
 
-func onlyHidden(files []os.DirEntry) bool {
-	for _, file := range files {
-		if !strings.HasPrefix(file.Name(), ".") {
-			return false
-		}
-	}
-	return true
-}
-
-func initUserFonts() error {
-	files, err := os.ReadDir(font.UserFontDir)
-	if err != nil {
-		return err
-	}
-
-	if onlyHidden(files) {
-		// Ensure Roboto font for form filling.
-		fontname := "Roboto-Regular"
-		if log.CLIEnabled() {
-			log.CLI.Printf("installing user font:")
-		}
-		if err := font.InstallFontFromBytes(font.UserFontDir, fontname, robotoFontFileBytes); err != nil {
-			return err
-		}
-	}
-
-	return font.LoadUserFonts()
-}
-
-func initCertificates() error {
-	// NOTE
-	// Load certs managed by The European Union Trusted Lists (EUTL) (https://eidas.ec.europa.eu/efda/trust-services/browse/eidas/tls).
-	// Additional certificates may be loaded using the corresponding CLI command: pdfcpu certificates import
-	// Certificates will be loaded by corresponding commands where applicable.
-
-	files, err := os.ReadDir(CertDir)
-	if err != nil {
-		return err
-	}
-	if !onlyHidden(files) {
-		return nil
-	}
-
-	files, err = certFilesEU.ReadDir("resources/certs")
-	if err != nil {
-		return err
-	}
-
-	euDir := filepath.Join(CertDir, "eu")
-	if err := os.MkdirAll(euDir, os.ModePerm); err != nil {
-		return err
-	}
-
-	for _, file := range files {
-		//fmt.Println("Embedded file:", file.Name())
-
-		content, err := certFilesEU.ReadFile("resources/certs/" + file.Name())
-		if err != nil {
-			return err
-		}
-
-		path := filepath.Join(euDir, file.Name())
-		//fmt.Printf("writing to %s\n", path)
-
-		destFile, err := os.Create(path)
-		if err != nil {
-			return err
-		}
-		defer destFile.Close()
-
-		_, err = destFile.Write(content)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 // EnsureDefaultConfigAt tries to load the default configuration from path.
 // If path/pdfcpu/config.yaml is not found, it will be created.
 func EnsureDefaultConfigAt(path string, override bool) error {
 	configDir := filepath.Join(path, "pdfcpu")
-	if err := os.MkdirAll(configDir, os.ModePerm); err != nil {
+	font.UserFontDir = filepath.Join(configDir, "fonts")
+	if err := os.MkdirAll(font.UserFontDir, os.ModePerm); err != nil {
 		return err
 	}
 	if err := ensureConfigFileAt(filepath.Join(configDir, "config.yml"), override); err != nil {
 		return err
 	}
-
-	font.UserFontDir = filepath.Join(configDir, "fonts")
-	if err := os.MkdirAll(font.UserFontDir, os.ModePerm); err != nil {
-		return err
-	}
-	if err := initUserFonts(); err != nil {
-		return err
-	}
-
-	CertDir = filepath.Join(configDir, "certs")
-	if err := os.MkdirAll(CertDir, os.ModePerm); err != nil {
-		return err
-	}
-	if err := initCertificates(); err != nil {
-		return err
-	}
-
 	//fmt.Println(loadedDefaultConfig)
 
-	return nil
+	files, err := os.ReadDir(font.UserFontDir)
+	if err != nil {
+		return err
+	}
+
+	if len(files) == 0 {
+		// Ensure Roboto font for form filling.
+		fn := "Roboto-Regular"
+		if log.CLIEnabled() {
+			log.CLI.Printf("installing user font:")
+		}
+		if err := font.InstallFontFromBytes(font.UserFontDir, fn, robotoFontFileBytes); err != nil {
+			if log.CLIEnabled() {
+				log.CLI.Printf("%v", err)
+			}
+		}
+	}
+
+	return font.LoadUserFonts()
 }
 
 func newDefaultConfiguration() *Configuration {
@@ -469,15 +364,12 @@ func newDefaultConfiguration() *Configuration {
 		TimestampFormat:                 "2006-01-02 15:04",
 		DateFormat:                      "2006-01-02",
 		Optimize:                        true,
-		OptimizeBeforeWriting:           true,
 		OptimizeResourceDicts:           true,
 		OptimizeDuplicateContentStreams: false,
 		CreateBookmarks:                 true,
 		NeedAppearances:                 false,
 		Offline:                         false,
 		Timeout:                         5,
-		PreferredCertRevocationChecker:  CRL,
-		FormFieldListMaxColWidth:        0,
 	}
 }
 
@@ -531,6 +423,65 @@ func NewRC4Configuration(userPW, ownerPW string, keyLength int) *Configuration {
 	return c
 }
 
+func (c Configuration) String() string {
+	path := "default"
+	if len(c.Path) > 0 {
+		path = c.Path
+	}
+	return fmt.Sprintf("pdfcpu configuration:\n"+
+		"Path:                %s\n"+
+		"CreationDate:		  %s\n"+
+		"Version:             %s\n"+
+		"CheckFileNameExt:    %t\n"+
+		"Reader15:            %t\n"+
+		"DecodeAllStreams:    %t\n"+
+		"ValidationMode:      %s\n"+
+		"PostProcessValidate: %t\n"+
+		"ValidateLinks:       %t\n"+
+		"Eol:                 %s\n"+
+		"WriteObjectStream:   %t\n"+
+		"WriteXrefStream:     %t\n"+
+		"EncryptUsingAES:     %t\n"+
+		"EncryptKeyLength:    %d\n"+
+		"Permissions:         %d\n"+
+		"Unit :               %s\n"+
+		"TimestampFormat:	  %s\n"+
+		"DateFormat:		  %s\n"+
+		"Optimize %t\n"+
+		"OptimizeResourceDicts %t\n"+
+		"OptimizeDuplicateContentStreams %t\n"+
+		"CreateBookmarks %t\n"+
+		"NeedAppearances %t\n"+
+		"Offline %t\n"+
+		"Timeout %d\n",
+		path,
+		c.CreationDate,
+		c.Version,
+		c.CheckFileNameExt,
+		c.Reader15,
+		c.DecodeAllStreams,
+		c.ValidationModeString(),
+		c.PostProcessValidate,
+		c.ValidateLinks,
+		c.EolString(),
+		c.WriteObjectStream,
+		c.WriteXRefStream,
+		c.EncryptUsingAES,
+		c.EncryptKeyLength,
+		c.Permissions,
+		c.UnitString(),
+		c.TimestampFormat,
+		c.DateFormat,
+		c.Optimize,
+		c.OptimizeResourceDicts,
+		c.OptimizeDuplicateContentStreams,
+		c.CreateBookmarks,
+		c.NeedAppearances,
+		c.Offline,
+		c.Timeout,
+	)
+}
+
 // EolString returns a string rep for the eol in effect.
 func (c *Configuration) EolString() string {
 	var s string
@@ -551,14 +502,6 @@ func (c *Configuration) ValidationModeString() string {
 		return "strict"
 	}
 	return "relaxed"
-}
-
-// PreferredCertRevocationCheckerString returns a string rep for the preferred certificate revocation checker in effect.
-func (c *Configuration) PreferredCertRevocationCheckerString() string {
-	if c.PreferredCertRevocationChecker == CRL {
-		return "CRL"
-	}
-	return "OSCP"
 }
 
 // UnitString returns a string rep for the display unit in effect.

@@ -18,8 +18,6 @@ package pdfcpu
 
 import (
 	"fmt"
-	"sort"
-	"strings"
 	"time"
 
 	"github.com/pdfcpu/pdfcpu/pkg/log"
@@ -346,7 +344,6 @@ type PDFInfo struct {
 	Attachments        []model.Attachment              `json:"attachments,omitempty"`
 	Unit               types.DisplayUnit               `json:"-"`
 	UnitString         string                          `json:"unit"`
-	Fonts              []model.FontInfo                `json:"fonts,omitempty"`
 }
 
 func (info PDFInfo) renderKeywords(ss *[]string) error {
@@ -425,17 +422,15 @@ func (info PDFInfo) renderFlagsPart2(ss *[]string, separator string) {
 		s = "Yes"
 	}
 	*ss = append(*ss, fmt.Sprintf("                Form: %s", s))
-
-	if info.Signatures || info.AppendOnly {
-		*ss = append(*ss, "          Signatures: Yes")
-	}
-
 	if info.Form {
-		s = "No"
-		if info.AppendOnly {
-			s = "Yes"
+		if info.Signatures || info.AppendOnly {
+			*ss = append(*ss, "     SignaturesExist: Yes")
+			s = "No"
+			if info.AppendOnly {
+				s = "Yes"
+			}
+			*ss = append(*ss, fmt.Sprintf("          AppendOnly: %s", s))
 		}
-		*ss = append(*ss, fmt.Sprintf("          AppendOnly: %s", s))
 	}
 
 	s = "No"
@@ -484,60 +479,8 @@ func (info *PDFInfo) renderAttachments(ss *[]string) {
 	}
 }
 
-func (info *PDFInfo) renderFonts(ss *[]string) {
-	if len(info.Fonts) == 0 {
-		*ss = append(*ss, fmt.Sprintf("%20s: No fonts available", "Fonts"))
-		return
-	}
-
-	*ss = append(*ss, fmt.Sprintf("%20s:", "Fonts"))
-
-	maxLenName := 0
-	for _, fi := range info.Fonts {
-		name := fi.Name
-		if len(fi.Prefix) > 0 {
-			name = fi.Prefix + "-" + name
-		}
-		if len(name) > maxLenName {
-			maxLenName = len(name)
-		}
-	}
-
-	*ss = append(*ss, fmt.Sprintf("Name%s Type       Encoding             Embedded", strings.Repeat(" ", maxLenName-4)))
-	*ss = append(*ss, fmt.Sprint(draw.HorSepLine([]int{41 + maxLenName})))
-	for _, fi := range info.Fonts {
-		name := fi.Name
-		if len(fi.Prefix) > 0 {
-			name = fi.Prefix + "-" + name
-		}
-		*ss = append(*ss, fmt.Sprintf("%s%s %-10s %-20s %t", name, strings.Repeat(" ", maxLenName-len(name)), fi.Type, fi.Encoding, fi.Embedded))
-	}
-}
-
-func setupFontInfos(ctx *model.Context, fontInfos *[]model.FontInfo) {
-	var fontNames []string
-	for k := range ctx.Optimize.Fonts {
-		fontNames = append(fontNames, k)
-	}
-	sort.Strings(fontNames)
-
-	for _, fontName := range fontNames {
-		for _, objNr := range ctx.Optimize.Fonts[fontName] {
-			fontObj := ctx.Optimize.FontObjects[objNr]
-			fontInfo := model.FontInfo{
-				Prefix:   fontObj.Prefix,
-				Name:     fontObj.FontName,
-				Type:     fontObj.SubType(),
-				Encoding: fontObj.Encoding(),
-				Embedded: fontObj.Embedded,
-			}
-			*fontInfos = append(*fontInfos, fontInfo)
-		}
-	}
-}
-
 // Info returns info about ctx.
-func Info(ctx *model.Context, fileName string, selectedPages types.IntSet, fonts bool) (*PDFInfo, error) {
+func Info(ctx *model.Context, fileName string, selectedPages types.IntSet) (*PDFInfo, error) {
 	info := &PDFInfo{FileName: fileName, Unit: ctx.Unit, UnitString: ctx.UnitString()}
 
 	v := ctx.HeaderVersion
@@ -604,7 +547,7 @@ func Info(ctx *model.Context, fileName string, selectedPages types.IntSet, fonts
 	info.Outlines = len(ctx.Outlines) > 0
 	info.Names = len(ctx.Names) > 0
 
-	info.Signatures = ctx.SignatureExist || ctx.AppendOnly || len(ctx.Signatures) > 0
+	info.Signatures = ctx.SignatureExist
 	info.AppendOnly = ctx.AppendOnly
 	info.Encrypted = ctx.Encrypt != nil
 
@@ -618,19 +561,11 @@ func Info(ctx *model.Context, fileName string, selectedPages types.IntSet, fonts
 	}
 	info.Attachments = aa
 
-	fontInfos := []model.FontInfo{}
-
-	if fonts {
-		setupFontInfos(ctx, &fontInfos)
-	}
-
-	info.Fonts = fontInfos
-
 	return info, nil
 }
 
 // ListInfo returns formatted info about ctx.
-func ListInfo(info *PDFInfo, selectedPages types.IntSet, fonts bool) ([]string, error) {
+func ListInfo(info *PDFInfo, selectedPages types.IntSet) ([]string, error) {
 	var separator = draw.HorSepLine([]int{44})
 
 	var ss []string
@@ -670,10 +605,6 @@ func ListInfo(info *PDFInfo, selectedPages types.IntSet, fonts bool) ([]string, 
 	info.renderFlags(&ss, separator)
 	info.renderPermissions(&ss)
 	info.renderAttachments(&ss)
-
-	if fonts {
-		info.renderFonts(&ss)
-	}
 
 	return ss, nil
 }

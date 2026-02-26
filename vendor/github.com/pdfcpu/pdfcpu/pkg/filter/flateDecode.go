@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"compress/zlib"
 	"io"
-	"strings"
 
 	"github.com/pdfcpu/pdfcpu/pkg/log"
 	"github.com/pkg/errors"
@@ -107,12 +106,6 @@ func passThru(rin io.Reader, maxLen int64) (*bytes.Buffer, error) {
 		_, err = io.Copy(&b, rin)
 	} else {
 		_, err = io.CopyN(&b, rin, maxLen)
-	}
-	if err != nil && strings.Contains(err.Error(), "invalid checksum") {
-		if log.CLIEnabled() {
-			log.CLI.Println("skipped: truncated zlib stream")
-		}
-		err = nil
 	}
 	if err == io.ErrUnexpectedEOF {
 		// Workaround for missing support for partial flush in compress/flate.

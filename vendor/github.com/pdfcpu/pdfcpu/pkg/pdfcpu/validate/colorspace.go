@@ -17,8 +17,6 @@ limitations under the License.
 package validate
 
 import (
-	"fmt"
-
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/model"
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/types"
 	"github.com/pkg/errors"
@@ -630,10 +628,8 @@ func validateColorSpace(xRefTable *model.XRefTable, o types.Object, excludePatte
 		err = validateColorSpaceArray(xRefTable, o, excludePatternCS)
 
 	default:
-		if xRefTable.ValidationMode == model.ValidationStrict {
-			return errors.Errorf("pdfcpu: validateColorSpace: corrupt obj type(%T), must be Name or Array", o)
-		}
-		model.ShowSkipped(fmt.Sprintf("invalid color space type: %s", o))
+		err = errors.New("pdfcpu: validateColorSpace: corrupt obj typ, must be Name or Array")
+
 	}
 
 	return err
@@ -650,10 +646,7 @@ func validateColorSpaceEntry(xRefTable *model.XRefTable, d types.Dict, dictName 
 
 	case types.Name:
 		if ok := validateDeviceColorSpaceName(o.Value()); !ok {
-			if xRefTable.ValidationMode == model.ValidationStrict {
-				return errors.Errorf("pdfcpu: invalid colorSpaceEntry: Name:%s\n", o.Value())
-			}
-			model.ShowSkipped(fmt.Sprintf("invalid colorSpaceEntry: %s", o.Value()))
+			err = errors.Errorf("pdfcpu: validateColorSpaceEntry: Name:%s\n", o.Value())
 		}
 
 	case types.Array:

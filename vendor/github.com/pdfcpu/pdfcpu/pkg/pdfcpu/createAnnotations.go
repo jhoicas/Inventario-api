@@ -682,9 +682,9 @@ func createMovieAnnotation(xRefTable *model.XRefTable, pageIndRef types.Indirect
 	return xRefTable.IndRefForNewObject(d)
 }
 
-func createMediaRenditionAction(mediaClipDataDict *types.IndirectRef) types.Dict {
+func createMediaRenditionAction(xRefTable *model.XRefTable, mediaClipDataDict *types.IndirectRef) types.Dict {
 
-	r := createMediaRendition(mediaClipDataDict)
+	r := createMediaRendition(xRefTable, mediaClipDataDict)
 
 	return types.Dict(
 		map[string]types.Object{
@@ -717,7 +717,7 @@ func createScreenAnnotation(xRefTable *model.XRefTable, pageIndRef types.Indirec
 		return nil, err
 	}
 
-	mediaRenditionAction := createMediaRenditionAction(ir)
+	mediaRenditionAction := createMediaRenditionAction(xRefTable, ir)
 
 	selectorRenditionAction := createSelectorRenditionAction(ir)
 

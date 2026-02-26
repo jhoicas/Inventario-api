@@ -27,17 +27,6 @@ import (
 	"golang.org/x/text/unicode/norm"
 )
 
-func RemoveControlChars(s string) string {
-	return strings.Map(func(r rune) rune {
-		switch r {
-		case '\n', '\r', '\t', '\b', '\f':
-			return -1
-		default:
-			return r
-		}
-	}, s)
-}
-
 // NewStringSet returns a new StringSet for slice.
 func NewStringSet(slice []string) StringSet {
 	strSet := StringSet{}
@@ -314,18 +303,4 @@ func DecodeName(s string) (string, error) {
 		return s, nil
 	}
 	return sb.String(), nil
-}
-
-func TrimLeadingComment(s string) string {
-	for i := 0; i < len(s); i++ {
-		switch s[i] {
-		case ' ', '\t', '\r', '\n', '\f':
-			continue
-		case '%':
-			return ""
-		default:
-			return s
-		}
-	}
-	return ""
 }

@@ -22,53 +22,35 @@ import (
 	"github.com/pkg/errors"
 )
 
-var ErrBookmarksRepair = errors.New("pdfcpu: bookmarks repair failed")
-
-func validateOutlineItemDictTitle(xRefTable *model.XRefTable, d types.Dict, dictName string) error {
-	_, err := validateStringEntry(xRefTable, d, dictName, "Title", REQUIRED, model.V10, nil)
-	if err != nil {
-		if xRefTable.ValidationMode == model.ValidationStrict {
-			return err
-		}
-		if _, err := validateNameEntry(xRefTable, d, dictName, "Title", REQUIRED, model.V10, nil); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func validateOutlineItemDictParent(xRefTable *model.XRefTable, d types.Dict, dictName string) error {
-	required := REQUIRED
-	if xRefTable.ValidationMode == model.ValidationRelaxed {
-		required = OPTIONAL
-	}
-	ir, err := validateIndRefEntry(xRefTable, d, dictName, "Parent", required, model.V10)
-	if err != nil {
-		return err
-	}
-	if ir != nil {
-		if _, err = xRefTable.DereferenceDict(*ir); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func validateOutlineItemDict(xRefTable *model.XRefTable, d types.Dict) error {
 	dictName := "outlineItemDict"
 
 	// Title, required, text string
-	if err := validateOutlineItemDictTitle(xRefTable, d, dictName); err != nil {
+	_, err := validateStringEntry(xRefTable, d, dictName, "Title", REQUIRED, model.V10, nil)
+	if err != nil {
 		return err
 	}
+
+	// fmt.Printf("Title: %s\n", *title)
 
 	// Parent, required, dict indRef
-	if err := validateOutlineItemDictParent(xRefTable, d, dictName); err != nil {
+	ir, err := validateIndRefEntry(xRefTable, d, dictName, "Parent", REQUIRED, model.V10)
+	if err != nil {
+		return err
+	}
+	_, err = xRefTable.DereferenceDict(*ir)
+	if err != nil {
 		return err
 	}
 
+	// // Count, optional, int
+	// _, err = validateIntegerEntry(xRefTable, d, dictName, "Count", OPTIONAL, model.V10, nil)
+	// if err != nil {
+	// 	return err
+	// }
+
 	// SE, optional, dict indRef, since V1.3
-	ir, err := validateIndRefEntry(xRefTable, d, dictName, "SE", OPTIONAL, model.V13)
+	ir, err = validateIndRefEntry(xRefTable, d, dictName, "SE", OPTIONAL, model.V13)
 	if err != nil {
 		return err
 	}
@@ -80,36 +62,23 @@ func validateOutlineItemDict(xRefTable *model.XRefTable, d types.Dict) error {
 	}
 
 	// C, optional, array of 3 numbers, since V1.4
-	sinceVersion := model.V14
+	version := model.V14
 	if xRefTable.ValidationMode == model.ValidationRelaxed {
-		sinceVersion = model.V13
+		version = model.V13
 	}
-	if _, err = validateNumberArrayEntry(xRefTable, d, dictName, "C", OPTIONAL, sinceVersion, func(a types.Array) bool { return len(a) == 3 }); err != nil {
+	_, err = validateNumberArrayEntry(xRefTable, d, dictName, "C", OPTIONAL, version, func(a types.Array) bool { return len(a) == 3 })
+	if err != nil {
 		return err
 	}
 
 	// F, optional integer, since V1.4
-	sinceVersion = model.V14
-	if xRefTable.ValidationMode == model.ValidationRelaxed {
-		sinceVersion = model.V13
-	}
-	if _, err = validateIntegerEntry(xRefTable, d, dictName, "F", OPTIONAL, sinceVersion, nil); err != nil {
+	_, err = validateIntegerEntry(xRefTable, d, dictName, "F", OPTIONAL, model.V14, nil)
+	if err != nil {
 		return err
 	}
 
 	// Optional A or Dest, since V1.1
-	destName, err := validateActionOrDestination(xRefTable, d, dictName, model.V11)
-	if err != nil {
-		return err
-	}
-	if destName != "" {
-		if _, err = xRefTable.DereferenceDestArray(destName); err != nil && xRefTable.ValidationMode == model.ValidationRelaxed {
-			model.ShowDigestedSpecViolation("outlineDict with unresolved destination")
-			return nil
-		}
-	}
-
-	return err
+	return validateActionOrDestination(xRefTable, d, dictName, model.V11)
 }
 
 func handleOutlineItemDict(xRefTable *model.XRefTable, ir types.IndirectRef, objNumber int) (types.Dict, error) {
@@ -145,7 +114,7 @@ func leaf(firstChild, lastChild *types.IndirectRef, objNumber, validationMode in
 		lastChild != nil && lastChild.ObjectNumber.Value() == objNumber {
 		// Degenerated leaf = node pointing to itself.
 		if validationMode == model.ValidationStrict {
-			return false, errors.Errorf("pdfcpu: validateOutlineTree: invalid at obj#%d", objNumber)
+			return false, errors.Errorf("pdfcpu: validateOutlineTree: corrupted at obj#%d", objNumber)
 		}
 		return true, nil
 	}
@@ -182,7 +151,7 @@ func evalOutlineCount(xRefTable *model.XRefTable, c, visc int, count int, total,
 	return nil
 }
 
-func validateOutlineTree(xRefTable *model.XRefTable, first, last *types.IndirectRef, m map[int]bool, fixed *bool) (int, int, error) {
+func validateOutlineTree(xRefTable *model.XRefTable, first, last *types.IndirectRef) (int, int, error) {
 	var (
 		d       types.Dict
 		objNr   int
@@ -191,9 +160,17 @@ func validateOutlineTree(xRefTable *model.XRefTable, first, last *types.Indirect
 		err     error
 	)
 
+	m := map[int]bool{}
+
 	// Process linked list of outline items.
 	for ir := first; ir != nil; ir = d.IndirectRefEntry("Next") {
+
 		objNr = ir.ObjectNumber.Value()
+		if m[objNr] {
+			return 0, 0, errors.New("pdfcpu: validateOutlineTree: circular outline items")
+		}
+		m[objNr] = true
+
 		total++
 
 		d, err = handleOutlineItemDict(xRefTable, *ir, objNr)
@@ -215,18 +192,12 @@ func validateOutlineTree(xRefTable *model.XRefTable, first, last *types.Indirect
 		}
 		if ok {
 			if count != 0 {
-				if xRefTable.ValidationMode == model.ValidationStrict {
-					return 0, 0, errors.New("pdfcpu: validateOutlineTree: empty outline item dict \"Count\" must be 0")
-				}
+				return 0, 0, errors.New("pdfcpu: validateOutlineTree: empty outline item dict \"Count\" must be 0")
 			}
 			continue
 		}
 
-		if err := scanAndFixOutlineItems(xRefTable, firstChild, lastChild, m, fixed); err != nil {
-			return 0, 0, err
-		}
-
-		c, visc, err := validateOutlineTree(xRefTable, firstChild, lastChild, m, fixed)
+		c, visc, err := validateOutlineTree(xRefTable, firstChild, lastChild)
 		if err != nil {
 			return 0, 0, err
 		}
@@ -238,7 +209,7 @@ func validateOutlineTree(xRefTable *model.XRefTable, first, last *types.Indirect
 	}
 
 	if xRefTable.ValidationMode == model.ValidationStrict && objNr != last.ObjectNumber.Value() {
-		return 0, 0, errors.Errorf("pdfcpu: validateOutlineTree: invalid child list %d <> %d\n", objNr, last.ObjectNumber)
+		return 0, 0, errors.Errorf("pdfcpu: validateOutlineTree: corrupted child list %d <> %d\n", objNr, last.ObjectNumber)
 	}
 
 	return total, visible, nil
@@ -246,25 +217,25 @@ func validateOutlineTree(xRefTable *model.XRefTable, first, last *types.Indirect
 
 func validateVisibleOutlineCount(xRefTable *model.XRefTable, total, visible int, count *int) error {
 	if count == nil {
-		return errors.Errorf("pdfcpu: validateOutlines: invalid, root \"Count\" is nil, expected to be %d", total+visible)
+		return errors.Errorf("pdfcpu: validateOutlines: corrupted, root \"Count\" is nil, expected to be %d", total+visible)
 	}
 	if xRefTable.ValidationMode == model.ValidationStrict && *count != total+visible {
-		return errors.Errorf("pdfcpu: validateOutlines: invalid, root \"Count\" = %d, expected to be %d", *count, total+visible)
+		return errors.Errorf("pdfcpu: validateOutlines: corrupted, root \"Count\" = %d, expected to be %d", *count, total+visible)
 	}
 	if xRefTable.ValidationMode == model.ValidationRelaxed && *count != total+visible && *count != -total-visible {
-		return errors.Errorf("pdfcpu: validateOutlines: invalid, root \"Count\" = %d, expected to be %d", *count, total+visible)
+		return errors.Errorf("pdfcpu: validateOutlines: corrupted, root \"Count\" = %d, expected to be %d", *count, total+visible)
 	}
 
 	return nil
 }
 
-func validateInvisibleOutlineCount(xRefTable *model.XRefTable, total int, count *int) error {
+func validateInvisibleOutlineCount(xRefTable *model.XRefTable, total, visible int, count *int) error {
 	if count != nil {
 		if xRefTable.ValidationMode == model.ValidationStrict && *count == 0 {
-			return errors.New("pdfcpu: validateOutlines: invalid, root \"Count\" shall be omitted if there are no open outline items")
+			return errors.New("pdfcpu: validateOutlines: corrupted, root \"Count\" shall be omitted if there are no open outline items")
 		}
 		if xRefTable.ValidationMode == model.ValidationStrict && *count != total && *count != -total {
-			return errors.Errorf("pdfcpu: validateOutlines: invalid, root \"Count\" = %d, expected to be %d", *count, total)
+			return errors.Errorf("pdfcpu: validateOutlines: corrupted, root \"Count\" = %d, expected to be %d", *count, total)
 		}
 	}
 
@@ -273,224 +244,11 @@ func validateInvisibleOutlineCount(xRefTable *model.XRefTable, total int, count 
 
 func validateOutlineCount(xRefTable *model.XRefTable, total, visible int, count *int) error {
 	if visible == 0 {
-		return validateInvisibleOutlineCount(xRefTable, total, count)
+		return validateInvisibleOutlineCount(xRefTable, total, visible, count)
 	}
 
 	if visible > 0 {
 		return validateVisibleOutlineCount(xRefTable, total, visible, count)
-	}
-
-	return nil
-}
-
-func firstOfRemainder(xRefTable *model.XRefTable, last *types.IndirectRef, duplObjNr, oneBeforeDuplObj int) (int, types.Dict, error) {
-	// Starting with the last node, go back until we hit duplObjNr or oneBeforeDuplObj
-	for ir := last; ir != nil; {
-		objNr := ir.ObjectNumber.Value()
-		d, err := xRefTable.DereferenceDict(*ir)
-		if err != nil {
-			return 0, nil, err
-		}
-		if len(d) == 0 {
-			if xRefTable.ValidationMode == model.ValidationStrict {
-				return 0, nil, errors.New("pdfcpu: validateOutlines: corrupt outline items detected")
-			}
-		}
-		irPrev := d.IndirectRefEntry("Prev")
-		if irPrev == nil {
-			break
-		}
-		prevObjNr := irPrev.ObjectNumber.Value()
-		if prevObjNr == duplObjNr {
-			d["Prev"] = *types.NewIndirectRef(oneBeforeDuplObj, 0)
-			return objNr, d, nil
-		}
-		if prevObjNr == oneBeforeDuplObj {
-			return objNr, d, nil
-		}
-		ir = irPrev
-	}
-
-	return 0, nil, nil
-}
-
-func removeDuplFirst(xRefTable *model.XRefTable, first, last *types.IndirectRef, duplObjNr, oneBeforeDuplObj int) error {
-	nextObjNr, nextDict, err := firstOfRemainder(xRefTable, last, duplObjNr, oneBeforeDuplObj)
-	if err != nil {
-		return err
-	}
-	if nextObjNr == 0 {
-		return ErrBookmarksRepair
-	}
-	delete(nextDict, "Prev")
-	first.ObjectNumber = types.Integer(oneBeforeDuplObj)
-	return nil
-}
-
-func handleCircular(xRefTable *model.XRefTable, dict types.Dict, first *types.IndirectRef, fixed *bool) error {
-	if xRefTable.ValidationMode == model.ValidationStrict {
-		return errors.New("pdfcpu: validateOutlines: circular outline items detected")
-	}
-	dict["Prev"] = *first
-	delete(dict, "Next")
-	*fixed = true
-	return nil
-}
-
-func handleCorruptDict(xRefTable *model.XRefTable) error {
-	if xRefTable.ValidationMode == model.ValidationStrict {
-		return errors.New("pdfcpu: validateOutlines: corrupt outline items detected")
-	}
-	return ErrBookmarksRepair
-}
-
-func handleDuplicate(
-	xRefTable *model.XRefTable,
-	ir, first, last *types.IndirectRef,
-	prevDict types.Dict,
-	objNr, prevObjNr int) error {
-
-	if ir == first {
-		return removeDuplFirst(xRefTable, first, last, objNr, prevObjNr)
-	}
-
-	if ir == last {
-		delete(prevDict, "Next")
-		last.ObjectNumber = types.Integer(prevObjNr)
-		return nil
-	}
-
-	nextObjNr, _, _ := firstOfRemainder(xRefTable, last, objNr, prevObjNr)
-	if nextObjNr == 0 {
-		return ErrBookmarksRepair
-	}
-
-	nextRef := prevDict.IndirectRefEntry("Next")
-	if nextRef == nil {
-		return ErrBookmarksRepair
-	}
-
-	prevDict["Next"] = *types.NewIndirectRef(nextObjNr, 0)
-
-	return nil
-}
-
-func scanAndFixOutlineItems(xRefTable *model.XRefTable, first, last *types.IndirectRef, seen map[int]bool, fixed *bool) error {
-	visited := map[int]bool{}
-	var prevDict types.Dict
-	var prevObjNr int
-
-	for ir := first; ir != nil; {
-		objNr := ir.ObjectNumber.Value()
-
-		if visited[objNr] {
-			return handleCircular(xRefTable, prevDict, first, fixed)
-		}
-		visited[objNr] = true
-
-		dict, err := xRefTable.DereferenceDict(*ir)
-		if err != nil {
-			return err
-		}
-		if len(dict) == 0 {
-			return handleCorruptDict(xRefTable)
-		}
-
-		if ir == first && dict["Prev"] != nil {
-			*fixed = true
-			if xRefTable.ValidationMode == model.ValidationStrict {
-				return errors.New("pdfcpu: validateOutlines: corrupt outline items detected")
-			}
-			delete(dict, "Prev")
-		}
-
-		if seen[objNr] {
-			*fixed = true
-			return handleDuplicate(xRefTable, ir, first, last, prevDict, objNr, prevObjNr)
-		}
-
-		seen[objNr] = true
-		prevDict = dict
-		prevObjNr = objNr
-		ir = dict.IndirectRefEntry("Next")
-	}
-
-	return nil
-}
-
-func removeOutlines(xRefTable *model.XRefTable, rootDict types.Dict) {
-	xRefTable.Outlines = nil
-	delete(rootDict, "Outlines")
-}
-
-func validateOutlinesGeneral(xRefTable *model.XRefTable, rootDict types.Dict) (*types.IndirectRef, *types.IndirectRef, *int, error) {
-	d := xRefTable.Outlines
-
-	// Type, optional, name
-	_, err := validateNameEntry(xRefTable, d, "outlineDict", "Type", OPTIONAL, model.V10, func(s string) bool {
-		return s == "Outlines" || (xRefTable.ValidationMode == model.ValidationRelaxed && (s == "Outline" || s == "BMoutlines"))
-	})
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	first := d.IndirectRefEntry("First")
-	last := d.IndirectRefEntry("Last")
-
-	if first == nil {
-		if last != nil {
-			return nil, nil, nil, errors.New("pdfcpu: validateOutlines: invalid, root missing \"First\"")
-		}
-		removeOutlines(xRefTable, rootDict)
-		return nil, nil, nil, nil
-	}
-	if last == nil && xRefTable.ValidationMode == model.ValidationStrict {
-		return nil, nil, nil, errors.New("pdfcpu: validateOutlines: invalid, root missing \"Last\"")
-	}
-
-	count := d.IntEntry("Count")
-	if xRefTable.ValidationMode == model.ValidationStrict && count != nil && *count < 0 {
-		return nil, nil, nil, errors.New("pdfcpu: validateOutlines: invalid, root \"Count\" can't be negative")
-	}
-
-	return first, last, count, nil
-}
-
-func handleCorruptOutlineItems(xRefTable *model.XRefTable, rootDict types.Dict) {
-	model.ShowMsg("validateOutlines: corrupt outline items detected")
-	removeOutlines(xRefTable, rootDict)
-	model.ShowSkipped("bookmarks")
-}
-
-func scanAndFixOutlines(xRefTable *model.XRefTable, rootDict types.Dict, first, last *types.IndirectRef, count *int) error {
-
-	m := map[int]bool{}
-	var fixed bool
-
-	err := scanAndFixOutlineItems(xRefTable, first, last, m, &fixed)
-	if err != nil {
-		if err == ErrBookmarksRepair && xRefTable.ValidationMode == model.ValidationRelaxed {
-			handleCorruptOutlineItems(xRefTable, rootDict)
-			return nil
-		}
-		return err
-	}
-
-	total, visible, err := validateOutlineTree(xRefTable, first, last, m, &fixed)
-	if err != nil {
-		if err == ErrBookmarksRepair && xRefTable.ValidationMode == model.ValidationRelaxed {
-			handleCorruptOutlineItems(xRefTable, rootDict)
-			return nil
-		}
-		return err
-	}
-
-	if err := validateOutlineCount(xRefTable, total, visible, count); err != nil {
-		return err
-	}
-
-	if fixed {
-		model.ShowRepaired("bookmarks")
 	}
 
 	return nil
@@ -505,24 +263,47 @@ func validateOutlines(xRefTable *model.XRefTable, rootDict types.Dict, required 
 	}
 
 	d, err := xRefTable.DereferenceDict(*ir)
-	if err != nil {
+	if err != nil || d == nil {
 		return err
-	}
-
-	if d == nil {
-		removeOutlines(xRefTable, rootDict)
-		return nil
 	}
 
 	xRefTable.Outlines = d
 
-	first, last, count, err := validateOutlinesGeneral(xRefTable, rootDict)
+	// Type, optional, name
+	_, err = validateNameEntry(xRefTable, d, "outlineDict", "Type", OPTIONAL, model.V10, func(s string) bool { return s == "Outlines" || s == "Outline" })
 	if err != nil {
 		return err
 	}
-	if first == nil && last == nil {
+
+	first := d.IndirectRefEntry("First")
+	last := d.IndirectRefEntry("Last")
+
+	if first == nil {
+		if last != nil {
+			return errors.New("pdfcpu: validateOutlines: corrupted, root missing \"First\"")
+		}
+		// empty outlines
+		xRefTable.Outlines = nil
+		rootDict.Delete("Outlines")
 		return nil
 	}
+	if last == nil {
+		return errors.New("pdfcpu: validateOutlines: corrupted, root missing \"Last\"")
+	}
 
-	return scanAndFixOutlines(xRefTable, rootDict, first, last, count)
+	count := d.IntEntry("Count")
+	if xRefTable.ValidationMode == model.ValidationStrict && count != nil && *count < 0 {
+		return errors.New("pdfcpu: validateOutlines: corrupted, root \"Count\" can't be negativ")
+	}
+
+	total, visible, err := validateOutlineTree(xRefTable, first, last)
+	if err != nil {
+		return err
+	}
+
+	if err := validateOutlineCount(xRefTable, total, visible, count); err != nil {
+		return err
+	}
+
+	return nil
 }

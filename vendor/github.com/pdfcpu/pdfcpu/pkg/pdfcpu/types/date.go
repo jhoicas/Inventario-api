@@ -78,7 +78,7 @@ func parseTimezoneHours(s string, o byte) (int, bool) {
 		return 0, false
 	}
 
-	// Opinionated hack.
+	// Opininated hack.
 	tzh = tzh % 24
 
 	if o == 'Z' && tzh != 0 {
@@ -106,19 +106,15 @@ func parseTimezoneMinutes(s string, o byte) (int, bool) {
 	return tzm, true
 }
 
-func timezoneSeparator(c byte) bool {
+func validateTimezoneSeparator(c byte) bool {
 	return c == '+' || c == '-' || c == 'Z'
 }
 
-// func validateTimezoneSeparator(c byte) bool {
-// 	return c == '+' || c == '-' || c == 'Z'
-// }
+func parseTimezone(s string, relaxed bool) (h, m int, ok bool) {
 
-func parseTimezone(s string, off int, relaxed bool) (h, m int, ok bool) {
+	o := s[14]
 
-	o := s[off] // 14
-
-	if !timezoneSeparator(o) {
+	if !validateTimezoneSeparator(o) {
 		// Ignore timezone on corrupt timezone separator if relaxed.
 		return 0, 0, relaxed
 	}
@@ -129,17 +125,15 @@ func parseTimezone(s string, off int, relaxed bool) (h, m int, ok bool) {
 	// 		"YYYYMMDDHHmmSSZ'"
 	// 		"YYYYMMDDHHmmSSZ'0"
 
-	off++
-
 	if o == 'Z' {
-		t := s[off:]
+		t := s[15:]
 		if t == "" || relaxed && (t == "'" || t == "'0") {
 			return 0, 0, true
 		}
 	}
 
 	// HH'mm
-	s = s[off:]
+	s = s[15:]
 	if s[0] == '-' {
 		s = s[1:]
 	}
@@ -297,31 +291,24 @@ func parseMinute(s string) (min int, finished, ok bool) {
 	return min, false, true
 }
 
-func parseSecond(s string) (sec int, finished bool, off int, ok bool) {
-
-	off = 14
-
+func parseSecond(s string) (sec int, finished, ok bool) {
 	second := s[12:14]
-	if len(second) == 2 && timezoneSeparator(second[1]) {
-		second = second[:1]
-		off = 13
-	}
 
 	sec, err := strconv.Atoi(second)
 	if err != nil {
-		return 0, false, off, false
+		return 0, false, false
 	}
 
 	if sec > 59 {
-		return 0, false, off, false
+		return 0, false, false
 	}
 
 	// "YYYYMMDDHHmmSS"
 	if len(s) == 14 {
-		return sec, true, off, true
+		return sec, true, true
 	}
 
-	return sec, false, off, true
+	return sec, false, true
 }
 
 func digestPopularOutOfSpecDates(s string) (time.Time, bool) {
@@ -419,7 +406,7 @@ func DateTime(s string, relaxed bool) (time.Time, bool) {
 		return d, true
 	}
 
-	sec, finished, off, ok := parseSecond(s)
+	sec, finished, ok := parseSecond(s)
 	if !ok {
 		return d, false
 	}
@@ -430,7 +417,7 @@ func DateTime(s string, relaxed bool) (time.Time, bool) {
 	}
 
 	// Process timezone
-	tzh, tzm, ok := parseTimezone(s, off, relaxed)
+	tzh, tzm, ok := parseTimezone(s, relaxed)
 	if !ok {
 		return d, false
 	}

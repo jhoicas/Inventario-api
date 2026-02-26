@@ -329,6 +329,15 @@ func writeHexLiteralObject(ctx *model.Context, objNumber, genNumber int, hl type
 }
 
 func writeIntegerObject(ctx *model.Context, objNumber, genNumber int, integer types.Integer) error {
+	ok, err := writeToObjectStream(ctx, objNumber, genNumber)
+	if err != nil {
+		return err
+	}
+
+	if ok {
+		return nil
+	}
+
 	return writeObject(ctx, objNumber, genNumber, integer.PDFString())
 }
 
@@ -567,7 +576,7 @@ func writeNullObject(ctx *model.Context, objNumber, genNumber int) error {
 func writeDeepDict(ctx *model.Context, d types.Dict, objNr, genNr int) error {
 
 	if d.IsPage() {
-		valid, err := ctx.IsObjValid(objNr, genNr)
+		valid, err := ctx.IsValidObj(objNr, genNr)
 		if err != nil {
 			return err
 		}

@@ -190,7 +190,7 @@ func validateOCGs(xRefTable *model.XRefTable, d types.Dict, dictName, entryName 
 
 	// see 8.11.2.2
 
-	o, _, err := d.Entry(dictName, entryName, OPTIONAL)
+	o, err := d.Entry(dictName, entryName, OPTIONAL)
 	if err != nil || o == nil {
 		return err
 	}
@@ -388,11 +388,7 @@ func validateOptionalContentConfigurationDict(xRefTable *model.XRefTable, d type
 	}
 
 	// Locked, optional, array
-	sinceVersion = model.V16
-	if xRefTable.ValidationMode == model.ValidationRelaxed {
-		sinceVersion = model.V15
-	}
-	return validateOptionalContentGroupArray(xRefTable, d, dictName, "Locked", sinceVersion)
+	return validateOptionalContentGroupArray(xRefTable, d, dictName, "Locked", model.V16)
 }
 
 func validateOCProperties(xRefTable *model.XRefTable, rootDict types.Dict, required bool, sinceVersion model.Version) error {

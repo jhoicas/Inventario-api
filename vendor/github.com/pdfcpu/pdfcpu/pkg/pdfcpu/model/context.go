@@ -183,18 +183,17 @@ type ReadContext struct {
 	FileSize            int64         // Input file size.
 	RS                  io.ReadSeeker // Input read seeker.
 	EolCount            int           // 1 or 2 characters used for eol.
-	RepairOffset        int64
-	BinaryTotalSize     int64        // total stream data
-	BinaryImageSize     int64        // total image stream data
-	BinaryFontSize      int64        // total font stream data (fontfiles)
-	BinaryImageDuplSize int64        // total obsolet image stream data after optimization
-	BinaryFontDuplSize  int64        // total obsolet font stream data after optimization
-	Linearized          bool         // File is linearized.
-	Hybrid              bool         // File is a hybrid PDF file.
-	UsingObjectStreams  bool         // File is using object streams.
-	ObjectStreams       types.IntSet // All object numbers of any object streams found which need to be decoded.
-	UsingXRefStreams    bool         // File is using xref streams.
-	XRefStreams         types.IntSet // All object numbers of any xref streams found.
+	BinaryTotalSize     int64         // total stream data
+	BinaryImageSize     int64         // total image stream data
+	BinaryFontSize      int64         // total font stream data (fontfiles)
+	BinaryImageDuplSize int64         // total obsolet image stream data after optimization
+	BinaryFontDuplSize  int64         // total obsolet font stream data after optimization
+	Linearized          bool          // File is linearized.
+	Hybrid              bool          // File is a hybrid PDF file.
+	UsingObjectStreams  bool          // File is using object streams.
+	ObjectStreams       types.IntSet  // All object numbers of any object streams found which need to be decoded.
+	UsingXRefStreams    bool          // File is using xref streams.
+	XRefStreams         types.IntSet  // All object numbers of any xref streams found.
 }
 
 func newReadContext(rs io.ReadSeeker) (*ReadContext, error) {
@@ -279,23 +278,22 @@ func (rc *ReadContext) ReadFileSize() int {
 	return int(rc.FileSize)
 }
 
-// OptimizationContext represents the context for the optimization of a PDF file.
+// OptimizationContext represents the context for the optimiziation of a PDF file.
 type OptimizationContext struct {
 
 	// Font section
-	PageFonts           []types.IntSet      // For each page a registry of font object numbers.
-	FontObjects         map[int]*FontObject // FontObject lookup table by font object number.
-	FormFontObjects     map[int]*FontObject // FormFontObject lookup table by font object number.
-	Fonts               map[string][]int    // All font object numbers registered for a font name.
-	DuplicateFonts      map[int]types.Dict  // Registry of duplicate font dicts.
-	DuplicateFontObjs   types.IntSet        // The set of objects that represents the union of the object graphs of all duplicate font dicts.
-	CorruptFontResDicts []types.Dict        // Corrupted fontDicts encountered during bypassing xreftable.
+	PageFonts         []types.IntSet      // For each page a registry of font object numbers.
+	FontObjects       map[int]*FontObject // FontObject lookup table by font object number.
+	FormFontObjects   map[int]*FontObject // FormFontObject lookup table by font object number.
+	Fonts             map[string][]int    // All font object numbers registered for a font name.
+	DuplicateFonts    map[int]types.Dict  // Registry of duplicate font dicts.
+	DuplicateFontObjs types.IntSet        // The set of objects that represents the union of the object graphs of all duplicate font dicts.
 
 	// Image section
-	PageImages         []types.IntSet                // For each page a registry of image object numbers.
-	ImageObjects       map[int]*ImageObject          // ImageObject lookup table by image object number.
-	DuplicateImages    map[int]*DuplicateImageObject // Registry of duplicate image dicts.
-	DuplicateImageObjs types.IntSet                  // The set of objects that represents the union of the object graphs of all duplicate image dicts.
+	PageImages         []types.IntSet            // For each page a registry of image object numbers.
+	ImageObjects       map[int]*ImageObject      // ImageObject lookup table by image object number.
+	DuplicateImages    map[int]*types.StreamDict // Registry of duplicate image dicts.
+	DuplicateImageObjs types.IntSet              // The set of objects that represents the union of the object graphs of all duplicate image dicts.
 
 	ContentStreamCache map[int]*types.StreamDict
 	FormStreamCache    map[int]*types.StreamDict
@@ -309,14 +307,13 @@ type OptimizationContext struct {
 
 func newOptimizationContext() *OptimizationContext {
 	return &OptimizationContext{
-		FontObjects:       map[int]*FontObject{},
-		FormFontObjects:   map[int]*FontObject{},
-		Fonts:             map[string][]int{},
-		DuplicateFonts:    map[int]types.Dict{},
-		DuplicateFontObjs: types.IntSet{},
-
+		FontObjects:          map[int]*FontObject{},
+		FormFontObjects:      map[int]*FontObject{},
+		Fonts:                map[string][]int{},
+		DuplicateFonts:       map[int]types.Dict{},
+		DuplicateFontObjs:    types.IntSet{},
 		ImageObjects:         map[int]*ImageObject{},
-		DuplicateImages:      map[int]*DuplicateImageObject{},
+		DuplicateImages:      map[int]*types.StreamDict{},
 		DuplicateImageObjs:   types.IntSet{},
 		DuplicateInfoObjects: types.IntSet{},
 		ContentStreamCache:   map[int]*types.StreamDict{},
@@ -583,8 +580,6 @@ type WriteContext struct {
 	BinaryFontSize      int64         // total font stream data (fontfiles) = copy of Read.BinaryFontSize.
 	Table               map[int]int64 // object write offsets
 	Offset              int64         // current write offset
-	OffsetSigByteRange  int64         // write offset of signature dict value for "ByteRange"
-	OffsetSigContents   int64         // write offset of signature dict value for "Contents"
 	WriteToObjectStream bool          // if true start to embed objects into object streams and obey ObjectStreamMaxObjects.
 	CurrentObjStream    *int          // if not nil, any new non-stream-object gets added to the object stream with this object number.
 	Eol                 string        // end of line char sequence

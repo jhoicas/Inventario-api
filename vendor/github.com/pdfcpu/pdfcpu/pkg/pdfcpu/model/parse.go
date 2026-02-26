@@ -18,7 +18,6 @@ package model
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"strings"
 	"unicode"
@@ -34,7 +33,6 @@ var (
 	errArrayNotTerminated      = errors.New("pdfcpu: parse: unterminated array")
 	errDictionaryCorrupt       = errors.New("pdfcpu: parse: corrupt dictionary")
 	errDictionaryNotTerminated = errors.New("pdfcpu: parse: unterminated dictionary")
-	errDictionaryDuplicateKey  = errors.New("pdfcpu: parse: duplicate key")
 	errHexLiteralCorrupt       = errors.New("pdfcpu: parse: corrupt hex literal")
 	errHexLiteralNotTerminated = errors.New("pdfcpu: parse: hex literal not terminated")
 	errNameObjectCorrupt       = errors.New("pdfcpu: parse: corrupt name object")
@@ -47,8 +45,6 @@ var (
 	errXrefStreamCorruptIndex  = errors.New("pdfcpu: parse: xref stream dict corrupt entry Index")
 	errObjStreamMissingN       = errors.New("pdfcpu: parse: obj stream dict missing entry W")
 	errObjStreamMissingFirst   = errors.New("pdfcpu: parse: obj stream dict missing entry First")
-
-	ErrCorruptObjectOffset = errors.New("pdfcpu: corrupt object offset")
 )
 
 func positionToNextWhitespace(s string) (int, string) {
@@ -231,38 +227,9 @@ func delimiter(b byte) bool {
 	return false
 }
 
-func detectObj(s string) (string, string, error) {
-	i := strings.Index(s, "obj")
-	if i > 0 {
-		return s[:i], s[i+3:], nil
-	}
-
-	i = strings.Index(s, "bj")
-	if i > 0 {
-		return s[:i], s[i+2:], nil
-	}
-
-	return "", "", errors.New("pdfcpu: ParseObjectAttributes: can't find \"obj\"")
-}
-
-func cleanObjProlog(s string) (string, error) {
-	s, _ = trimLeftSpace(s, false)
-	if len(s) == 0 {
-		return "", errors.New("pdfcpu: ParseObjectAttributes: can't find object number")
-	}
-
-	var b strings.Builder
-	for _, r := range s {
-		if r >= '0' && r <= '9' || r == ' ' {
-			b.WriteRune(r)
-		}
-	}
-	return b.String(), nil
-}
-
 // ParseObjectAttributes parses object number and generation of the next object for given string buffer.
-func ParseObjectAttributes(line *string) (*int, *int, error) {
-	// TODO always called twice ?
+func ParseObjectAttributes(line *string) (objectNumber *int, generationNumber *int, err error) {
+
 	if line == nil || len(*line) == 0 {
 		return nil, nil, errors.New("pdfcpu: ParseObjectAttributes: buf not available")
 	}
@@ -271,55 +238,58 @@ func ParseObjectAttributes(line *string) (*int, *int, error) {
 		log.Parse.Printf("ParseObjectAttributes: buf=<%s>\n", *line)
 	}
 
-	l, remainder, err := detectObj(*line)
-	if err != nil {
-		return nil, nil, err
+	l := *line
+	var remainder string
+
+	i := strings.Index(l, "obj")
+	if i < 0 {
+		return nil, nil, errors.New("pdfcpu: ParseObjectAttributes: can't find \"obj\"")
 	}
+
+	remainder = l[i+len("obj"):]
+	l = l[:i]
 
 	// object number
 
-	l, err = cleanObjProlog(l)
+	l, _ = trimLeftSpace(l, false)
+	if len(l) == 0 {
+		return nil, nil, errors.New("pdfcpu: ParseObjectAttributes: can't find object number")
+	}
+
+	i, _ = positionToNextWhitespaceOrChar(l, "%")
+	if i <= 0 {
+		return nil, nil, errors.New("pdfcpu: ParseObjectAttributes: can't find end of object number")
+	}
+
+	objNr, err := strconv.Atoi(l[:i])
 	if err != nil {
 		return nil, nil, err
-	}
-
-	i, _ := positionToNextWhitespaceOrChar(l, "%")
-	s := l
-	if i > 0 {
-		s = l[:i]
-	}
-
-	objNr, err := strconv.Atoi(strings.TrimSpace(s))
-	if err != nil {
-		return nil, nil, ErrCorruptObjectOffset
 	}
 
 	// generation number
 
-	genNr := 0
-
-	if i > 0 {
-
-		l = l[i:]
-		l, _ = trimLeftSpace(l, false)
-		if len(l) == 0 {
-			return nil, nil, errors.New("pdfcpu: ParseObjectAttributes: can't find generation number")
-		}
-
-		i, _ = positionToNextWhitespaceOrChar(l, "%")
-		if i <= 0 {
-			return nil, nil, errors.New("pdfcpu: ParseObjectAttributes: can't find end of generation number")
-		}
-
-		genNr, err = strconv.Atoi(l[:i])
-		if err != nil {
-			return nil, nil, err
-		}
+	l = l[i:]
+	l, _ = trimLeftSpace(l, false)
+	if len(l) == 0 {
+		return nil, nil, errors.New("pdfcpu: ParseObjectAttributes: can't find generation number")
 	}
+
+	i, _ = positionToNextWhitespaceOrChar(l, "%")
+	if i <= 0 {
+		return nil, nil, errors.New("pdfcpu: ParseObjectAttributes: can't find end of generation number")
+	}
+
+	genNr, err := strconv.Atoi(l[:i])
+	if err != nil {
+		return nil, nil, err
+	}
+
+	objectNumber = &objNr
+	generationNumber = &genNr
 
 	*line = remainder
 
-	return &objNr, &genNr, nil
+	return objectNumber, generationNumber, nil
 }
 
 func parseArray(c context.Context, line *string) (*types.Array, error) {
@@ -417,6 +387,10 @@ func parseStringLiteral(line *string) (types.Object, error) {
 		return nil, errBufNotAvailable
 	}
 
+	if log.ParseEnabled() {
+		log.Parse.Printf("ParseObject: value = String Literal: <%s>\n", *line)
+	}
+
 	l := *line
 
 	if log.ParseEnabled() {
@@ -477,10 +451,7 @@ func parseHexLiteral(line *string) (types.Object, error) {
 
 	hexStr, ok := hexString(strings.TrimSpace(l[:eov]))
 	if !ok {
-		// Skip junk
-		*line = forwardParseBuf(l[eov:], 1)
-		return nil, nil
-		//return nil, errHexLiteralCorrupt
+		return nil, errHexLiteralCorrupt
 	}
 
 	// position behind '>'
@@ -539,19 +510,18 @@ func parseName(line *string) (*types.Name, error) {
 	return &nameObj, nil
 }
 
-func insertKey(d types.Dict, key string, val types.Object, relaxed bool) error {
+func insertKey(d types.Dict, key string, val types.Object) error {
 	if _, found := d[key]; !found {
 		d[key] = val
 	} else {
-
-		// was: for now we ignore duplicate keys - config flag ?
-
-		// if !relaxed {
+		// for now we digest duplicate keys.
+		// TODO
+		// if !validationRelaxed {
 		// 	return errDictionaryDuplicateKey
 		// }
-
-		d[key] = val
-		ShowDigestedSpecViolation(fmt.Sprintf("duplicate key \"%s\"", key))
+		// if log.CLIEnabled() {
+		// 	log.CLI.Printf("ParseDict: digesting duplicate key\n")
+		// }
 	}
 
 	if log.ParseEnabled() {
@@ -561,16 +531,12 @@ func insertKey(d types.Dict, key string, val types.Object, relaxed bool) error {
 	return nil
 }
 
-func dictString(l string) bool {
-	return len(l) > 0 && !strings.HasPrefix(l, ">>")
-}
-
 func processDictKeys(c context.Context, line *string, relaxed bool) (types.Dict, error) {
 	l := *line
 	var eol bool
 	d := types.NewDict()
 
-	for dictString(l) {
+	for !strings.HasPrefix(l, ">>") {
 
 		if err := c.Err(); err != nil {
 			return nil, err
@@ -578,11 +544,7 @@ func processDictKeys(c context.Context, line *string, relaxed bool) (types.Dict,
 
 		keyName, err := parseName(&l)
 		if err != nil {
-			if !relaxed {
-				return nil, err
-			}
-			// Skip junk.
-			l = forwardParseBuf(l, 1)
+			return nil, err
 		}
 
 		if log.ParseEnabled() {
@@ -592,12 +554,10 @@ func processDictKeys(c context.Context, line *string, relaxed bool) (types.Dict,
 		// Position to first non whitespace after key.
 		l, eol = trimLeftSpace(l, relaxed)
 
-		if err != nil && relaxed {
-			// Skip junk.
-			continue
-		}
-
 		if len(l) == 0 {
+			if log.ParseEnabled() {
+				log.Parse.Println("ParseDict: only whitespace after key")
+			}
 			// Only whitespace after key.
 			return nil, errDictionaryNotTerminated
 		}
@@ -616,13 +576,13 @@ func processDictKeys(c context.Context, line *string, relaxed bool) (types.Dict,
 		// Specifying the null object as the value of a dictionary entry (7.3.7, "Dictionary Objects")
 		// shall be equivalent to omitting the entry entirely.
 		if val != nil {
-			if err := insertKey(d, string(*keyName), val, relaxed); err != nil {
+			if err := insertKey(d, string(*keyName), val); err != nil {
 				return nil, err
 			}
 		}
 
 		// We are positioned on the char behind the last parsed dict value.
-		if len(l) < 2 {
+		if len(l) == 0 {
 			return nil, errDictionaryNotTerminated
 		}
 
@@ -705,10 +665,9 @@ func startParseNumericOrIndRef(l string) (string, string, int) {
 			0.000000000
 	*/
 	if len(str) > 1 && str[0] == '0' {
-		switch str[1] {
-		case '+', '-':
+		if str[1] == '+' || str[1] == '-' {
 			str = str[1:]
-		case '.':
+		} else if str[1] == '.' {
 			var i int
 			for i = 2; len(str) > i && str[i] == '0'; i++ {
 			}
@@ -729,7 +688,8 @@ func isRangeError(err error) bool {
 	return false
 }
 
-func parseIndRef(s, l, l1 string, line *string, i, i2 int) (types.Object, error) {
+func parseIndRef(s, l, l1 string, line *string, i, i2 int, rangeErr bool) (types.Object, error) {
+
 	g, err := strconv.Atoi(s)
 	if err != nil {
 		// 2nd int(generation number) not available.
@@ -745,6 +705,9 @@ func parseIndRef(s, l, l1 string, line *string, i, i2 int) (types.Object, error)
 	l, _ = trimLeftSpace(l, false)
 
 	if len(l) == 0 {
+		if rangeErr {
+			return nil, err
+		}
 		// only whitespace
 		*line = l1
 		return types.Integer(i), nil
@@ -752,8 +715,15 @@ func parseIndRef(s, l, l1 string, line *string, i, i2 int) (types.Object, error)
 
 	if l[0] == 'R' {
 		*line = forwardParseBuf(l, 1)
+		if rangeErr {
+			return nil, nil
+		}
 		// We have all 3 components to create an indirect reference.
 		return *types.NewIndirectRef(i, g), nil
+	}
+
+	if rangeErr {
+		return nil, err
 	}
 
 	// 'R' not available.
@@ -767,27 +737,15 @@ func parseIndRef(s, l, l1 string, line *string, i, i2 int) (types.Object, error)
 }
 
 func parseFloat(s string) (types.Object, error) {
-	// Replace ',' with '.' to accept comma as decimal separator
-	s = strings.Replace(s, ",", ".", 1)
-
-	f, n := strconv.ParseFloat(s, 64)
-	if n != nil {
-		// Fallback: handle ".-" case (e.g., ".-5")
-		s = strings.Replace(s, ".-", ".", 1)
-		f, err := strconv.ParseFloat(s, 64)
-		if err != nil {
-			// Skip junk
-			return nil, nil
-		}
-		if log.ParseEnabled() {
-			log.Parse.Printf("parseFloat: value is: %f\n", f)
-		}
-		return types.Float(f), nil
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return nil, err
 	}
 
 	if log.ParseEnabled() {
 		log.Parse.Printf("parseFloat: value is: %f\n", f)
 	}
+
 	return types.Float(f), nil
 }
 
@@ -804,22 +762,29 @@ func parseNumericOrIndRef(line *string) (types.Object, error) {
 	s, l1, i1 := startParseNumericOrIndRef(l)
 
 	// Try int
+	var rangeErr bool
 	i, err := strconv.Atoi(s)
 	if err != nil {
-		if isRangeError(err) {
-			// #407
-			i = 0
+		rangeErr = isRangeError(err)
+		if !rangeErr {
+			// Try float
 			*line = l1
-			return types.Integer(i), nil
+			return parseFloat(s)
 		}
-		*line = l1
-		return parseFloat(s)
+
+		// #407
+		i = 0
 	}
 
 	// We have an Int!
 
 	// if not followed by whitespace return sole integer value.
 	if i1 <= 0 || delimiter(l[i1]) {
+
+		if rangeErr {
+			return nil, err
+		}
+
 		if log.ParseEnabled() {
 			log.Parse.Printf("parseNumericOrIndRef: value is numeric int: %d\n", i)
 		}
@@ -834,6 +799,9 @@ func parseNumericOrIndRef(line *string) (types.Object, error) {
 	l, _ = trimLeftSpace(l, false)
 	if len(l) == 0 {
 		// only whitespace
+		if rangeErr {
+			return nil, err
+		}
 		*line = l1
 		return types.Integer(i), nil
 	}
@@ -843,6 +811,9 @@ func parseNumericOrIndRef(line *string) (types.Object, error) {
 	// if only 2 token, can't be indirect reference.
 	// if not followed by whitespace return sole integer value.
 	if i2 <= 0 || delimiter(l[i2]) {
+		if rangeErr {
+			return nil, err
+		}
 		if log.ParseEnabled() {
 			log.Parse.Printf("parseNumericOrIndRef: 2 objects => value is numeric int: %d\n", i)
 		}
@@ -855,7 +826,7 @@ func parseNumericOrIndRef(line *string) (types.Object, error) {
 		s = l[:i2]
 	}
 
-	return parseIndRef(s, l, l1, line, i, i2)
+	return parseIndRef(s, l, l1, line, i, i2, rangeErr)
 }
 
 func parseHexLiteralOrDict(c context.Context, l *string) (val types.Object, err error) {
@@ -891,16 +862,9 @@ func parseHexLiteralOrDict(c context.Context, l *string) (val types.Object, err 
 	return val, nil
 }
 
-func parseBooleanOrNull(l string) (types.Object, string, bool) {
-
-	if len(l) < 4 {
-		return nil, "", false
-	}
-
-	s := strings.ToLower(l[:4])
-
+func parseBooleanOrNull(l string) (val types.Object, s string, ok bool) {
 	// null, absent object
-	if strings.HasPrefix(s, "null") {
+	if strings.HasPrefix(l, "null") {
 		if log.ParseEnabled() {
 			log.Parse.Println("parseBoolean: value = null")
 		}
@@ -908,21 +872,15 @@ func parseBooleanOrNull(l string) (types.Object, string, bool) {
 	}
 
 	// boolean true
-	if strings.HasPrefix(s, "true") {
+	if strings.HasPrefix(l, "true") {
 		if log.ParseEnabled() {
 			log.Parse.Println("parseBoolean: value = true")
 		}
 		return types.Boolean(true), "true", true
 	}
 
-	if len(l) < 5 {
-		return nil, "", false
-	}
-
-	s += strings.ToLower(l[4:5])
-
 	// boolean false
-	if strings.HasPrefix(s, "false") {
+	if strings.HasPrefix(l, "false") {
 		if log.ParseEnabled() {
 			log.Parse.Println("parseBoolean: value = false")
 		}
@@ -1182,11 +1140,11 @@ func detectMarker(line, marker string) int {
 
 func detectMarkers(line string, endInd, streamInd *int) {
 	//fmt.Printf("buflen=%d\n%s", len(line), hex.Dump([]byte(line)))
-	if *endInd == 0 {
+	if *endInd <= 0 {
 		*endInd = detectMarker(line, "endobj")
 
 	}
-	if *streamInd == 0 {
+	if *streamInd <= 0 {
 		*streamInd = detectMarker(line, "stream")
 	}
 }
@@ -1207,7 +1165,7 @@ func posFloor(pos1, pos2 int) int {
 		return pos2
 	}
 	if pos1 < pos2 {
-		return pos1
+		return pos2
 	}
 	if pos2 < 0 {
 		return pos1
@@ -1279,89 +1237,21 @@ func applyOffStreamIndFirst(endInd, streamInd, off, floor int) (int, int, error)
 }
 
 func isComment(commentPos, strLitPos int) bool {
-	return commentPos >= 0 && (strLitPos < 0 || commentPos < strLitPos)
+	return commentPos > 0 && (strLitPos < 0 || commentPos < strLitPos)
 }
 
 func DetectKeywords(line string) (endInd int, streamInd int, err error) {
-	return DetectKeywordsWithContext(context.Background(), line)
-}
-
-func skipComment(line string, commentPos int, off, endInd, streamInd *int) string {
-	l, i := positionToNextEOL(line[commentPos:])
-	if l == "" {
-		return l
-	}
-	delta := commentPos + i
-	*off += delta
-
-	// Adjust found positions for changed line.
-	if *endInd > delta {
-		*endInd -= delta
-	} else if *endInd != -1 {
-		*endInd = 0
-	}
-	if *streamInd > delta {
-		*streamInd -= delta
-	} else if *streamInd != -1 {
-		*streamInd = 0
-	}
-	return l
-}
-
-func skipStringLit(line string, strLitPos int, off, endInd, streamInd *int) (string, error) {
-	l, i, err := positionAfterStringLiteral(line[strLitPos:])
-	if err != nil {
-		return "", err
-	}
-	delta := strLitPos + i
-	*off += delta
-	// Adjust found positions for changed line.
-	if *endInd > delta {
-		*endInd -= delta
-	} else if *endInd != -1 {
-		*endInd = 0
-	}
-	if *streamInd > delta {
-		*streamInd -= delta
-	} else if *streamInd != -1 {
-		*streamInd = 0
-	}
-	return l, nil
-}
-
-func skipCommentOrStringLiteral(line string, commentPos, slPos int, off, endInd, streamInd *int) (string, error) {
-	if isComment(commentPos, slPos) {
-		// skip comment if % before any (
-		line = skipComment(line, commentPos, off, endInd, streamInd)
-		if line == "" {
-			return "", nil
-		}
-		return line, nil
-	}
-	return skipStringLit(line, slPos, off, endInd, streamInd)
-}
-
-func DetectKeywordsWithContext(c context.Context, line string) (endInd int, streamInd int, err error) {
 	// return endInd or streamInd which ever first encountered.
-	off := 0
-	strLitPos, commentPos := 0, 0
+	off, i := 0, 0
 	for {
-		if err := c.Err(); err != nil {
-			return -1, -1, err
-		}
+
+		strLitPos := detectNonEscaped(line, "(")
+		commentPos := detectNonEscaped(line, "%")
 
 		detectMarkers(line, &endInd, &streamInd)
 
 		if off == 0 && endInd < 0 && streamInd < 0 {
 			return -1, -1, nil
-		}
-
-		// Don't re-search in partial line if known to be not present.
-		if strLitPos != -1 {
-			strLitPos = detectNonEscaped(line, "(")
-		}
-		if commentPos != -1 {
-			commentPos = detectNonEscaped(line, "%")
 		}
 
 		if strLitPos < 0 && commentPos < 0 {
@@ -1385,9 +1275,23 @@ func DetectKeywordsWithContext(c context.Context, line string) (endInd int, stre
 			}
 		}
 
-		line, err = skipCommentOrStringLiteral(line, commentPos, strLitPos, &off, &endInd, &streamInd)
+		// skip comment if % before any (
+		if isComment(commentPos, strLitPos) {
+			line, i = positionToNextEOL(line[commentPos:])
+			if line == "" {
+				return -1, -1, nil
+			}
+			off += commentPos + i
+			endInd, streamInd = 0, 0
+			continue
+		}
+
+		// Skip string literal.
+		line, i, err = positionAfterStringLiteral(line[strLitPos:])
 		if err != nil {
 			return -1, -1, err
 		}
+		off += strLitPos + i
+		endInd, streamInd = 0, 0
 	}
 }

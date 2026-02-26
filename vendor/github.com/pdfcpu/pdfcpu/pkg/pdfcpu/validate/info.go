@@ -17,7 +17,6 @@ limitations under the License.
 package validate
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/pdfcpu/pdfcpu/pkg/log"
@@ -31,13 +30,8 @@ func DocumentProperty(s string) bool {
 	return !types.MemberOf(s, []string{"Keywords", "Producer", "CreationDate", "ModDate", "Trapped"})
 }
 
-func validateInfoDictDate(xRefTable *model.XRefTable, name string, o types.Object) (string, error) {
-	s, err := validateDateObject(xRefTable, o, model.V10)
-	if err != nil && xRefTable.ValidationMode == model.ValidationRelaxed {
-		err = nil
-		model.ShowRepaired(fmt.Sprintf("info dict \"%s\"", name))
-	}
-	return s, err
+func validateInfoDictDate(xRefTable *model.XRefTable, o types.Object) (s string, err error) {
+	return validateDateObject(xRefTable, o, model.V10)
 }
 
 func validateInfoDictTrapped(xRefTable *model.XRefTable, o types.Object) error {
@@ -87,7 +81,7 @@ func handleProperties(xRefTable *model.XRefTable, key string, val types.Object) 
 }
 
 func validateKeywords(xRefTable *model.XRefTable, v types.Object) (err error) {
-	xRefTable.Keywords, err = xRefTable.DereferenceStringOrHexLiteral(v, model.V10, nil)
+	xRefTable.Keywords, err = xRefTable.DereferenceStringOrHexLiteral(v, model.V11, nil)
 	if err != nil {
 		return err
 	}
@@ -111,7 +105,7 @@ func validateDocInfoDictEntry(xRefTable *model.XRefTable, k string, v types.Obje
 
 	// text string, opt, since V1.1
 	case "Title":
-		xRefTable.Title, err = xRefTable.DereferenceStringOrHexLiteral(v, model.V10, nil)
+		xRefTable.Title, err = xRefTable.DereferenceStringOrHexLiteral(v, model.V11, nil)
 
 	// text string, optional
 	case "Author":
@@ -119,7 +113,7 @@ func validateDocInfoDictEntry(xRefTable *model.XRefTable, k string, v types.Obje
 
 	// text string, optional, since V1.1
 	case "Subject":
-		xRefTable.Subject, err = xRefTable.DereferenceStringOrHexLiteral(v, model.V10, nil)
+		xRefTable.Subject, err = xRefTable.DereferenceStringOrHexLiteral(v, model.V11, nil)
 
 	// text string, optional, since V1.1
 	case "Keywords":
@@ -137,19 +131,22 @@ func validateDocInfoDictEntry(xRefTable *model.XRefTable, k string, v types.Obje
 
 	// date, optional
 	case "CreationDate":
-		xRefTable.CreationDate, err = validateInfoDictDate(xRefTable, "CreationDate", v)
+		xRefTable.CreationDate, err = validateInfoDictDate(xRefTable, v)
+		if err != nil && xRefTable.ValidationMode == model.ValidationRelaxed {
+			err = nil
+		}
 
 	// date, required if PieceInfo is present in document catalog.
 	case "ModDate":
 		hasModDate = true
-		xRefTable.ModDate, err = validateInfoDictDate(xRefTable, "ModDate", v)
+		xRefTable.ModDate, err = validateInfoDictDate(xRefTable, v)
 
 	// name, optional, since V1.3
 	case "Trapped":
 		err = validateInfoDictTrapped(xRefTable, v)
 
 	case "AAPL:Keywords":
-		xRefTable.CustomExtensions = true
+		xRefTable.AAPLExtensions = true
 
 	// text string, optional
 	default:
@@ -162,12 +159,8 @@ func validateDocInfoDictEntry(xRefTable *model.XRefTable, k string, v types.Obje
 func validateDocumentInfoDict(xRefTable *model.XRefTable, obj types.Object) (bool, error) {
 	// Document info object is optional.
 	d, err := xRefTable.DereferenceDict(obj)
-	if err != nil {
+	if err != nil || d == nil {
 		return false, err
-	}
-	if d == nil {
-		xRefTable.Info = nil
-		return false, nil
 	}
 
 	hasModDate := false
@@ -205,12 +198,7 @@ func validateDocumentInfoObject(xRefTable *model.XRefTable) error {
 
 	hasModDate, err := validateDocumentInfoDict(xRefTable, *xRefTable.Info)
 	if err != nil {
-		if xRefTable.ValidationMode != model.ValidationRelaxed || !strings.Contains(err.Error(), "wrong type") {
-			return err
-		}
-		xRefTable.Info = nil
-		model.ShowSkipped("invalid info dict")
-		return nil
+		return err
 	}
 
 	hasPieceInfo, err := xRefTable.CatalogHasPieceInfo()
@@ -219,10 +207,7 @@ func validateDocumentInfoObject(xRefTable *model.XRefTable) error {
 	}
 
 	if hasPieceInfo && !hasModDate {
-		if xRefTable.ValidationMode == model.ValidationStrict {
-			return errors.Errorf("validateDocumentInfoObject: missing required entry \"ModDate\"")
-		}
-		model.ShowDigestedSpecViolation("infoDict with \"PieceInfo\" but missing \"ModDate\"")
+		return errors.Errorf("validateDocumentInfoObject: missing required entry \"ModDate\"")
 	}
 
 	if log.ValidateEnabled() {

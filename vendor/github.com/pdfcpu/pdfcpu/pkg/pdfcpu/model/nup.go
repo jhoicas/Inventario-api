@@ -321,7 +321,7 @@ func (ctx *Context) NUpTilePDFBytesForPDF(
 	}
 
 	// Retrieve content stream bytes.
-	bb, err := ctx.PageContent(d, pageNr)
+	bb, err := ctx.PageContent(d)
 	if err == ErrNoContent {
 		// TODO render if has annotations.
 		return nil

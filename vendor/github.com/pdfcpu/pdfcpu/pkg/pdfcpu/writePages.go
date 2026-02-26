@@ -255,6 +255,13 @@ func writePagesDict(ctx *model.Context, indRef *types.IndirectRef, pageNr *int) 
 
 	// Push count, kids.
 	countOrig, _ := d.Find("Count")
+	c := countOrig.(types.Integer).Value()
+
+	if c == 0 {
+		// Ignore empty page tree.
+		return true, 0, nil
+	}
+
 	kidsOrig := d.ArrayEntry("Kids")
 
 	// Iterate over page tree.

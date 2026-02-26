@@ -22,22 +22,19 @@ import (
 	"time"
 
 	"github.com/pdfcpu/pdfcpu/pkg/filter"
+	"github.com/pdfcpu/pdfcpu/pkg/log"
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/model"
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/types"
 )
 
 func validateMetadataStream(xRefTable *model.XRefTable, d types.Dict, required bool, sinceVersion model.Version) (*types.StreamDict, error) {
 	if xRefTable.ValidationMode == model.ValidationRelaxed {
-		sinceVersion = model.V10
+		sinceVersion = model.V13
 	}
 
 	sd, err := validateStreamDictEntry(xRefTable, d, "dict", "Metadata", required, sinceVersion, nil)
-	if err != nil {
+	if err != nil || sd == nil {
 		return nil, err
-	}
-	if sd == nil {
-		delete(d, "Metadata")
-		return nil, nil
 	}
 
 	dictName := "metaDataDict"
@@ -89,7 +86,7 @@ func catalogMetaData(xRefTable *model.XRefTable, rootDict types.Dict, required b
 		if xRefTable.ValidationMode == model.ValidationStrict {
 			return nil, err
 		}
-		model.ShowSkipped("metadata parse error")
+		log.CLI.Println("ignoring metadata parse error")
 		return nil, nil
 	}
 

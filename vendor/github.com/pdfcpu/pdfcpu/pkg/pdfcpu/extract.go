@@ -24,7 +24,6 @@ import (
 
 	"github.com/pdfcpu/pdfcpu/pkg/filter"
 	"github.com/pdfcpu/pdfcpu/pkg/log"
-	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/font"
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/model"
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/types"
 	"github.com/pkg/errors"
@@ -394,7 +393,7 @@ func decodeImage(ctx *model.Context, sd *types.StreamDict, filters, lastFilter s
 func img(
 	ctx *model.Context,
 	sd *types.StreamDict,
-	thumb bool,
+	thumb, imgMask bool,
 	resourceID, filters, lastFilter string,
 	objNr int) (*model.Image, error) {
 
@@ -434,7 +433,7 @@ func ExtractImage(ctx *model.Context, sd *types.StreamDict, thumb bool, resource
 		return imageStub(ctx, sd, resourceID, filters, lastFilter, decodeParms, thumb, imgMask, objNr)
 	}
 
-	return img(ctx, sd, thumb, resourceID, filters, lastFilter, objNr)
+	return img(ctx, sd, thumb, imgMask, resourceID, filters, lastFilter, objNr)
 }
 
 // ExtractPageImages extracts all images used by pageNr.
@@ -507,7 +506,15 @@ func FontObjNrs(ctx *model.Context, pageNr int) []int {
 
 // ExtractFont extracts a font from fontObject.
 func ExtractFont(ctx *model.Context, fontObject model.FontObject, objNr int) (*Font, error) {
-	d, err := font.FontDescriptor(ctx.XRefTable, fontObject.FontDict, objNr)
+	// Only embedded fonts have binary data.
+	if !fontObject.Embedded() {
+		if log.DebugEnabled() {
+			log.Debug.Printf("ExtractFont: ignoring obj#%d - non embedded font: %s\n", objNr, fontObject.FontName)
+		}
+		return nil, nil
+	}
+
+	d, err := fontDescriptor(ctx.XRefTable, fontObject.FontDict, objNr)
 	if err != nil {
 		return nil, err
 	}
@@ -556,12 +563,8 @@ func ExtractFont(ctx *model.Context, fontObject model.FontObject, objNr int) (*F
 		f = &Font{bytes.NewReader(sd.Content), fontObject.FontName, "ttf"}
 
 	default:
-		s := fmt.Sprintf("extractFontData: obj#%d - unsupported fonttype %s -  font: %s\n", objNr, fontType, fontObject.FontName)
 		if log.InfoEnabled() {
-			log.Info.Println(s)
-		}
-		if log.CLIEnabled() {
-			log.CLI.Printf(s)
+			log.Info.Printf("extractFontData: ignoring obj#%d - unsupported fonttype %s -  font: %s\n", objNr, fontType, fontObject.FontName)
 		}
 		return nil, nil
 	}
@@ -570,12 +573,9 @@ func ExtractFont(ctx *model.Context, fontObject model.FontObject, objNr int) (*F
 }
 
 // ExtractPageFonts extracts all fonts used by pageNr.
-func ExtractPageFonts(ctx *model.Context, pageNr int, objNrs, skipped types.IntSet) ([]Font, error) {
+func ExtractPageFonts(ctx *model.Context, pageNr int) ([]Font, error) {
 	ff := []Font{}
 	for _, i := range FontObjNrs(ctx, pageNr) {
-		if objNrs[i] || skipped[i] {
-			continue
-		}
 		fontObject := ctx.Optimize.FontObjects[i]
 		f, err := ExtractFont(ctx, *fontObject, i)
 		if err != nil {
@@ -583,9 +583,6 @@ func ExtractPageFonts(ctx *model.Context, pageNr int, objNrs, skipped types.IntS
 		}
 		if f != nil {
 			ff = append(ff, *f)
-			objNrs[i] = true
-		} else {
-			skipped[i] = true
 		}
 	}
 	return ff, nil
@@ -608,7 +605,7 @@ func ExtractFormFonts(ctx *model.Context) ([]Font, error) {
 
 // ExtractPages extracts pageNrs into a new single page context.
 func ExtractPages(ctx *model.Context, pageNrs []int, usePgCache bool) (*model.Context, error) {
-	ctxDest, err := CreateContextWithXRefTable(ctx.Conf, types.PaperSize["A4"])
+	ctxDest, err := CreateContextWithXRefTable(nil, types.PaperSize["A4"])
 	if err != nil {
 		return nil, err
 	}
@@ -627,7 +624,7 @@ func ExtractPageContent(ctx *model.Context, pageNr int) (io.Reader, error) {
 	if err != nil {
 		return nil, err
 	}
-	bb, err := ctx.PageContent(d, pageNr)
+	bb, err := ctx.PageContent(d)
 	if err != nil && err != model.ErrNoContent {
 		return nil, err
 	}

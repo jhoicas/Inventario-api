@@ -281,14 +281,37 @@ func (df *DateField) validate() error {
 	return df.validateTab()
 }
 
-func (df *DateField) calcFontFromDA(ctx *model.Context, d types.Dict, da *string, needUTF8 bool, fonts map[string]types.IndirectRef) (*types.IndirectRef, error) {
-	id, font, _, fontIndRef, err := calcFontDetailsFromDA(ctx, d, da, needUTF8, fonts)
+func (df *DateField) calcFontFromDA(ctx *model.Context, d types.Dict, fonts map[string]types.IndirectRef) (*types.IndirectRef, error) {
+
+	s := d.StringEntry("DA")
+	if s == nil {
+		s = ctx.Form.StringEntry("DA")
+		if s == nil {
+			return nil, errors.New("pdfcpu: datefield missing \"DA\"")
+		}
+	}
+
+	fontID, f, err := fontFromDA(*s)
 	if err != nil {
 		return nil, err
 	}
 
+	df.Font, df.fontID = &f, fontID
+
+	id, name, lang, fontIndRef, err := extractFormFontDetails(ctx, df.fontID, fonts)
+	if err != nil {
+		return nil, err
+	}
+	if fontIndRef == nil {
+		return nil, errors.New("pdfcpu: unable to detect indirect reference for font")
+	}
+
+	fillFont := formFontIndRef(ctx.XRefTable, fontID) != nil
+
 	df.fontID = id
-	df.Font = font
+	df.Font.Name = name
+	df.Font.Lang = lang
+	df.Font.FillFont = fillFont
 
 	return fontIndRef, nil
 }
@@ -463,7 +486,6 @@ func (df *DateField) renderN(xRefTable *model.XRefTable) ([]byte, error) {
 }
 
 // RefreshN updates the normal appearance referred to by indRef according to df.
-// Unused.
 func (df *DateField) RefreshN(xRefTable *model.XRefTable, indRef *types.IndirectRef) error {
 	bb, err := df.renderN(xRefTable)
 	if err != nil {
@@ -838,25 +860,20 @@ func NewDateField(
 	ctx *model.Context,
 	d types.Dict,
 	v string,
-	da *string,
-	fontIndRef *types.IndirectRef,
 	fonts map[string]types.IndirectRef) (*DateField, *types.IndirectRef, error) {
 
 	df := &DateField{Value: v}
 
-	obj, _ := d.Find("Rect")
-	arr, _ := ctx.DereferenceArray(obj)
-	bb, err := ctx.RectForArray(arr)
+	bb, err := ctx.RectForArray(d.ArrayEntry("Rect"))
 	if err != nil {
 		return nil, nil, err
 	}
 
 	df.BoundingBox = types.RectForDim(bb.Width(), bb.Height())
 
-	if fontIndRef == nil {
-		if fontIndRef, err = df.calcFontFromDA(ctx, d, da, hasUTF(v), fonts); err != nil {
-			return nil, nil, err
-		}
+	fontIndRef, err := df.calcFontFromDA(ctx, d, fonts)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	df.HorAlign = types.AlignLeft
@@ -881,9 +898,9 @@ func NewDateField(
 	return df, fontIndRef, nil
 }
 
-func renderDateFieldAP(ctx *model.Context, d types.Dict, v string, da *string, fonts map[string]types.IndirectRef) error {
+func renderDateFieldAP(ctx *model.Context, d types.Dict, v string, fonts map[string]types.IndirectRef) error {
 
-	df, fontIndRef, err := NewDateField(ctx, d, v, da, nil, fonts)
+	df, fontIndRef, err := NewDateField(ctx, d, v, fonts)
 	if err != nil {
 		return err
 	}
@@ -903,8 +920,9 @@ func renderDateFieldAP(ctx *model.Context, d types.Dict, v string, da *string, f
 	return nil
 }
 
-func refreshDateFieldAP(ctx *model.Context, d types.Dict, v string, da *string, fonts map[string]types.IndirectRef, irN *types.IndirectRef) error {
-	df, _, err := NewDateField(ctx, d, v, da, nil, fonts)
+func refreshDateFieldAP(ctx *model.Context, d types.Dict, v string, fonts map[string]types.IndirectRef, irN *types.IndirectRef) error {
+
+	df, _, err := NewDateField(ctx, d, v, fonts)
 	if err != nil {
 		return err
 	}
@@ -917,10 +935,10 @@ func refreshDateFieldAP(ctx *model.Context, d types.Dict, v string, da *string, 
 	return updateForm(ctx.XRefTable, bb, irN)
 }
 
-func EnsureDateFieldAP(ctx *model.Context, d types.Dict, v string, da *string, fonts map[string]types.IndirectRef) error {
+func EnsureDateFieldAP(ctx *model.Context, d types.Dict, v string, fonts map[string]types.IndirectRef) error {
 	apd := d.DictEntry("AP")
 	if apd == nil {
-		return renderDateFieldAP(ctx, d, v, da, fonts)
+		return renderDateFieldAP(ctx, d, v, fonts)
 	}
 
 	irN := apd.IndirectRefEntry("N")
@@ -928,5 +946,5 @@ func EnsureDateFieldAP(ctx *model.Context, d types.Dict, v string, da *string, f
 		return nil
 	}
 
-	return refreshDateFieldAP(ctx, d, v, da, fonts, irN)
+	return refreshDateFieldAP(ctx, d, v, fonts, irN)
 }
