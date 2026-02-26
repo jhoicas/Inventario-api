@@ -27,12 +27,12 @@ func NewProductRepository(q Querier) *ProductRepo {
 // Create persiste un nuevo producto. Cost inicia en 0.
 func (r *ProductRepo) Create(product *entity.Product) error {
 	query := `
-		INSERT INTO products (id, company_id, sku, name, description, price, cost, tax_rate, unspsc_code, unit_measure, attributes, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`
+		INSERT INTO products (id, company_id, sku, name, description, price, cost, tax_rate, unspsc_code, unit_measure, attributes, cogs, reorder_point, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`
 	_, err := r.q.Exec(context.Background(), query,
 		product.ID, product.CompanyID, product.SKU, product.Name, product.Description,
 		product.Price, product.Cost, product.TaxRate, product.UNSPSC_Code, product.UnitMeasure,
-		product.Attributes, product.CreatedAt, product.UpdatedAt,
+		product.Attributes, product.COGS, product.ReorderPoint, product.CreatedAt, product.UpdatedAt,
 	)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -46,12 +46,12 @@ func (r *ProductRepo) Create(product *entity.Product) error {
 // GetByID obtiene un producto por ID.
 func (r *ProductRepo) GetByID(id string) (*entity.Product, error) {
 	query := `
-		SELECT id, company_id, sku, name, description, price, cost, tax_rate, unspsc_code, unit_measure, attributes, created_at, updated_at
+		SELECT id, company_id, sku, name, description, price, cost, tax_rate, unspsc_code, unit_measure, attributes, cogs, reorder_point, created_at, updated_at
 		FROM products WHERE id = $1`
 	var p entity.Product
 	err := r.q.QueryRow(context.Background(), query, id).Scan(
 		&p.ID, &p.CompanyID, &p.SKU, &p.Name, &p.Description, &p.Price, &p.Cost, &p.TaxRate,
-		&p.UNSPSC_Code, &p.UnitMeasure, &p.Attributes, &p.CreatedAt, &p.UpdatedAt,
+		&p.UNSPSC_Code, &p.UnitMeasure, &p.Attributes, &p.COGS, &p.ReorderPoint, &p.CreatedAt, &p.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -65,12 +65,12 @@ func (r *ProductRepo) GetByID(id string) (*entity.Product, error) {
 // GetByCompanyAndSKU obtiene un producto por empresa y SKU.
 func (r *ProductRepo) GetByCompanyAndSKU(companyID, sku string) (*entity.Product, error) {
 	query := `
-		SELECT id, company_id, sku, name, description, price, cost, tax_rate, unspsc_code, unit_measure, attributes, created_at, updated_at
+		SELECT id, company_id, sku, name, description, price, cost, tax_rate, unspsc_code, unit_measure, attributes, cogs, reorder_point, created_at, updated_at
 		FROM products WHERE company_id = $1 AND sku = $2`
 	var p entity.Product
 	err := r.q.QueryRow(context.Background(), query, companyID, sku).Scan(
 		&p.ID, &p.CompanyID, &p.SKU, &p.Name, &p.Description, &p.Price, &p.Cost, &p.TaxRate,
-		&p.UNSPSC_Code, &p.UnitMeasure, &p.Attributes, &p.CreatedAt, &p.UpdatedAt,
+		&p.UNSPSC_Code, &p.UnitMeasure, &p.Attributes, &p.COGS, &p.ReorderPoint, &p.CreatedAt, &p.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -114,7 +114,7 @@ func (r *ProductRepo) UpdateCost(productID string, cost decimal.Decimal) error {
 // ListByCompany lista productos por empresa con paginación.
 func (r *ProductRepo) ListByCompany(companyID string, limit, offset int) ([]*entity.Product, error) {
 	query := `
-		SELECT id, company_id, sku, name, description, price, cost, tax_rate, unspsc_code, unit_measure, attributes, created_at, updated_at
+		SELECT id, company_id, sku, name, description, price, cost, tax_rate, unspsc_code, unit_measure, attributes, cogs, reorder_point, created_at, updated_at
 		FROM products WHERE company_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`
 	rows, err := r.q.Query(context.Background(), query, companyID, limit, offset)
 	if err != nil {
@@ -125,7 +125,7 @@ func (r *ProductRepo) ListByCompany(companyID string, limit, offset int) ([]*ent
 	for rows.Next() {
 		var p entity.Product
 		if err := rows.Scan(&p.ID, &p.CompanyID, &p.SKU, &p.Name, &p.Description, &p.Price, &p.Cost, &p.TaxRate,
-			&p.UNSPSC_Code, &p.UnitMeasure, &p.Attributes, &p.CreatedAt, &p.UpdatedAt); err != nil {
+			&p.UNSPSC_Code, &p.UnitMeasure, &p.Attributes, &p.COGS, &p.ReorderPoint, &p.CreatedAt, &p.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan product: %w", err)
 		}
 		list = append(list, &p)

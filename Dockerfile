@@ -1,38 +1,53 @@
-# Build stage
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║  ETAPA 1 – Builder (modo vendor: sin descargas externas)                    ║
+# ║  • COPY . . incluye vendor/; no se ejecuta go mod download                   ║
+# ║  • Tests y build usan -mod=vendor                                            ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
 FROM golang:1.24-alpine AS builder
 
-WORKDIR /app
-
-# Instalar dependencias del sistema necesarias para compilación
 RUN apk add --no-cache git
 
-# Copiar go mod files
-COPY go.mod go.sum ./
-RUN go mod download
-
-# Copiar código fuente
+WORKDIR /app
+# Copiar todo el árbol (incluye go.mod, go.sum y vendor/)
 COPY . .
 
-# Compilar la aplicación
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o api ./cmd/api
+# ── CI Gate (usa -mod=vendor, sin descargas externas) ───────────────────────────
+RUN go test -mod=vendor -count=1 -timeout 120s ./...
 
-# Runtime stage
-FROM alpine:latest
+# ── Compilación usando solo vendor/ ───────────────────────────────────────────
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build -mod=vendor -a -installsuffix cgo \
+    -ldflags="-w -s" \
+    -o erp-api ./cmd/api
+
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║  ETAPA 2 – Runtime                                                          ║
+# ║  Imagen mínima: solo el binario + librerías del sistema esenciales          ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+FROM alpine:3.20
+
+# ca-certificates → necesario para TLS saliente (Anthropic, DIAN, Supabase, etc.)
+# tzdata         → permite configurar la zona horaria del proceso
+# curl           → healthcheck del contenedor
+RUN apk --no-cache add ca-certificates tzdata curl
+
+# Zona horaria Colombia para que los timestamps del servidor sean correctos.
+ENV TZ=America/Bogota
 
 WORKDIR /app
 
-# Instalar ca-certificates y curl para conexiones HTTPS/SSL y healthcheck
-RUN apk --no-cache add ca-certificates tzdata curl
+# ── Usuario no-root (principio de mínimo privilegio) ──────────────────────────
+# El proceso de la API no necesita privilegios de root en runtime.
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+COPY --from=builder --chown=appuser:appgroup /app/erp-api .
 
-# Copiar el binario compilado desde builder
-COPY --from=builder /app/api .
+USER appuser
 
-# Exponer puerto
 EXPOSE 8080
 
-# Healthcheck
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:8080/health || exit 1
+# Healthcheck: verifica que la API responde antes de que el load balancer
+# (Caddy) empiece a enviarle tráfico.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
 
-# Ejecutar la aplicación
-CMD ["./api"]
+ENTRYPOINT ["./erp-api"]

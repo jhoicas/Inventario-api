@@ -1,0 +1,49 @@
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+  issues:
+    exclude-files:
+      - cmd/*
+      - mocks/*
+      - internal/fpdf/*
+      - internal/fixture
+
+linters-settings:
+  lll:
+    line-length: 140
+  gocritic:
+    enabled-checks:
+      - boolExprSimplify
+      - commentedOutCode
+      - commentedOutImport
+      - dupImport
+      - stringXbytes
+
+linters:
+  disable-all: true
+  enable:
+    - bodyclose
+    - dogsled
+    - dupl
+    - errcheck
+    - gochecknoinits
+    - goconst
+    - gocritic
+    - gofmt
+    - gofumpt
+    - goimports
+    - goprintffuncname
+    - govet
+    - gosimple
+    - ineffassign
+    - lll
+    - misspell
+    - nakedret
+    - rowserrcheck
+    - staticcheck
+    - stylecheck
+    - typecheck
+    - unconvert
+    - unparam
+    - unused
+    - whitespace

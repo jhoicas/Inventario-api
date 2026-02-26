@@ -1,0 +1,19 @@
+{
+    email tu-email@ludoia.com
+}
+
+{$DOMAIN:api.ludoia.com} {
+    reverse_proxy api:8080 {
+        header_up Host {upstream_hostport}
+        header_up X-Real-IP {remote}
+        header_up X-Forwarded-For {remote}
+        header_up X-Forwarded-Proto {scheme}
+    }
+
+    encode gzip
+
+    log {
+        output stdout
+    }
+}
+

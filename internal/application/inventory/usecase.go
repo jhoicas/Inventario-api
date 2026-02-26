@@ -168,8 +168,9 @@ func (uc *RegisterMovementUseCase) doIN(
 
 // RegisterOUTInTx ejecuta una salida (OUT) usando los repositorios proporcionados (misma transacción del caller).
 // Implementa la interfaz billing.InventoryUseCase para integración facturación-inventario.
-// transactionID suele ser el ID de la factura para referenciar el movimiento.
+// ctx propaga la transacción SQL; transactionID suele ser el ID de la factura.
 func (uc *RegisterMovementUseCase) RegisterOUTInTx(
+	ctx context.Context,
 	movRepo repository.InventoryMovementRepository,
 	stockRepo repository.StockRepository,
 	_ repository.ProductRepository,

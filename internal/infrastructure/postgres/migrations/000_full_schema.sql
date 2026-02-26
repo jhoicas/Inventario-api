@@ -300,3 +300,87 @@ ALTER TABLE invoices ADD COLUMN IF NOT EXISTS xml_signed TEXT;
 ALTER TABLE invoices DROP CONSTRAINT IF EXISTS invoices_dian_status_check;
 ALTER TABLE invoices ADD CONSTRAINT invoices_dian_status_check
   CHECK (dian_status IN ('Pending', 'Sent', 'Error', 'DRAFT', 'SIGNED', 'ERROR_GENERATION'));
+
+-- ------------------------------------------------------------------------------
+-- 015 - Products: restaurar columna unit_measure
+-- ------------------------------------------------------------------------------
+ALTER TABLE products ADD COLUMN IF NOT EXISTS unit_measure VARCHAR(10) NOT NULL DEFAULT '94';
+
+-- ------------------------------------------------------------------------------
+-- 016 - SaaS Modules, Sales Channels, Analytics & Weighted Average Cost Trigger
+-- ------------------------------------------------------------------------------
+
+-- Módulos SaaS por empresa
+CREATE TABLE IF NOT EXISTS company_modules (
+    id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_id   UUID        NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    module_name  VARCHAR(50) NOT NULL
+                    CHECK (module_name IN ('inventory', 'billing', 'crm', 'analytics', 'purchasing')),
+    is_active    BOOLEAN     NOT NULL DEFAULT true,
+    activated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    expires_at   TIMESTAMPTZ,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (company_id, module_name)
+);
+CREATE INDEX IF NOT EXISTS idx_company_modules_company ON company_modules (company_id);
+CREATE INDEX IF NOT EXISTS idx_company_modules_active  ON company_modules (company_id, is_active);
+CREATE INDEX IF NOT EXISTS idx_company_modules_expires ON company_modules (expires_at)
+    WHERE expires_at IS NOT NULL;
+
+-- Canales de venta
+CREATE TABLE IF NOT EXISTS sales_channels (
+    id              UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_id      UUID         NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    name            VARCHAR(100) NOT NULL,
+    channel_type    VARCHAR(30)  DEFAULT 'other'
+                        CHECK (channel_type IN ('ecommerce', 'pos', 'b2b', 'marketplace', 'other')),
+    commission_rate DECIMAL(5,2) NOT NULL DEFAULT 0
+                        CHECK (commission_rate >= 0 AND commission_rate <= 100),
+    is_active       BOOLEAN      NOT NULL DEFAULT true,
+    created_at      TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    UNIQUE (company_id, name)
+);
+CREATE INDEX IF NOT EXISTS idx_sales_channels_company ON sales_channels (company_id);
+CREATE INDEX IF NOT EXISTS idx_sales_channels_active  ON sales_channels (company_id, is_active);
+
+-- channel_id en facturas
+ALTER TABLE invoices
+    ADD COLUMN IF NOT EXISTS channel_id UUID REFERENCES sales_channels(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_invoices_channel_id ON invoices (channel_id)
+    WHERE channel_id IS NOT NULL;
+
+-- cogs y reorder_point en productos
+ALTER TABLE products
+    ADD COLUMN IF NOT EXISTS cogs          DECIMAL(15,2) NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS reorder_point DECIMAL(15,4) NOT NULL DEFAULT 0;
+
+-- Función y trigger: costo promedio ponderado (IN)
+CREATE OR REPLACE FUNCTION actualizar_costo_promedio()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+DECLARE
+    v_total_qty  DECIMAL(15,4);
+    v_total_cost DECIMAL(15,4);
+BEGIN
+    IF NEW.type <> 'IN' OR NEW.quantity <= 0 THEN
+        RETURN NEW;
+    END IF;
+    SELECT COALESCE(SUM(quantity), 0), COALESCE(SUM(total_cost), 0)
+      INTO v_total_qty, v_total_cost
+      FROM inventory_movements
+     WHERE product_id = NEW.product_id AND type = 'IN';
+    IF v_total_qty > 0 THEN
+        UPDATE products
+           SET cost = ROUND(v_total_cost / v_total_qty, 4), updated_at = now()
+         WHERE id = NEW.product_id;
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_actualizar_costo_promedio ON inventory_movements;
+CREATE TRIGGER trg_actualizar_costo_promedio
+    AFTER INSERT ON inventory_movements
+    FOR EACH ROW
+    EXECUTE FUNCTION actualizar_costo_promedio();

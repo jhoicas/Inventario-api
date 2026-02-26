@@ -21,6 +21,14 @@ type Product struct {
 	UNSPSC_Code  string
 	UnitMeasure  string
 	Attributes   json.RawMessage
+	COGS         decimal.Decimal // costo de bienes vendidos (analítica)
+	ReorderPoint decimal.Decimal // punto de reorden para alertas de ruptura
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
+}
+
+// IdealStock retorna el nivel de stock objetivo: 1.5× el punto de reorden.
+// Se usa para calcular la cantidad sugerida de pedido en reposición.
+func (p *Product) IdealStock() decimal.Decimal {
+	return p.ReorderPoint.Mul(decimal.NewFromFloat(1.5))
 }

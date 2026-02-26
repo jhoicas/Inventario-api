@@ -1,0 +1,38 @@
+# ── Binarios compilados ───────────────────────────────────────────────────────
+erp-api
+api
+
+# ── Secretos y configuración de producción ────────────────────────────────────
+.env
+.env.prod
+.env.local
+.env.*.local
+
+# ── Certificados digitales (NUNCA en git) ─────────────────────────────────────
+*.p12
+*.pfx
+*.pem
+*.key
+*.crt
+*.cer
+
+# ── Cobertura de tests ────────────────────────────────────────────────────────
+coverage.out
+coverage.html
+
+# ── IDE y sistema operativo ───────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ── Docker ────────────────────────────────────────────────────────────────────
+# Los volúmenes locales de Caddy no deben versionarse
+caddy_data/
+caddy_config/
+caddy_logs/
+
+# ── Go ────────────────────────────────────────────────────────────────────────
+# vendor/ se versiona para builds reproducibles sin descargas externas (go mod vendor)

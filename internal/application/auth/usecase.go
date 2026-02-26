@@ -89,7 +89,7 @@ func (uc *AuthUseCase) Login(in dto.LoginRequest) (*dto.LoginResponse, error) {
 	if user.Status != "active" {
 		return nil, domain.ErrForbidden
 	}
-	token, err := jwt.Generate(uc.jwtCfg.Secret, user.ID, user.CompanyID, uc.jwtCfg.Issuer, uc.jwtCfg.ExpMinutes)
+	token, err := jwt.Generate(uc.jwtCfg.Secret, user.ID, user.CompanyID, user.Role, uc.jwtCfg.Issuer, uc.jwtCfg.ExpMinutes)
 	if err != nil {
 		return nil, err
 	}

@@ -64,3 +64,15 @@ type InvoiceDetailResponse struct {
 	TaxRate   decimal.Decimal `json:"tax_rate"`
 	Subtotal  decimal.Decimal `json:"subtotal"`
 }
+
+// InvoiceDIANStatusDTO respuesta ligera para el endpoint de polling
+// GET /api/invoices/:id/status.
+// El frontend consulta este endpoint periódicamente hasta que dian_status sea
+// "EXITOSO" o "RECHAZADO".
+type InvoiceDIANStatusDTO struct {
+	ID         string `json:"id"`
+	DIANStatus string `json:"dian_status"` // DRAFT|SIGNED|EXITOSO|RECHAZADO|ERROR_GENERATION
+	CUFE       string `json:"cufe"`         // Código único de factura (SHA-384)
+	TrackID    string `json:"track_id"`     // ZipKey devuelto por el WS DIAN
+	Errors     string `json:"errors"`       // Mensajes de rechazo de la DIAN (vacío si OK)
+}

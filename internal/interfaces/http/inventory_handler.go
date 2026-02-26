@@ -7,14 +7,15 @@ import (
 	"github.com/tu-usuario/inventory-pro/internal/domain"
 )
 
-// InventoryHandler maneja las peticiones HTTP de movimientos de inventario (protegido).
+// InventoryHandler maneja las peticiones HTTP de movimientos e inventario (protegido).
 type InventoryHandler struct {
-	uc *inventory.RegisterMovementUseCase
+	uc            *inventory.RegisterMovementUseCase
+	replenishment *inventory.ReplenishmentUseCase
 }
 
 // NewInventoryHandler construye el handler.
-func NewInventoryHandler(uc *inventory.RegisterMovementUseCase) *InventoryHandler {
-	return &InventoryHandler{uc: uc}
+func NewInventoryHandler(uc *inventory.RegisterMovementUseCase, replenishment *inventory.ReplenishmentUseCase) *InventoryHandler {
+	return &InventoryHandler{uc: uc, replenishment: replenishment}
 }
 
 // RegisterMovement godoc
@@ -57,4 +58,37 @@ func (h *InventoryHandler) RegisterMovement(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{"message": "movimiento registrado"})
+}
+
+// GetReplenishmentList godoc
+// @Summary      Lista semanal de reposición
+// @Description  Devuelve los SKUs por debajo del punto de reorden con la cantidad sugerida
+//
+//	de pedido, ordenados por margen histórico y volumen de ventas.
+//
+// @Tags         inventory
+// @Security     Bearer
+// @Produce      json
+// @Param        warehouse_id  query  string  false  "Filtrar por bodega (UUID). Vacío = stock global."
+// @Success      200  {array}   dto.ReplenishmentSuggestionDTO
+// @Failure      401  {object}  dto.ErrorResponse
+// @Failure      500  {object}  dto.ErrorResponse
+// @Router       /api/inventory/replenishment-list [get]
+func (h *InventoryHandler) GetReplenishmentList(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	if companyID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+
+	warehouseID := c.Query("warehouse_id")
+
+	list, err := h.replenishment.GenerateReplenishmentList(c.Context(), companyID, warehouseID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+
+	return c.JSON(fiber.Map{
+		"total":           len(list),
+		"replenishments":  list,
+	})
 }

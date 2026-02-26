@@ -64,13 +64,29 @@ func (r *InvoiceRepo) CreateDetail(detail *entity.InvoiceDetail) error {
 	return nil
 }
 
-// Update actualiza los campos DIAN de la factura (cufe, uuid, xml_signed, dian_status, qr_data).
+// Update actualiza todos los campos DIAN de la factura.
 func (r *InvoiceRepo) Update(invoice *entity.Invoice) error {
 	query := `
-		UPDATE invoices SET cufe = COALESCE($2, cufe), uuid = COALESCE($3, uuid), xml_signed = $4, dian_status = $5, qr_data = COALESCE($6, qr_data), updated_at = $7
+		UPDATE invoices
+		SET cufe          = COALESCE($2,  cufe),
+		    uuid          = COALESCE($3,  uuid),
+		    xml_signed    = $4,
+		    dian_status   = $5,
+		    qr_data       = COALESCE($6,  qr_data),
+		    track_id_dian = COALESCE($7,  track_id_dian),
+		    dian_errors   = COALESCE($8,  dian_errors),
+		    updated_at    = $9
 		WHERE id = $1`
 	_, err := r.q.Exec(context.Background(), query,
-		invoice.ID, nullIfEmpty(invoice.CUFE), nullIfEmpty(invoice.UUID), nullIfEmpty(invoice.XMLSigned), invoice.DIAN_Status, nullIfEmpty(invoice.QRData), invoice.UpdatedAt,
+		invoice.ID,
+		nullIfEmpty(invoice.CUFE),
+		nullIfEmpty(invoice.UUID),
+		nullIfEmpty(invoice.XMLSigned),
+		invoice.DIAN_Status,
+		nullIfEmpty(invoice.QRData),
+		nullIfEmpty(invoice.TrackID),
+		nullIfEmpty(invoice.DIANErrors),
+		invoice.UpdatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("update invoice: %w", err)
@@ -78,17 +94,22 @@ func (r *InvoiceRepo) Update(invoice *entity.Invoice) error {
 	return nil
 }
 
-// GetByID obtiene una factura por ID.
+// GetByID obtiene una factura completa por ID.
 func (r *InvoiceRepo) GetByID(id string) (*entity.Invoice, error) {
 	query := `
-		SELECT id, company_id, customer_id, prefix, number, date, net_total, tax_total, grand_total, dian_status, cufe, uuid, xml_signed, qr_data, created_at, updated_at
+		SELECT id, company_id, customer_id, prefix, number, date,
+		       net_total, tax_total, grand_total, dian_status,
+		       cufe, uuid, xml_signed, qr_data, track_id_dian, dian_errors,
+		       created_at, updated_at
 		FROM invoices WHERE id = $1`
 	var inv entity.Invoice
-	var cufe, uuid, xmlSigned, qrData *string
+	var cufe, uuid, xmlSigned, qrData, trackID, dianErrors *string
 	err := r.q.QueryRow(context.Background(), query, id).Scan(
 		&inv.ID, &inv.CompanyID, &inv.CustomerID, &inv.Prefix, &inv.Number,
 		&inv.Date, &inv.NetTotal, &inv.TaxTotal, &inv.GrandTotal,
-		&inv.DIAN_Status, &cufe, &uuid, &xmlSigned, &qrData, &inv.CreatedAt, &inv.UpdatedAt,
+		&inv.DIAN_Status, &cufe, &uuid, &xmlSigned, &qrData,
+		&trackID, &dianErrors,
+		&inv.CreatedAt, &inv.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -96,17 +117,37 @@ func (r *InvoiceRepo) GetByID(id string) (*entity.Invoice, error) {
 		}
 		return nil, fmt.Errorf("get invoice: %w", err)
 	}
-	if cufe != nil {
-		inv.CUFE = *cufe
+	derefStr := func(p *string) string {
+		if p != nil {
+			return *p
+		}
+		return ""
 	}
-	if uuid != nil {
-		inv.UUID = *uuid
-	}
-	if xmlSigned != nil {
-		inv.XMLSigned = *xmlSigned
-	}
-	if qrData != nil {
-		inv.QRData = *qrData
+	inv.CUFE = derefStr(cufe)
+	inv.UUID = derefStr(uuid)
+	inv.XMLSigned = derefStr(xmlSigned)
+	inv.QRData = derefStr(qrData)
+	inv.TrackID = derefStr(trackID)
+	inv.DIANErrors = derefStr(dianErrors)
+	return &inv, nil
+}
+
+// GetDIANStatus devuelve solo los campos de estado DIAN (consulta ligera para polling).
+func (r *InvoiceRepo) GetDIANStatus(id string) (*entity.Invoice, error) {
+	const query = `
+		SELECT id, company_id, dian_status,
+		       COALESCE(cufe, ''), COALESCE(track_id_dian, ''), COALESCE(dian_errors, '')
+		FROM invoices WHERE id = $1`
+	var inv entity.Invoice
+	err := r.q.QueryRow(context.Background(), query, id).Scan(
+		&inv.ID, &inv.CompanyID, &inv.DIAN_Status,
+		&inv.CUFE, &inv.TrackID, &inv.DIANErrors,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get invoice dian status: %w", err)
 	}
 	return &inv, nil
 }

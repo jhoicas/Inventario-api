@@ -127,6 +127,24 @@ func (r *CompanyRepo) Delete(id string) error {
 	return nil
 }
 
+// HasActiveModule informa si la empresa tiene el módulo activo y sin vencer.
+// Consulta directamente company_modules para una respuesta O(1) vía índice.
+func (r *CompanyRepo) HasActiveModule(ctx context.Context, companyID, moduleName string) (bool, error) {
+	const query = `
+		SELECT EXISTS (
+			SELECT 1 FROM company_modules
+			 WHERE company_id  = $1
+			   AND module_name = $2
+			   AND is_active   = true
+			   AND (expires_at IS NULL OR expires_at > now())
+		)`
+	var active bool
+	if err := r.pool.QueryRow(ctx, query, companyID, moduleName).Scan(&active); err != nil {
+		return false, fmt.Errorf("check module %s: %w", moduleName, err)
+	}
+	return active, nil
+}
+
 func isNoRows(err error) bool {
 	return errors.Is(err, pgx.ErrNoRows)
 }
