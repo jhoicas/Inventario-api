@@ -1,0 +1,911 @@
+definitions:
+  dto.AIClassificationDTO:
+    properties:
+      confidence_score:
+        description: 0.0 – 1.0
+        type: number
+      reasoning:
+        description: explicación del modelo
+        type: string
+      suggested_tax_rate:
+        description: 0, 5 o 19
+        type: number
+      suggested_unspsc:
+        description: código UNSPSC de 8 dígitos
+        type: string
+    type: object
+  dto.AIClassificationRequest:
+    properties:
+      description:
+        type: string
+      product_name:
+        type: string
+    type: object
+  dto.ChannelProfitabilityDTO:
+    properties:
+      channels:
+        items:
+          $ref: '#/definitions/dto.MarginByChannelDTO'
+        type: array
+      overall_margin_pct:
+        description: margen ponderado global
+        type: number
+      total_cogs:
+        type: number
+      total_margin:
+        type: number
+      total_revenue:
+        type: number
+    type: object
+  dto.CompanyListResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/dto.CompanyResponse'
+        type: array
+      page:
+        $ref: '#/definitions/dto.PageResponse'
+    type: object
+  dto.CompanyResponse:
+    properties:
+      address:
+        type: string
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      nit:
+        type: string
+      phone:
+        type: string
+      status:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  dto.CreateCompanyRequest:
+    properties:
+      address:
+        type: string
+      email:
+        type: string
+      name:
+        maxLength: 200
+        minLength: 1
+        type: string
+      nit:
+        maxLength: 20
+        minLength: 1
+        type: string
+      phone:
+        type: string
+    required:
+    - name
+    - nit
+    type: object
+  dto.CreateProductRequest:
+    properties:
+      attributes:
+        items:
+          type: integer
+        type: array
+      description:
+        type: string
+      name:
+        maxLength: 200
+        minLength: 1
+        type: string
+      price:
+        type: number
+      sku:
+        maxLength: 100
+        minLength: 1
+        type: string
+      tax_rate:
+        type: number
+      unit_measure:
+        type: string
+      unspsc_code:
+        type: string
+    required:
+    - name
+    - sku
+    - unit_measure
+    type: object
+  dto.CreateWarehouseRequest:
+    properties:
+      address:
+        type: string
+      name:
+        maxLength: 200
+        minLength: 1
+        type: string
+    required:
+    - name
+    type: object
+  dto.ErrorResponse:
+    properties:
+      code:
+        type: string
+      message:
+        type: string
+    type: object
+  dto.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  dto.LoginResponse:
+    properties:
+      token:
+        type: string
+      user:
+        $ref: '#/definitions/dto.UserResponse'
+    type: object
+  dto.MarginByChannelDTO:
+    properties:
+      channel_id:
+        description: UUID o "direct"
+        type: string
+      channel_name:
+        description: nombre del canal o "Directo"
+        type: string
+      channel_type:
+        description: ecommerce|pos|b2b|marketplace|other
+        type: string
+      commission_cost:
+        description: ingresos * commission_rate / 100
+        type: number
+      commission_rate:
+        description: '% de comisión del canal'
+        type: number
+      gross_revenue:
+        description: ingresos brutos (suma de subtotales)
+        type: number
+      invoice_count:
+        description: facturas emitidas en el período
+        type: integer
+      margin_pct:
+        description: TotalMargin / GrossRevenue * 100
+        type: number
+      revenue_pct:
+        description: participación % en ingresos totales
+        type: number
+      total_cogs:
+        description: costo total (qty * costo_prom_producto)
+        type: number
+      total_margin:
+        description: GrossRevenue - COGS - CommissionCost
+        type: number
+      units_sold:
+        description: unidades totales
+        type: number
+    type: object
+  dto.MarginsReportDTO:
+    properties:
+      channel_profitability:
+        $ref: '#/definitions/dto.ChannelProfitabilityDTO'
+      pareto_skus:
+        description: SKUs del top 20% que generan ~80% ingresos
+        items:
+          $ref: '#/definitions/dto.SKURankingDTO'
+        type: array
+      period:
+        $ref: '#/definitions/dto.PeriodDTO'
+      sku_ranking:
+        description: top N por margen
+        items:
+          $ref: '#/definitions/dto.SKURankingDTO'
+        type: array
+    type: object
+  dto.PageResponse:
+    properties:
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  dto.PeriodDTO:
+    properties:
+      end_date:
+        type: string
+      start_date:
+        type: string
+    type: object
+  dto.ProductListResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/dto.ProductResponse'
+        type: array
+      page:
+        $ref: '#/definitions/dto.PageResponse'
+    type: object
+  dto.ProductResponse:
+    properties:
+      attributes:
+        items:
+          type: integer
+        type: array
+      company_id:
+        type: string
+      cost:
+        type: number
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      price:
+        type: number
+      sku:
+        type: string
+      tax_rate:
+        type: number
+      unit_measure:
+        type: string
+      unspsc_code:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  dto.RegisterMovementRequest:
+    properties:
+      from_warehouse_id:
+        type: string
+      product_id:
+        type: string
+      quantity:
+        type: number
+      to_warehouse_id:
+        type: string
+      type:
+        type: string
+      unit_cost:
+        type: number
+      warehouse_id:
+        type: string
+    type: object
+  dto.RegisterRequest:
+    properties:
+      company_id:
+        type: string
+      email:
+        type: string
+      name:
+        maxLength: 200
+        type: string
+      password:
+        minLength: 8
+        type: string
+      role:
+        enum:
+        - admin
+        - bodeguero
+        - vendedor
+        type: string
+    required:
+    - company_id
+    - email
+    - password
+    type: object
+  dto.ReplenishmentSuggestionDTO:
+    properties:
+      current_stock:
+        type: number
+      estimated_order_cost:
+        description: SuggestedOrderQty * UnitCost
+        type: number
+      gross_margin_pct:
+        description: '% margen histórico (puede ser 0 si sin ventas)'
+        type: number
+      ideal_stock:
+        description: ReorderPoint * 1.5
+        type: number
+      priority:
+        description: 1 = más urgente
+        type: integer
+      product_id:
+        type: string
+      product_name:
+        type: string
+      reorder_point:
+        type: number
+      sku:
+        type: string
+      suggested_order_qty:
+        description: IdealStock - CurrentStock
+        type: number
+      unit_cost:
+        description: costo promedio ponderado
+        type: number
+      units_sold_last_90d:
+        description: volumen de ventas reciente
+        type: number
+    type: object
+  dto.SKURankingDTO:
+    properties:
+      cumulative_revenue_pct:
+        description: acumulado descendente
+        type: number
+      gross_profit:
+        description: GrossRevenue - TotalCOGS
+        type: number
+      gross_revenue:
+        type: number
+      is_top_pareto:
+        description: true si forma parte del top 80% de ingresos (Pareto)
+        type: boolean
+      margin_pct:
+        description: GrossProfit / GrossRevenue * 100
+        type: number
+      product_id:
+        type: string
+      product_name:
+        type: string
+      rank:
+        description: posición (1 = más rentable)
+        type: integer
+      revenue_pct:
+        description: participación % en ingresos totales
+        type: number
+      sku:
+        type: string
+      total_cogs:
+        type: number
+      units_sold:
+        type: number
+    type: object
+  dto.UpdateProductRequest:
+    properties:
+      attributes:
+        items:
+          type: integer
+        type: array
+      description:
+        type: string
+      name:
+        maxLength: 200
+        minLength: 1
+        type: string
+      price:
+        type: number
+      tax_rate:
+        type: number
+      unit_measure:
+        type: string
+      unspsc_code:
+        type: string
+    type: object
+  dto.UserResponse:
+    properties:
+      company_id:
+        type: string
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      role:
+        type: string
+      status:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  dto.WarehouseListResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/dto.WarehouseResponse'
+        type: array
+      page:
+        $ref: '#/definitions/dto.PageResponse'
+    type: object
+  dto.WarehouseResponse:
+    properties:
+      address:
+        type: string
+      company_id:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      updated_at:
+        type: string
+    type: object
+info:
+  contact: {}
+paths:
+  /api/ai/suggest-classification:
+    post:
+      consumes:
+      - application/json
+      description: Analiza el nombre y descripción de un producto y devuelve el código
+        UNSPSC
+      parameters:
+      - description: product_name (obligatorio) y description (opcional)
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.AIClassificationRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.AIClassificationDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "408":
+          description: Request Timeout
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Sugerir clasificación arancelaria DIAN con IA
+      tags:
+      - ai
+  /api/analytics/margins:
+    get:
+      description: Devuelve rentabilidad por canal de venta y el ranking de SKUs más
+        rentables
+      parameters:
+      - description: 'Inicio del período (YYYY-MM-DD). Default: primer día del mes.'
+        in: query
+        name: start_date
+        type: string
+      - description: 'Fin del período (YYYY-MM-DD). Default: hoy.'
+        in: query
+        name: end_date
+        type: string
+      - description: Máx. SKUs en el ranking (default 20, max 200).
+        in: query
+        name: top_n
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.MarginsReportDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Reporte de márgenes por canal y ranking de SKUs (Pareto 80/20)
+      tags:
+      - analytics
+  /api/auth/login:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: email, password
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.LoginResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Iniciar sesión
+      tags:
+      - auth
+  /api/auth/register:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: email, password, company_id
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.UserResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Registrar usuario
+      tags:
+      - auth
+  /api/companies:
+    get:
+      parameters:
+      - default: 20
+        description: Límite
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.CompanyListResponse'
+      summary: Listar empresas
+      tags:
+      - companies
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Datos de la empresa
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateCompanyRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.CompanyResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Crear empresa
+      tags:
+      - companies
+  /api/companies/{id}:
+    get:
+      parameters:
+      - description: ID de la empresa
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.CompanyResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Obtener empresa por ID
+      tags:
+      - companies
+  /api/inventory/movements:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: product_id, warehouse_id (o from/to para TRANSFER), type, quantity,
+          unit_cost (entradas)
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.RegisterMovementRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Registrar movimiento de inventario
+      tags:
+      - inventory
+  /api/inventory/replenishment-list:
+    get:
+      description: Devuelve los SKUs por debajo del punto de reorden con la cantidad
+        sugerida
+      parameters:
+      - description: Filtrar por bodega (UUID). Vacío = stock global.
+        in: query
+        name: warehouse_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/dto.ReplenishmentSuggestionDTO'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Lista semanal de reposición
+      tags:
+      - inventory
+  /api/products:
+    get:
+      parameters:
+      - default: 20
+        description: Límite
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.ProductListResponse'
+      security:
+      - Bearer: []
+      summary: Listar productos
+      tags:
+      - products
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Datos del producto
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateProductRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.ProductResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Crear producto
+      tags:
+      - products
+  /api/products/{id}:
+    get:
+      parameters:
+      - description: ID del producto
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.ProductResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Obtener producto por ID
+      tags:
+      - products
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: ID del producto
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Datos a actualizar
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateProductRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.ProductResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Actualizar producto
+      tags:
+      - products
+  /api/warehouses:
+    get:
+      parameters:
+      - default: 20
+        description: Límite
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.WarehouseListResponse'
+      security:
+      - Bearer: []
+      summary: Listar bodegas
+      tags:
+      - warehouses
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Datos de la bodega
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateWarehouseRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.WarehouseResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Crear bodega
+      tags:
+      - warehouses
+  /api/warehouses/{id}:
+    get:
+      parameters:
+      - description: ID de la bodega
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.WarehouseResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Obtener bodega por ID
+      tags:
+      - warehouses
+swagger: "2.0"
