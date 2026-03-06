@@ -1,27 +1,44 @@
 package http
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/jhoicas/Inventario-api/internal/application/billing"
 	"github.com/jhoicas/Inventario-api/internal/application/dto"
 	"github.com/jhoicas/Inventario-api/internal/domain"
 )
 
+// CreateInvoiceUseCase interface para permitir mocking en tests.
+type CreateInvoiceUseCase interface {
+	CreateInvoice(ctx context.Context, companyID, userID string, in dto.CreateInvoiceRequest) (*dto.InvoiceResponse, error)
+	GetInvoiceDIANStatus(ctx context.Context, companyID, id string) (*dto.InvoiceDIANStatusDTO, error)
+	GetInvoice(ctx context.Context, companyID, id string) (*dto.InvoiceResponse, error)
+}
+
+// CreateCreditNoteUseCase interface para permitir mocking en tests.
+type CreateCreditNoteUseCase interface {
+	CreateCreditNote(ctx context.Context, companyID, userID, invoiceID string, in dto.ReturnInvoiceRequest) (*dto.InvoiceResponse, error)
+}
+
+// InvoicePDFUseCase interface para permitir mocking en tests.
+type InvoicePDFUseCase interface {
+	DownloadInvoicePDF(ctx context.Context, companyID, invoiceID string) (pdfBytes []byte, filename string, err error)
+}
+
 // InvoiceHandler maneja las peticiones HTTP de facturación (protegido).
 type InvoiceHandler struct {
-	uc        *billing.CreateInvoiceUseCase
-	returnUC  *billing.CreateCreditNoteUseCase
-	pdfUC     *billing.PDFUseCase
+	uc       CreateInvoiceUseCase
+	returnUC CreateCreditNoteUseCase
+	pdfUC    InvoicePDFUseCase
 }
 
 // NewInvoiceHandler construye el handler.
 func NewInvoiceHandler(
-	uc *billing.CreateInvoiceUseCase,
-	returnUC *billing.CreateCreditNoteUseCase,
-	pdfUC *billing.PDFUseCase,
+	uc CreateInvoiceUseCase,
+	returnUC CreateCreditNoteUseCase,
+	pdfUC InvoicePDFUseCase,
 ) *InvoiceHandler {
 	return &InvoiceHandler{
 		uc:       uc,
