@@ -23,7 +23,8 @@ type RouterDeps struct {
 	InvoicePDF       *billing.PDFUseCase
 	AuthUC           *auth.AuthUseCase
 	ModuleService    *usecase.ModuleService
-	AnalyticsUC      *usecase.AnalyticsUseCase
+	AnalyticsUC             *usecase.AnalyticsUseCase
+	RawMaterialAnalyticsUC   *usecase.RawMaterialAnalyticsUseCase
 	DashboardUC      *appanalytics.DashboardUseCase
 	AIUC             *usecase.AIUseCase
 	JWTSecret        string
@@ -115,12 +116,13 @@ func Router(app *fiber.App, deps RouterDeps) {
 	invGroup2.Get("/:id", invoiceHandler.GetByID)
 
 	// ── Analytics (módulo 'analytics' + solo admin) ────────────────────────────
-	analyticsHandler := NewAnalyticsHandler(deps.AnalyticsUC)
+	analyticsHandler := NewAnalyticsHandler(deps.AnalyticsUC, deps.RawMaterialAnalyticsUC)
 	analyticsGroup := protected.Group("/analytics",
 		RequireModule(entity.ModuleAnalytics, deps.ModuleService),
 		RequireRole(entity.RoleAdmin),
 	)
-	analyticsGroup.Get("/margins", analyticsHandler.GetMargins)
+		analyticsGroup.Get("/margins", analyticsHandler.GetMargins)
+		analyticsGroup.Get("/raw-materials-impact", analyticsHandler.GetRawMaterialImpactRanking)
 
 	// ── Dashboard (JWT + solo admin) ───────────────────────────────────────────
 	dashboardHandler := NewDashboardHandler(deps.DashboardUC)

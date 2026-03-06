@@ -20,7 +20,9 @@ type ChannelSalesResult struct {
 	GrossRevenue   decimal.Decimal // Suma de subtotales de las líneas de factura
 	TotalCOGS      decimal.Decimal // qty * costo_promedio_producto (products.cost)
 	CommissionCost decimal.Decimal // GrossRevenue * commission_rate / 100
-	TotalMargin    decimal.Decimal // GrossRevenue - TotalCOGS - CommissionCost
+	LogisticsCost  decimal.Decimal // Suma de logistics_cost de facturas del canal
+	DiscountTotal  decimal.Decimal // Suma de discount_total de facturas del canal
+	TotalMargin    decimal.Decimal // GrossRevenue - TotalCOGS - CommissionCost - LogisticsCost - DiscountTotal
 }
 
 // SKUMarginResult resultado crudo de la consulta de márgenes por SKU.

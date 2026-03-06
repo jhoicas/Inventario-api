@@ -138,6 +138,8 @@ func buildChannelProfitability(rows []repository.ChannelSalesResult) dto.Channel
 			GrossRevenue:   r.GrossRevenue.Round(2),
 			TotalCOGS:      r.TotalCOGS.Round(2),
 			CommissionCost: r.CommissionCost.Round(2),
+			LogisticsCost:  r.LogisticsCost.Round(2),
+			DiscountTotal:  r.DiscountTotal.Round(2),
 			TotalMargin:    r.TotalMargin.Round(2),
 			MarginPct:      marginPct,
 			RevenuePct:     revenuePct,

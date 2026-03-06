@@ -101,6 +101,7 @@ func main() {
 	productUC := usecase.NewProductUseCase(productRepo)
 	moduleSvc := usecase.NewModuleService(companyRepo)
 	analyticsUC := usecase.NewAnalyticsUseCase(analyticsRepo)
+	rawMaterialAnalyticsUC := usecase.NewRawMaterialAnalyticsUseCase(analyticsRepo)
 	replenishmentUC := inventory.NewReplenishmentUseCase(levelRepo, analyticsRepo)
 	dashboardUC := appanalytics.NewDashboardUseCase(analyticsRepo)
 
@@ -150,8 +151,9 @@ func main() {
 		InvoicePDF:       invoicePDFUC,
 		AuthUC:           authUC,
 		ModuleService:    moduleSvc,
-		AnalyticsUC:      analyticsUC,
-		DashboardUC:      dashboardUC,
+		AnalyticsUC:            analyticsUC,
+		RawMaterialAnalyticsUC:  rawMaterialAnalyticsUC,
+		DashboardUC:            dashboardUC,
 		AIUC:             aiUC,
 		JWTSecret:        cfg.JWT.Secret,
 	})

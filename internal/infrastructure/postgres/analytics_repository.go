@@ -24,8 +24,9 @@ func NewAnalyticsRepository(pool *pgxpool.Pool) *AnalyticsRepo {
 }
 
 // GetSalesByChannel agrupa ingresos, COGS y margen por canal de venta.
-// Fórmula del margen: ingresos_linea - (qty × cost_promedio) - (ingresos_linea × commission_rate / 100)
+// Fórmula del margen: GrossRevenue - TotalCOGS - CommissionCost - LogisticsCost - DiscountTotal.
 // Las facturas sin canal se consolidan en el grupo "Directo".
+// logistics_cost y discount_total se reparten por factura (una vez por invoice, no por línea).
 func (r *AnalyticsRepo) GetSalesByChannel(
 	ctx context.Context,
 	companyID string,
@@ -33,20 +34,17 @@ func (r *AnalyticsRepo) GetSalesByChannel(
 ) ([]repository.ChannelSalesResult, error) {
 	const query = `
 	SELECT
-	    COALESCE(sc.id::TEXT, 'direct')                                              AS channel_id,
-	    COALESCE(sc.name,    'Directo')                                              AS channel_name,
-	    COALESCE(sc.channel_type, 'other')                                           AS channel_type,
-	    COALESCE(sc.commission_rate, 0)                                              AS commission_rate,
-	    COUNT(DISTINCT i.id)                                                         AS invoice_count,
-	    SUM(d.quantity)                                                              AS units_sold,
-	    SUM(d.subtotal)                                                              AS gross_revenue,
-	    SUM(d.quantity * p.cost)                                                     AS total_cogs,
-	    SUM(d.subtotal * COALESCE(sc.commission_rate, 0) / 100)                     AS commission_cost,
-	    SUM(
-	        d.subtotal
-	        - (d.quantity * p.cost)
-	        - (d.subtotal * COALESCE(sc.commission_rate, 0) / 100)
-	    )                                                                            AS total_margin
+	    COALESCE(sc.id::TEXT, 'direct')                                                                   AS channel_id,
+	    COALESCE(sc.name,    'Directo')                                                                   AS channel_name,
+	    COALESCE(sc.channel_type, 'other')                                                                AS channel_type,
+	    COALESCE(sc.commission_rate, 0)                                                                  AS commission_rate,
+	    COUNT(DISTINCT i.id)                                                                              AS invoice_count,
+	    SUM(d.quantity)                                                                                   AS units_sold,
+	    SUM(d.subtotal)                                                                                   AS gross_revenue,
+	    SUM(d.quantity * p.cost)                                                                          AS total_cogs,
+	    SUM(d.subtotal * COALESCE(sc.commission_rate, 0) / 100)                                           AS commission_cost,
+	    SUM(COALESCE(i.logistics_cost, 0) / NULLIF((SELECT COUNT(*) FROM invoice_details d2 WHERE d2.invoice_id = i.id), 0)) AS logistics_cost,
+	    SUM(COALESCE(i.discount_total, 0) / NULLIF((SELECT COUNT(*) FROM invoice_details d2 WHERE d2.invoice_id = i.id), 0))  AS discount_total
 	FROM invoices i
 	JOIN invoice_details d ON d.invoice_id = i.id
 	JOIN products       p  ON p.id         = d.product_id
@@ -55,7 +53,9 @@ func (r *AnalyticsRepo) GetSalesByChannel(
 	  AND i.date BETWEEN $2 AND $3
 	  AND i.dian_status NOT IN ('DRAFT', 'ERROR_GENERATION')
 	GROUP BY sc.id, sc.name, sc.channel_type, sc.commission_rate
-	ORDER BY total_margin DESC`
+	ORDER BY SUM(d.subtotal) - SUM(d.quantity * p.cost) - SUM(d.subtotal * COALESCE(sc.commission_rate, 0) / 100)
+	       - SUM(COALESCE(i.logistics_cost, 0) / NULLIF((SELECT COUNT(*) FROM invoice_details d2 WHERE d2.invoice_id = i.id), 0))
+	       - SUM(COALESCE(i.discount_total, 0) / NULLIF((SELECT COUNT(*) FROM invoice_details d2 WHERE d2.invoice_id = i.id), 0)) DESC`
 
 	rows, err := r.pool.Query(ctx, query, companyID, startDate, endDate)
 	if err != nil {
@@ -76,10 +76,12 @@ func (r *AnalyticsRepo) GetSalesByChannel(
 			&row.GrossRevenue,
 			&row.TotalCOGS,
 			&row.CommissionCost,
-			&row.TotalMargin,
+			&row.LogisticsCost,
+			&row.DiscountTotal,
 		); err != nil {
 			return nil, fmt.Errorf("analytics.GetSalesByChannel scan: %w", err)
 		}
+		row.TotalMargin = row.GrossRevenue.Sub(row.TotalCOGS).Sub(row.CommissionCost).Sub(row.LogisticsCost).Sub(row.DiscountTotal)
 		results = append(results, row)
 	}
 	return results, rows.Err()
@@ -224,4 +226,80 @@ func (r *AnalyticsRepo) GetSKUMargins(
 		results = append(results, row)
 	}
 	return results, rows.Err()
+}
+
+// GetRawMaterialImpactRanking devuelve ranking de materias primas por impacto financiero
+// en los productos vendidos en el período (uso proyectado vía BOM y coste de materia prima).
+func (r *AnalyticsRepo) GetRawMaterialImpactRanking(
+	ctx context.Context,
+	companyID string,
+	startDate, endDate time.Time,
+	limit int,
+) ([]dto.RawMaterialImpactDTO, error) {
+	const query = `
+	WITH sales AS (
+	    SELECT d.product_id, SUM(d.quantity) AS qty
+	    FROM invoices i
+	    JOIN invoice_details d ON d.invoice_id = i.id
+	    WHERE i.company_id = $1
+	      AND i.date BETWEEN $2 AND $3
+	      AND i.dian_status NOT IN ('DRAFT', 'ERROR_GENERATION', 'Error')
+	    GROUP BY d.product_id
+	),
+	material_usage AS (
+	    SELECT
+	        rm.id   AS raw_material_id,
+	        rm.sku,
+	        rm.name,
+	        (s.qty * bom.quantity_required * (1 + bom.waste_percentage)) * rm.cost AS cost_impact
+	    FROM sales s
+	    JOIN bill_of_materials bom ON bom.product_id = s.product_id
+	    JOIN raw_materials rm ON rm.id = bom.raw_material_id AND rm.company_id = $1
+	),
+	ranking AS (
+	    SELECT
+	        raw_material_id,
+	        sku,
+	        name,
+	        SUM(cost_impact) AS total_cost_impact
+	    FROM material_usage
+	    GROUP BY raw_material_id, sku, name
+	    ORDER BY total_cost_impact DESC
+	    LIMIT $4
+	)
+	SELECT
+	    r.raw_material_id,
+	    r.sku,
+	    r.name,
+	    r.total_cost_impact,
+	    (r.total_cost_impact / NULLIF(SUM(r.total_cost_impact) OVER (), 0)) * 100 AS usage_pct
+	FROM ranking r`
+
+	rows, err := r.pool.Query(ctx, query, companyID, startDate, endDate, limit)
+	if err != nil {
+		return nil, fmt.Errorf("analytics.GetRawMaterialImpactRanking: %w", err)
+	}
+	defer rows.Close()
+
+	var results []dto.RawMaterialImpactDTO
+	for rows.Next() {
+		var item dto.RawMaterialImpactDTO
+		if err := rows.Scan(
+			&item.RawMaterialID,
+			&item.SKU,
+			&item.Name,
+			&item.TotalCostImpact,
+			&item.UsagePct,
+		); err != nil {
+			return nil, fmt.Errorf("analytics.GetRawMaterialImpactRanking scan: %w", err)
+		}
+		results = append(results, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("analytics.GetRawMaterialImpactRanking rows: %w", err)
+	}
+	if results == nil {
+		results = []dto.RawMaterialImpactDTO{}
+	}
+	return results, nil
 }
