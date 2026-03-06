@@ -14,6 +14,8 @@ import (
 const (
 	// Namespace por defecto (UBL Invoice)
 	NsInvoice = "urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
+	// Namespace para UBL CreditNote
+	NsCreditNote = "urn:oasis:names:specification:ubl:schema:xsd:CreditNote-2"
 	// Common Aggregate Components
 	NsCac = "urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
 	// Common Basic Components
@@ -30,6 +32,8 @@ const (
 	nsXsi = "http://www.w3.org/2001/XMLSchema-instance"
 	// Schema location UBL Invoice 2.1
 	schemaLocationInvoice = "urn:oasis:names:specification:ubl:schema:xsd:Invoice-2 http://docs.oasis-open.org/ubl/os-UBL-2.1/xsd/maindoc/UBL-Invoice-2.1.xsd"
+	// Schema location UBL CreditNote 2.1
+	schemaLocationCreditNote = "urn:oasis:names:specification:ubl:schema:xsd:CreditNote-2 http://docs.oasis-open.org/ubl/os-UBL-2.1/xsd/maindoc/UBL-CreditNote-2.1.xsd"
 )
 
 // XMLBuilderService construye el XML UBL 2.1 de la factura (sin firma XAdES).
@@ -40,7 +44,7 @@ func NewXMLBuilderService() *XMLBuilderService {
 	return &XMLBuilderService{}
 }
 
-// Build genera el []byte del documento Invoice según UBL 2.1 y extensiones DIAN.
+// Build genera el []byte del documento Invoice o CreditNote según UBL 2.1 y extensiones DIAN.
 func (s *XMLBuilderService) Build(ctx *InvoiceBuildContext) ([]byte, error) {
 	if ctx == nil || ctx.Invoice == nil || ctx.Company == nil || ctx.Customer == nil {
 		return nil, fmt.Errorf("dian: faltan invoice, company o customer en el contexto")
@@ -49,21 +53,46 @@ func (s *XMLBuilderService) Build(ctx *InvoiceBuildContext) ([]byte, error) {
 	enc := xml.NewEncoder(&buf)
 	enc.Indent("", "  ")
 
-	// Root <Invoice> con atributos obligatorios (Anexo 1.9). Id para Reference URI en firma XAdES.
-	root := xml.StartElement{
-		Name: xml.Name{Space: NsInvoice, Local: "Invoice"},
-		Attr: []xml.Attr{
-			{Name: xml.Name{Local: "Id"}, Value: "invoice-id"},
-			{Name: xml.Name{Local: "xmlns"}, Value: NsInvoice},
-			{Name: xml.Name{Local: "xmlns:cac"}, Value: NsCac},
-			{Name: xml.Name{Local: "xmlns:cbc"}, Value: NsCbc},
-			{Name: xml.Name{Local: "xmlns:ds"}, Value: NsDs},
-			{Name: xml.Name{Local: "xmlns:ext"}, Value: NsExt},
-			{Name: xml.Name{Local: "xmlns:sts"}, Value: NsSts},
-			{Name: xml.Name{Local: "xmlns:xades"}, Value: NsXades},
-			{Name: xml.Name{Local: "xmlns:xsi"}, Value: nsXsi},
-			{Name: xml.Name{Space: nsXsi, Local: "schemaLocation"}, Value: schemaLocationInvoice},
-		},
+	docType := ctx.DocumentType
+	if docType == "" {
+		docType = "INVOICE"
+	}
+
+	// Root <Invoice> o <CreditNote> con atributos obligatorios (Anexo 1.9).
+	var root xml.StartElement
+	switch docType {
+	case "CREDIT_NOTE":
+		root = xml.StartElement{
+			Name: xml.Name{Space: NsCreditNote, Local: "CreditNote"},
+			Attr: []xml.Attr{
+				{Name: xml.Name{Local: "Id"}, Value: "creditnote-id"},
+				{Name: xml.Name{Local: "xmlns"}, Value: NsCreditNote},
+				{Name: xml.Name{Local: "xmlns:cac"}, Value: NsCac},
+				{Name: xml.Name{Local: "xmlns:cbc"}, Value: NsCbc},
+				{Name: xml.Name{Local: "xmlns:ds"}, Value: NsDs},
+				{Name: xml.Name{Local: "xmlns:ext"}, Value: NsExt},
+				{Name: xml.Name{Local: "xmlns:sts"}, Value: NsSts},
+				{Name: xml.Name{Local: "xmlns:xades"}, Value: NsXades},
+				{Name: xml.Name{Local: "xmlns:xsi"}, Value: nsXsi},
+				{Name: xml.Name{Space: nsXsi, Local: "schemaLocation"}, Value: schemaLocationCreditNote},
+			},
+		}
+	default:
+		root = xml.StartElement{
+			Name: xml.Name{Space: NsInvoice, Local: "Invoice"},
+			Attr: []xml.Attr{
+				{Name: xml.Name{Local: "Id"}, Value: "invoice-id"},
+				{Name: xml.Name{Local: "xmlns"}, Value: NsInvoice},
+				{Name: xml.Name{Local: "xmlns:cac"}, Value: NsCac},
+				{Name: xml.Name{Local: "xmlns:cbc"}, Value: NsCbc},
+				{Name: xml.Name{Local: "xmlns:ds"}, Value: NsDs},
+				{Name: xml.Name{Local: "xmlns:ext"}, Value: NsExt},
+				{Name: xml.Name{Local: "xmlns:sts"}, Value: NsSts},
+				{Name: xml.Name{Local: "xmlns:xades"}, Value: NsXades},
+				{Name: xml.Name{Local: "xmlns:xsi"}, Value: nsXsi},
+				{Name: xml.Name{Space: nsXsi, Local: "schemaLocation"}, Value: schemaLocationInvoice},
+			},
+		}
 	}
 	if err := enc.EncodeToken(root); err != nil {
 		return nil, err
@@ -75,7 +104,7 @@ func (s *XMLBuilderService) Build(ctx *InvoiceBuildContext) ([]byte, error) {
 		return nil, err
 	}
 
-	// ---- cbc: elementos obligatorios y opcionales del Invoice
+	// ---- cbc: elementos obligatorios y opcionales del documento
 	issueDate := ctx.Invoice.Date
 	if ctx.IssueDate != nil {
 		issueDate = *ctx.IssueDate
@@ -87,7 +116,11 @@ func (s *XMLBuilderService) Build(ctx *InvoiceBuildContext) ([]byte, error) {
 
 	writeCbc(enc, "UBLVersionID", "2.1")
 	writeCbc(enc, "CustomizationID", "10")
-	writeCbc(enc, "ProfileID", "DIAN 2.1: Factura Electrónica de Venta")
+	if docType == "CREDIT_NOTE" {
+		writeCbc(enc, "ProfileID", "DIAN 2.1: Nota Crédito de Venta")
+	} else {
+		writeCbc(enc, "ProfileID", "DIAN 2.1: Factura Electrónica de Venta")
+	}
 	writeCbc(enc, "ID", invoiceID)
 	// cbc:UUID = CUFE (Código Único de Factura Electrónica)
 	if u := ctx.Invoice.UUID; u != "" {
@@ -102,6 +135,44 @@ func (s *XMLBuilderService) Build(ctx *InvoiceBuildContext) ([]byte, error) {
 
 	if ctx.DueDate != nil {
 		writeCbc(enc, "DueDate", ctx.DueDate.Format("2006-01-02"))
+	}
+
+	// Elementos específicos de Nota Crédito
+	if docType == "CREDIT_NOTE" {
+		// DiscrepancyResponse obligatorio: referencia, código de concepto y descripción.
+		_ = enc.EncodeToken(xml.StartElement{Name: xml.Name{Space: NsCac, Local: "DiscrepancyResponse"}})
+		if ctx.OriginalInvoiceNumber != "" {
+			writeCbc(enc, "ReferenceID", ctx.OriginalInvoiceNumber)
+		}
+		if ctx.DiscrepancyCode != "" {
+			writeCbc(enc, "ResponseCode", string(ctx.DiscrepancyCode))
+		}
+		if ctx.DiscrepancyReason != "" {
+			writeCbc(enc, "Description", ctx.DiscrepancyReason)
+		}
+		_ = enc.EncodeToken(xml.EndElement{Name: xml.Name{Space: NsCac, Local: "DiscrepancyResponse"}})
+
+		// BillingReference: referencia a la factura original.
+		_ = enc.EncodeToken(xml.StartElement{Name: xml.Name{Space: NsCac, Local: "BillingReference"}})
+		_ = enc.EncodeToken(xml.StartElement{Name: xml.Name{Space: NsCac, Local: "InvoiceDocumentReference"}})
+		if ctx.OriginalInvoiceNumber != "" {
+			writeCbc(enc, "ID", ctx.OriginalInvoiceNumber)
+		}
+		if ctx.OriginalInvoiceCUFE != "" {
+			_ = enc.EncodeToken(xml.StartElement{
+				Name: xml.Name{Space: NsCbc, Local: "UUID"},
+				Attr: []xml.Attr{
+					{Name: xml.Name{Local: "schemeName"}, Value: "CUFE"},
+				},
+			})
+			_ = enc.EncodeToken(xml.CharData(ctx.OriginalInvoiceCUFE))
+			_ = enc.EncodeToken(xml.EndElement{Name: xml.Name{Space: NsCbc, Local: "UUID"}})
+		}
+		if ctx.OriginalIssueDate != "" {
+			writeCbc(enc, "IssueDate", ctx.OriginalIssueDate)
+		}
+		_ = enc.EncodeToken(xml.EndElement{Name: xml.Name{Space: NsCac, Local: "InvoiceDocumentReference"}})
+		_ = enc.EncodeToken(xml.EndElement{Name: xml.Name{Space: NsCac, Local: "BillingReference"}})
 	}
 
 	// ---- cac:AccountingSupplierParty
@@ -122,10 +193,16 @@ func (s *XMLBuilderService) Build(ctx *InvoiceBuildContext) ([]byte, error) {
 	if err := s.writeLegalMonetaryTotal(enc, ctx); err != nil {
 		return nil, err
 	}
-	// ---- cac:InvoiceLine (cada detalle)
+	// ---- Líneas: InvoiceLine o CreditNoteLine según tipo de documento
 	for i, line := range ctx.Details {
-		if err := s.writeInvoiceLine(enc, i+1, line); err != nil {
-			return nil, err
+		if docType == "CREDIT_NOTE" {
+			if err := s.writeCreditNoteLine(enc, i+1, line); err != nil {
+				return nil, err
+			}
+		} else {
+			if err := s.writeInvoiceLine(enc, i+1, line); err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -197,6 +274,43 @@ func writeSts(enc *xml.Encoder, local, value string) {
 	_ = enc.EncodeToken(xml.StartElement{Name: xml.Name{Space: NsSts, Local: local}})
 	_ = enc.EncodeToken(xml.CharData(value))
 	_ = enc.EncodeToken(xml.EndElement{Name: xml.Name{Space: NsSts, Local: local}})
+}
+
+// writeCreditNoteLine escribe una línea de Nota Crédito (CreditNoteLine) usando los datos de producto.
+func (s *XMLBuilderService) writeCreditNoteLine(enc *xml.Encoder, lineNumber int, line InvoiceLineForXML) error {
+	_ = enc.EncodeToken(xml.StartElement{Name: xml.Name{Space: NsCac, Local: "CreditNoteLine"}})
+
+	// cbc:ID — número de línea
+	writeCbc(enc, "ID", strconv.Itoa(lineNumber))
+
+	// CreditedQuantity (cantidad acreditada) con unidad de medida.
+	_ = enc.EncodeToken(xml.StartElement{
+		Name: xml.Name{Space: NsCbc, Local: "CreditedQuantity"},
+		Attr: []xml.Attr{
+			{Name: xml.Name{Local: "unitCode"}, Value: line.UnitCode},
+		},
+	})
+	_ = enc.EncodeToken(xml.CharData(line.Quantity.String()))
+	_ = enc.EncodeToken(xml.EndElement{Name: xml.Name{Space: NsCbc, Local: "CreditedQuantity"}})
+
+	// LineExtensionAmount (subtotal de la línea).
+	writeCbcAmount(enc, "LineExtensionAmount", line.Subtotal.Round(2).StringFixed(2), "COP")
+
+	// Item (descripción y código del producto).
+	_ = enc.EncodeToken(xml.StartElement{Name: xml.Name{Space: NsCac, Local: "Item"}})
+	writeCbc(enc, "Description", line.ProductName)
+	_ = enc.EncodeToken(xml.StartElement{Name: xml.Name{Space: NsCbc, Local: "Name"}})
+	_ = enc.EncodeToken(xml.CharData(line.ProductCode))
+	_ = enc.EncodeToken(xml.EndElement{Name: xml.Name{Space: NsCbc, Local: "Name"}})
+	_ = enc.EncodeToken(xml.EndElement{Name: xml.Name{Space: NsCac, Local: "Item"}})
+
+	// Price (precio unitario).
+	_ = enc.EncodeToken(xml.StartElement{Name: xml.Name{Space: NsCac, Local: "Price"}})
+	writeCbcAmount(enc, "PriceAmount", line.UnitPrice.Round(2).StringFixed(2), "COP")
+	_ = enc.EncodeToken(xml.EndElement{Name: xml.Name{Space: NsCac, Local: "Price"}})
+
+	_ = enc.EncodeToken(xml.EndElement{Name: xml.Name{Space: NsCac, Local: "CreditNoteLine"}})
+	return nil
 }
 
 func (s *XMLBuilderService) writeSupplierParty(enc *xml.Encoder, ctx *InvoiceBuildContext) error {

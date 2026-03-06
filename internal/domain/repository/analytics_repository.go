@@ -73,4 +73,17 @@ type AnalyticsRepository interface {
 		startDate, endDate time.Time,
 		limit int,
 	) ([]dto.TopSKUDTO, error)
+
+	// GetRawMaterialImpactRanking devuelve un ranking de materias primas ordenadas por
+	// su peso financiero en los productos que forman parte del top 20% de ingresos (Pareto).
+	// La implementación debe:
+	//   1. Identificar los SKUs top Pareto en el rango dado.
+	//   2. Descomponer su BOM (bill_of_materials) y agregar el costo ponderado por materia prima.
+	// El DTO de respuesta se modela desde la capa de aplicación.
+	GetRawMaterialImpactRanking(
+		ctx context.Context,
+		companyID string,
+		startDate, endDate time.Time,
+		limit int,
+	) ([]dto.RawMaterialImpactDTO, error)
 }

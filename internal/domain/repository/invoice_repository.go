@@ -13,4 +13,9 @@ type InvoiceRepository interface {
 	GetDetailsByInvoiceID(invoiceID string) ([]*entity.InvoiceDetail, error)
 	// GetDIANStatus devuelve solo los campos de estado DIAN (ligero, para polling).
 	GetDIANStatus(id string) (*entity.Invoice, error)
+
+	// UpdateReturnStatus actualiza el estado de devolución lógico de la factura original
+	// (por ejemplo, 'Returned' o 'Partially_Returned'). La implementación puede usar
+	// una columna dedicada o el campo notes según el esquema de BD.
+	UpdateReturnStatus(invoiceID string, status string) error
 }

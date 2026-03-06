@@ -37,6 +37,20 @@ type InvoiceItemRequest struct {
 	UnitPrice  decimal.Decimal `json:"unit_price"`
 }
 
+// ReturnItemRequest línea de devolución (producto y cantidad devuelta).
+type ReturnItemRequest struct {
+	ProductID string          `json:"product_id"`
+	Quantity  decimal.Decimal `json:"quantity"`
+}
+
+// ReturnInvoiceRequest body para POST /api/invoices/{id}/return.
+// WarehouseID: bodega a la que se reingresa el stock devuelto.
+type ReturnInvoiceRequest struct {
+	WarehouseID string              `json:"warehouse_id"`
+	Items       []ReturnItemRequest `json:"items"`
+	Reason      string              `json:"reason,omitempty"`
+}
+
 // InvoiceResponse factura con detalle para GET /api/invoices/:id.
 type InvoiceResponse struct {
 	ID           string                  `json:"id"`

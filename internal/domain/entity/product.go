@@ -32,3 +32,24 @@ type Product struct {
 func (p *Product) IdealStock() decimal.Decimal {
 	return p.ReorderPoint.Mul(decimal.NewFromFloat(1.5))
 }
+
+// CalculateProductionCost calcula el costo de producción basado en la receta (BOM).
+// Fórmula por ítem: (RawMaterial.Cost * QuantityRequired) * (1 + WastePercentage).
+// WastePercentage debe venir en forma fraccional (ej: 0.05 = 5% merma).
+func (p *Product) CalculateProductionCost(recipeItems []RecipeItem) decimal.Decimal {
+	total := decimal.Zero
+	for _, item := range recipeItems {
+		if item.RawMaterial == nil {
+			continue
+		}
+		qty := item.QuantityRequired
+		if !qty.GreaterThan(decimal.Zero) {
+			continue
+		}
+		cost := item.RawMaterial.Cost
+		wasteFactor := decimal.NewFromInt(1).Add(item.WastePercentage)
+		lineCost := cost.Mul(qty).Mul(wasteFactor)
+		total = total.Add(lineCost)
+	}
+	return total
+}

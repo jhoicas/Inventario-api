@@ -30,11 +30,12 @@ type InvoiceLineForXML struct {
 	Subtotal     decimal.Decimal
 }
 
-// InvoiceBuildContext contexto con todos los datos necesarios para construir el XML de la factura.
+// InvoiceBuildContext contexto con todos los datos necesarios para construir el XML de la factura
+// o de la Nota Crédito, incluyendo referencias a la factura original cuando aplica.
 type InvoiceBuildContext struct {
 	Invoice   *entity.Invoice
-	Company   *entity.Company   // Emisor (AccountingSupplierParty)
-	Customer  *entity.Customer  // Cliente (AccountingCustomerParty)
+	Company   *entity.Company  // Emisor (AccountingSupplierParty)
+	Customer  *entity.Customer // Cliente (AccountingCustomerParty)
 	Details   []InvoiceLineForXML
 	Resolution *BillingResolutionData
 
@@ -45,4 +46,16 @@ type InvoiceBuildContext struct {
 	IssueDate             *time.Time // Si no se usa Invoice.Date
 	CustomerIdentificationTypeCode string // 13=CC, 31=NIT
 	CompanyIdentificationTypeCode  string
+
+	// Tipo de documento UBL: "INVOICE" (por defecto) o "CREDIT_NOTE"
+	DocumentType string
+
+	// Referencias a la factura original (obligatorias para Notas Crédito).
+	OriginalInvoiceNumber string
+	OriginalInvoiceCUFE   string
+	OriginalIssueDate     string
+
+	// Concepto DIAN de la Nota Crédito.
+	DiscrepancyCode   entity.CreditNoteConcept
+	DiscrepancyReason string
 }

@@ -18,7 +18,7 @@ const (
 	DIANStatusErrorGeneration = "ERROR_GENERATION"  // Falló firma o generación XML
 )
 
-// Invoice representa la cabecera de una factura.
+// Invoice representa la cabecera de una factura o Nota Crédito.
 type Invoice struct {
 	ID          string
 	CompanyID   string
@@ -30,12 +30,22 @@ type Invoice struct {
 	TaxTotal    decimal.Decimal
 	GrandTotal  decimal.Decimal
 	DIAN_Status string
-	CUFE        string // Código Único de Factura Electrónica (SHA-384)
-	UUID        string // Mismo valor que CUFE; en <cbc:UUID> del XML DIAN
+	CUFE        string // Código Único de Factura Electrónica / CUDE (SHA-384)
+	UUID        string // Mismo valor que CUFE/CUDE; en <cbc:UUID> del XML DIAN
 	XMLSigned   string // XML firmado (contenido completo)
 	QRData      string // String para QR (NumFac|FecFac|...|Cufe|UrlValidacionDIAN)
 	TrackID     string // ZipKey / TrackID devuelto por el WS DIAN tras el envío
 	DIANErrors  string // Mensajes de rechazo devueltos por la DIAN (JSON o texto plano)
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+
+	// Campos adicionales para Notas Crédito / referencias
+	DocumentType           string             // "INVOICE" | "CREDIT_NOTE"
+	OriginalInvoiceID      string             // ID de la factura origen
+	OriginalInvoiceNumber  string             // Prefijo+Número de la factura origen
+	OriginalInvoiceCUFE    string             // CUFE de la factura origen
+	OriginalInvoiceIssueOn time.Time          // Fecha de emisión de la factura origen
+	DiscrepancyCode        CreditNoteConcept  // Código de concepto DIAN (1..6)
+	DiscrepancyReason      string             // Motivo textual de la Nota Crédito
+
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }

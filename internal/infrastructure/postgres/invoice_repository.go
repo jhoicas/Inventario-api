@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -29,12 +30,55 @@ func (r *InvoiceRepo) Create(invoice *entity.Invoice) error {
 		invoice.ID = uuid.New().String()
 	}
 	query := `
-		INSERT INTO invoices (id, company_id, customer_id, prefix, number, date, net_total, tax_total, grand_total, dian_status, cufe, uuid, xml_signed, qr_data, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`
+		INSERT INTO invoices (
+			id, company_id, customer_id, prefix, number, date,
+			net_total, tax_total, grand_total, dian_status,
+			cufe, uuid, xml_signed, qr_data, track_id_dian, dian_errors,
+			document_type,
+			original_invoice_id,
+			original_invoice_number,
+			original_invoice_cufe,
+			original_invoice_issue_on,
+			discrepancy_code,
+			discrepancy_reason,
+			created_at, updated_at
+		)
+		VALUES (
+			$1, $2, $3, $4, $5, $6,
+			$7, $8, $9, $10,
+			$11, $12, $13, $14, $15, $16,
+			$17,
+			$18,
+			$19,
+			$20,
+			$21,
+			$22,
+			$23,
+			$24, $25
+		)`
 	_, err := r.q.Exec(context.Background(), query,
 		invoice.ID, invoice.CompanyID, invoice.CustomerID, invoice.Prefix, invoice.Number,
 		invoice.Date, invoice.NetTotal, invoice.TaxTotal, invoice.GrandTotal,
-		invoice.DIAN_Status, nullIfEmpty(invoice.CUFE), nullIfEmpty(invoice.UUID), nullIfEmpty(invoice.XMLSigned), nullIfEmpty(invoice.QRData),
+		invoice.DIAN_Status,
+		nullIfEmpty(invoice.CUFE),
+		nullIfEmpty(invoice.UUID),
+		nullIfEmpty(invoice.XMLSigned),
+		nullIfEmpty(invoice.QRData),
+		nullIfEmpty(invoice.TrackID),
+		nullIfEmpty(invoice.DIANErrors),
+		nullIfEmpty(invoice.DocumentType),
+		nullIfEmpty(invoice.OriginalInvoiceID),
+		nullIfEmpty(invoice.OriginalInvoiceNumber),
+		nullIfEmpty(invoice.OriginalInvoiceCUFE),
+		invoice.OriginalInvoiceIssueOn,
+		func() *string {
+			if invoice.DiscrepancyCode == "" {
+				return nil
+			}
+			s := string(invoice.DiscrepancyCode)
+			return &s
+		}(),
+		nullIfEmpty(invoice.DiscrepancyReason),
 		invoice.CreatedAt, invoice.UpdatedAt,
 	)
 	if err != nil {
@@ -100,15 +144,31 @@ func (r *InvoiceRepo) GetByID(id string) (*entity.Invoice, error) {
 		SELECT id, company_id, customer_id, prefix, number, date,
 		       net_total, tax_total, grand_total, dian_status,
 		       cufe, uuid, xml_signed, qr_data, track_id_dian, dian_errors,
+		       document_type,
+		       original_invoice_id,
+		       original_invoice_number,
+		       original_invoice_cufe,
+		       original_invoice_issue_on,
+		       discrepancy_code,
+		       discrepancy_reason,
 		       created_at, updated_at
 		FROM invoices WHERE id = $1`
 	var inv entity.Invoice
 	var cufe, uuid, xmlSigned, qrData, trackID, dianErrors *string
+	var docType, origInvID, origInvNumber, origInvCUFE, discCode, discReason *string
+	var origIssueOn *time.Time
 	err := r.q.QueryRow(context.Background(), query, id).Scan(
 		&inv.ID, &inv.CompanyID, &inv.CustomerID, &inv.Prefix, &inv.Number,
 		&inv.Date, &inv.NetTotal, &inv.TaxTotal, &inv.GrandTotal,
 		&inv.DIAN_Status, &cufe, &uuid, &xmlSigned, &qrData,
 		&trackID, &dianErrors,
+		&docType,
+		&origInvID,
+		&origInvNumber,
+		&origInvCUFE,
+		&origIssueOn,
+		&discCode,
+		&discReason,
 		&inv.CreatedAt, &inv.UpdatedAt,
 	)
 	if err != nil {
@@ -129,6 +189,17 @@ func (r *InvoiceRepo) GetByID(id string) (*entity.Invoice, error) {
 	inv.QRData = derefStr(qrData)
 	inv.TrackID = derefStr(trackID)
 	inv.DIANErrors = derefStr(dianErrors)
+	inv.DocumentType = derefStr(docType)
+	inv.OriginalInvoiceID = derefStr(origInvID)
+	inv.OriginalInvoiceNumber = derefStr(origInvNumber)
+	inv.OriginalInvoiceCUFE = derefStr(origInvCUFE)
+	if origIssueOn != nil {
+		inv.OriginalInvoiceIssueOn = *origIssueOn
+	}
+	if discCode != nil {
+		inv.DiscrepancyCode = entity.CreditNoteConcept(*discCode)
+	}
+	inv.DiscrepancyReason = derefStr(discReason)
 	return &inv, nil
 }
 
@@ -171,6 +242,24 @@ func (r *InvoiceRepo) GetDetailsByInvoiceID(invoiceID string) ([]*entity.Invoice
 		list = append(list, &d)
 	}
 	return list, rows.Err()
+}
+
+// UpdateReturnStatus marca una factura como devuelta total o parcialmente.
+// Esta implementación almacena el estado en la columna notes, preservando cualquier contenido previo.
+func (r *InvoiceRepo) UpdateReturnStatus(invoiceID string, status string) error {
+	query := `
+		UPDATE invoices
+		SET notes = CASE
+		                WHEN notes IS NULL OR notes = '' THEN $2
+		                ELSE notes || E'\n' || $2
+		            END,
+		    updated_at = now()
+		WHERE id = $1`
+	_, err := r.q.Exec(context.Background(), query, invoiceID, status)
+	if err != nil {
+		return fmt.Errorf("update invoice return status: %w", err)
+	}
+	return nil
 }
 
 func nullIfEmpty(s string) *string {

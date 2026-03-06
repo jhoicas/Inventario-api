@@ -30,8 +30,15 @@ func CalculateCufeFromInvoice(ctx *CufeContext) (string, error) {
 	if tipoAmb == "" {
 		tipoAmb = "1"
 	}
+	docType := "01" // Factura electrónica de venta
+	if strings.EqualFold(inv.DocumentType, "CREDIT_NOTE") {
+		// 91 = Nota Crédito según tabla DIAN de tipo de documento.
+		docType = "91"
+	}
+
 	params := &domdian.CufeParams{
 		NumFac:    strings.TrimSpace(inv.Prefix) + strings.TrimSpace(inv.Number),
+		DocType:   docType,
 		FecFac:    inv.Date.Format("2006-01-02"), // YYYY-MM-DD
 		ValFac:    inv.NetTotal,                   // Valor total sin impuestos
 		ValImp_01: inv.TaxTotal,                   // IVA (código 01)

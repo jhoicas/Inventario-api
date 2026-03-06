@@ -14,7 +14,8 @@ type MarginsReportRequest struct {
 // ── Por canal ─────────────────────────────────────────────────────────────────
 
 // MarginByChannelDTO margen calculado por canal de venta.
-// Fórmula: margen = ingresos_netos - cogs - comisión_canal
+// Fórmula:
+//   TotalMargin = GrossRevenue - TotalCOGS - CommissionCost - LogisticsCost - DiscountTotal
 type MarginByChannelDTO struct {
 	ChannelID      string          `json:"channel_id"`       // UUID o "direct"
 	ChannelName    string          `json:"channel_name"`     // nombre del canal o "Directo"
@@ -25,7 +26,9 @@ type MarginByChannelDTO struct {
 	GrossRevenue   decimal.Decimal `json:"gross_revenue"`    // ingresos brutos (suma de subtotales)
 	TotalCOGS      decimal.Decimal `json:"total_cogs"`       // costo total (qty * costo_prom_producto)
 	CommissionCost decimal.Decimal `json:"commission_cost"`  // ingresos * commission_rate / 100
-	TotalMargin    decimal.Decimal `json:"total_margin"`     // GrossRevenue - COGS - CommissionCost
+	LogisticsCost  decimal.Decimal `json:"logistics_cost"`   // costos logísticos imputados al canal
+	DiscountTotal  decimal.Decimal `json:"discount_total"`   // descuentos comerciales concedidos
+	TotalMargin    decimal.Decimal `json:"total_margin"`     // GrossRevenue - TotalCOGS - CommissionCost - LogisticsCost - DiscountTotal
 	MarginPct      decimal.Decimal `json:"margin_pct"`       // TotalMargin / GrossRevenue * 100
 	RevenuePct     decimal.Decimal `json:"revenue_pct"`      // participación % en ingresos totales
 }

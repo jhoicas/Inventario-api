@@ -23,6 +23,7 @@ const (
 // CufeParams contiene los datos para calcular el CUFE en el orden exigido por la DIAN.
 type CufeParams struct {
 	NumFac       string          // Número de factura (prefijo + número, sin espacios)
+	DocType      string          // Tipo de documento DIAN (01=Factura, 91=Nota Crédito, etc.)
 	FecFac       string          // Fecha de emisión YYYY-MM-DD
 	ValFac       decimal.Decimal // Valor total sin impuestos (neto)
 	ValImp_01    decimal.Decimal // Valor total IVA (código 01)
@@ -75,8 +76,16 @@ func (s *CufeCalculatorService) Calculate(p *CufeParams) (string, error) {
 		tipoAmb = "1"
 	}
 
-	// Orden estricto DIAN (sin separadores)
-	cadena := numFac +
+	docType := strings.TrimSpace(p.DocType)
+	if docType == "" {
+		// Por defecto 01 = Factura electrónica de venta
+		docType = "01"
+	}
+
+	// Orden estricto DIAN (sin separadores).
+	// Para Notas Crédito se utiliza el tipo de documento 91 en DocType.
+	cadena := docType +
+		numFac +
 		p.FecFac +
 		formatAmount(p.ValFac) +
 		CodImpIVA + formatAmount(p.ValImp_01) +

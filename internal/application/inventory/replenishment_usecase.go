@@ -58,6 +58,7 @@ func (uc *ReplenishmentUseCase) GenerateReplenishmentList(
 
 	// 3. Construir los DTOs enriquecidos
 	hundred := decimal.NewFromInt(100)
+	ninety := decimal.NewFromInt(90)
 
 	suggestions := make([]dto.ReplenishmentSuggestionDTO, 0, len(rawItems))
 	for _, item := range rawItems {
@@ -69,7 +70,7 @@ func (uc *ReplenishmentUseCase) GenerateReplenishmentList(
 
 		estimatedCost := suggestedQty.Mul(item.UnitCost)
 
-		var grossMarginPct, unitsSold decimal.Decimal
+		var grossMarginPct, unitsSold, inventoryDays decimal.Decimal
 		if m, ok := marginByID[item.ProductID]; ok {
 			unitsSold = m.UnitsSold
 			if m.GrossRevenue.GreaterThan(decimal.Zero) {
@@ -79,6 +80,14 @@ func (uc *ReplenishmentUseCase) GenerateReplenishmentList(
 			// Sin historial de ventas: estimar margen por precio y costo
 			if item.Price.GreaterThan(decimal.Zero) {
 				grossMarginPct = item.Price.Sub(item.UnitCost).Div(item.Price).Mul(hundred).Round(2)
+			}
+		}
+
+		// Días de inventario = CurrentStock / (UnitsSoldLast90Days / 90).
+		if unitsSold.GreaterThan(decimal.Zero) {
+			avgDaily := unitsSold.Div(ninety)
+			if avgDaily.GreaterThan(decimal.Zero) {
+				inventoryDays = item.CurrentStock.Div(avgDaily).Round(2)
 			}
 		}
 
@@ -94,6 +103,7 @@ func (uc *ReplenishmentUseCase) GenerateReplenishmentList(
 			EstimatedOrderCost:  estimatedCost,
 			GrossMarginPct:      grossMarginPct,
 			UnitsSoldLast90Days: unitsSold,
+			InventoryDays:       inventoryDays,
 		})
 	}
 

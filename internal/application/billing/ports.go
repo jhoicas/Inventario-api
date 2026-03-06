@@ -57,4 +57,18 @@ type InventoryUseCase interface {
 		now time.Time,
 		transactionID string, // referencia a la factura (invoice ID)
 	) error
+
+	// RegisterReturnInTx registra una devolución de venta (RETURN) reutilizando la misma transacción SQL.
+	// Suma stock en la bodega indicada y crea un movement RETURN asociado a la factura/nota crédito.
+	RegisterReturnInTx(
+		ctx context.Context,
+		movRepo repository.InventoryMovementRepository,
+		stockRepo repository.StockRepository,
+		productRepo repository.ProductRepository,
+		product *entity.Product,
+		productID, warehouseID, userID string,
+		quantity decimal.Decimal,
+		now time.Time,
+		transactionID string,
+	) error
 }

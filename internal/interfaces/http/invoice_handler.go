@@ -12,13 +12,22 @@ import (
 
 // InvoiceHandler maneja las peticiones HTTP de facturación (protegido).
 type InvoiceHandler struct {
-	uc    *billing.CreateInvoiceUseCase
-	pdfUC *billing.PDFUseCase
+	uc        *billing.CreateInvoiceUseCase
+	returnUC  *billing.CreateCreditNoteUseCase
+	pdfUC     *billing.PDFUseCase
 }
 
 // NewInvoiceHandler construye el handler.
-func NewInvoiceHandler(uc *billing.CreateInvoiceUseCase, pdfUC *billing.PDFUseCase) *InvoiceHandler {
-	return &InvoiceHandler{uc: uc, pdfUC: pdfUC}
+func NewInvoiceHandler(
+	uc *billing.CreateInvoiceUseCase,
+	returnUC *billing.CreateCreditNoteUseCase,
+	pdfUC *billing.PDFUseCase,
+) *InvoiceHandler {
+	return &InvoiceHandler{
+		uc:       uc,
+		returnUC: returnUC,
+		pdfUC:    pdfUC,
+	}
 }
 
 // Create crea una factura y descuenta inventario.
@@ -54,6 +63,60 @@ func (h *InvoiceHandler) Create(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}
 	return c.Status(fiber.StatusCreated).JSON(invoice)
+}
+
+// HandleReturn godoc
+// @Summary      Registrar devolución de factura (Nota Crédito)
+// @Tags         billing
+// @Security     Bearer
+// @Accept       json
+// @Produce      json
+// @Param        id    path   string                     true  "ID de la factura original"
+// @Param        body  body   dto.ReturnInvoiceRequest   true  "Productos devueltos y bodega de reingreso"
+// @Success      201   {object}  dto.InvoiceResponse
+// @Failure      400   {object}  dto.ErrorResponse
+// @Failure      401   {object}  dto.ErrorResponse
+// @Failure      403   {object}  dto.ErrorResponse
+// @Failure      404   {object}  dto.ErrorResponse
+// @Failure      409   {object}  dto.ErrorResponse
+// @Router       /api/invoices/{id}/return [post]
+func (h *InvoiceHandler) HandleReturn(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	userID := GetUserID(c)
+	if companyID == "" || userID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	invoiceID := c.Params("id")
+	if invoiceID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "id requerido"})
+	}
+
+	var in dto.ReturnInvoiceRequest
+	if err := c.BodyParser(&in); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
+	}
+
+	creditNote, err := h.returnUC.CreateCreditNote(c.Context(), companyID, userID, invoiceID, in)
+	if err != nil {
+		if err == domain.ErrInvalidInput {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "datos inválidos"})
+		}
+		if err == domain.ErrNotFound {
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "factura, producto o bodega no encontrada"})
+		}
+		if err == domain.ErrForbidden {
+			return c.Status(fiber.StatusForbidden).JSON(dto.ErrorResponse{Code: "FORBIDDEN", Message: "acceso denegado al recurso"})
+		}
+		if errors.Is(err, domain.ErrInsufficientStock) {
+			return c.Status(fiber.StatusConflict).JSON(dto.ErrorResponse{
+				Code:    "INSUFFICIENT_STOCK",
+				Message: err.Error(),
+			})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(creditNote)
 }
 
 // GetDIANStatus devuelve el estado DIAN de una factura (endpoint de polling para el frontend).

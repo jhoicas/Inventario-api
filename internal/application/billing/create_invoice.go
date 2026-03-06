@@ -195,6 +195,7 @@ func (uc *CreateInvoiceUseCase) CreateInvoice(ctx context.Context, companyID, us
 			TaxTotal:    taxTotal,
 			GrandTotal:  grandTotal,
 			DIAN_Status: entity.DIANStatusDraft,
+			DocumentType: "INVOICE",
 			CreatedAt:   now,
 			UpdatedAt:   now,
 		}

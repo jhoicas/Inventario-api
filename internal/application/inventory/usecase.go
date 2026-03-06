@@ -49,24 +49,24 @@ type MovementInputDTO struct {
 }
 
 // RegisterMovement inicia una transacción, bloquea la fila en inventory_stock (SELECT FOR UPDATE),
-// aplica la lógica según tipo (IN/OUT/TRANSFER/ADJUSTMENT) y hace Commit o Rollback.
+// aplica la lógica según tipo (IN/OUT/TRANSFER/ADJUSTMENT/RETURN) y hace Commit o Rollback.
 func (uc *RegisterMovementUseCase) RegisterMovement(ctx context.Context, input MovementInputDTO) error {
 	// Validar tipo y campos
 	switch input.Type {
-	case entity.MovementTypeIN, entity.MovementTypeOUT, entity.MovementTypeADJUSTMENT:
+	case string(entity.MovementTypeIN), string(entity.MovementTypeOUT), string(entity.MovementTypeADJUSTMENT), string(entity.MovementTypeReturn):
 		if input.ProductID == "" || input.WarehouseID == "" {
 			return domain.ErrInvalidInput
 		}
 		if input.Quantity.IsZero() {
 			return domain.ErrInvalidInput
 		}
-		if input.Type == entity.MovementTypeIN && (input.UnitCost == nil || input.UnitCost.LessThan(decimal.Zero)) {
+		if input.Type == string(entity.MovementTypeIN) && (input.UnitCost == nil || input.UnitCost.LessThan(decimal.Zero)) {
 			return domain.ErrInvalidInput
 		}
-		if input.Type == entity.MovementTypeOUT && input.Quantity.LessThan(decimal.Zero) {
+		if input.Type == string(entity.MovementTypeOUT) && input.Quantity.LessThan(decimal.Zero) {
 			return domain.ErrInvalidInput
 		}
-	case entity.MovementTypeTRANSFER:
+	case string(entity.MovementTypeTRANSFER):
 		if input.ProductID == "" || input.FromWarehouseID == "" || input.ToWarehouseID == "" {
 			return domain.ErrInvalidInput
 		}
@@ -86,7 +86,7 @@ func (uc *RegisterMovementUseCase) RegisterMovement(ctx context.Context, input M
 		return domain.ErrForbidden
 	}
 
-	if input.Type == entity.MovementTypeTRANSFER {
+	if input.Type == string(entity.MovementTypeTRANSFER) {
 		fromWh, _ := uc.warehouseRepo.GetByID(input.FromWarehouseID)
 		toWh, _ := uc.warehouseRepo.GetByID(input.ToWarehouseID)
 		if fromWh == nil || toWh == nil || fromWh.CompanyID != input.CompanyID || toWh.CompanyID != input.CompanyID {
@@ -108,7 +108,7 @@ func (uc *RegisterMovementUseCase) RegisterMovement(ctx context.Context, input M
 		stockRepo repository.StockRepository,
 		productRepo repository.ProductRepository,
 	) error {
-		switch input.Type {
+		switch entity.MovementType(input.Type) {
 		case entity.MovementTypeIN:
 			return uc.doIN(movRepo, stockRepo, productRepo, product, input, now, txID)
 		case entity.MovementTypeOUT:
@@ -162,6 +162,45 @@ func (uc *RegisterMovementUseCase) doIN(
 		Date:          now,
 		CreatedAt:     now,
 		CreatedBy:     input.UserID,
+	}
+	return movRepo.Create(mov)
+}
+
+// RegisterReturnInTx registra una devolución de venta (RETURN) reutilizando la transacción del caller.
+// A diferencia de un movimiento IN normal, no recalcula el costo promedio del producto.
+// Se usa desde facturación electrónica al emitir una Nota Crédito.
+func (uc *RegisterMovementUseCase) RegisterReturnInTx(
+	ctx context.Context,
+	movRepo repository.InventoryMovementRepository,
+	stockRepo repository.StockRepository,
+	_ repository.ProductRepository,
+	product *entity.Product,
+	productID, warehouseID, userID string,
+	quantity decimal.Decimal,
+	now time.Time,
+	transactionID string,
+) error {
+	stock, err := stockRepo.GetForUpdate(productID, warehouseID)
+	if err != nil {
+		return err
+	}
+	stock.Quantity = stock.Quantity.Add(quantity)
+	stock.UpdatedAt = now
+	if err := stockRepo.Upsert(stock); err != nil {
+		return err
+	}
+	unitCost := product.Cost
+	mov := &entity.InventoryMovement{
+		TransactionID: transactionID,
+		ProductID:     productID,
+		WarehouseID:   warehouseID,
+		Type:          entity.MovementTypeReturn,
+		Quantity:      quantity,
+		UnitCost:      unitCost,
+		TotalCost:     quantity.Mul(unitCost),
+		Date:          now,
+		CreatedAt:     now,
+		CreatedBy:     userID,
 	}
 	return movRepo.Create(mov)
 }

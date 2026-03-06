@@ -27,5 +27,6 @@ type ReplenishmentSuggestionDTO struct {
 	EstimatedOrderCost    decimal.Decimal `json:"estimated_order_cost"`  // SuggestedOrderQty * UnitCost
 	GrossMarginPct        decimal.Decimal `json:"gross_margin_pct"`      // % margen histórico (puede ser 0 si sin ventas)
 	UnitsSoldLast90Days   decimal.Decimal `json:"units_sold_last_90d"`   // volumen de ventas reciente
+	InventoryDays         decimal.Decimal `json:"inventory_days"`        // días de inventario = CurrentStock / (UnitsSoldLast90Days/90)
 	Priority              int             `json:"priority"`              // 1 = más urgente
 }
