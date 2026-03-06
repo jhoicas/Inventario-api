@@ -3,17 +3,24 @@ package http
 import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/jhoicas/Inventario-api/internal/application/dto"
-	"github.com/jhoicas/Inventario-api/internal/application/usecase"
 	"github.com/jhoicas/Inventario-api/internal/domain"
 )
 
+// ProductUseCase interface para permitir mocking en tests.
+type ProductUseCase interface {
+	Create(companyID string, in dto.CreateProductRequest) (*dto.ProductResponse, error)
+	GetByID(id string) (*dto.ProductResponse, error)
+	List(companyID string, limit, offset int) (*dto.ProductListResponse, error)
+	Update(id string, in dto.UpdateProductRequest) (*dto.ProductResponse, error)
+}
+
 // ProductHandler maneja las peticiones HTTP para Product (protegido).
 type ProductHandler struct {
-	uc *usecase.ProductUseCase
+	uc ProductUseCase
 }
 
 // NewProductHandler construye el handler.
-func NewProductHandler(uc *usecase.ProductUseCase) *ProductHandler {
+func NewProductHandler(uc ProductUseCase) *ProductHandler {
 	return &ProductHandler{uc: uc}
 }
 
