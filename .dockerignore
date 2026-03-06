@@ -41,3 +41,6 @@ README.md
 
 # Migraciones (opcional, si quieres incluirlas en la imagen, comenta esta línea)
 # internal/infrastructure/postgres/migrations/
+
+# Seguridad: evitar subir certificados a la imagen Docker (usar volumen en runtime)
+*.p12

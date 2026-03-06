@@ -129,10 +129,8 @@ func Router(app *fiber.App, deps RouterDeps) {
 	dashboardGroup := protected.Group("/dashboard", RequireRole(entity.RoleAdmin))
 	dashboardGroup.Get("/summary", dashboardHandler.GetSummary)
 
-	// ── IA — clasificación arancelaria (JWT + admin y bodeguero) ──────────────
-	aiHandler := NewAIHandler(deps.AIUC)
-	aiGroup := protected.Group("/ai",
-		RequireRole(entity.RoleAdmin, entity.RoleBodeguero),
-	)
-	aiGroup.Post("/suggest-classification", aiHandler.SuggestClassification)
+	// ── IA (reservado para futuros usos; sugerencia de clasificación de productos deshabilitada — parametrización manual)
+	// aiHandler := NewAIHandler(deps.AIUC)
+	// aiGroup := protected.Group("/ai", RequireRole(entity.RoleAdmin, entity.RoleBodeguero))
+	// Ruta eliminada: aiGroup.Post("/suggest-classification", aiHandler.SuggestClassification)
 }

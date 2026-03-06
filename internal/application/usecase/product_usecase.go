@@ -33,9 +33,7 @@ func (uc *ProductUseCase) Create(companyID string, in dto.CreateProductRequest) 
 	if !in.TaxRate.Equal(taxZero) && !in.TaxRate.Equal(tax5) && !in.TaxRate.Equal(tax19) {
 		return nil, domain.ErrInvalidInput
 	}
-	if in.UnitMeasure == "" {
-		in.UnitMeasure = "94"
-	}
+	// UnitMeasure e información DIAN provienen exclusivamente del DTO (parametrización manual).
 	now := time.Now()
 	product := &entity.Product{
 		ID:           uuid.New().String(),

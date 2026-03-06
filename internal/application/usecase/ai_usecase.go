@@ -3,7 +3,6 @@ package usecase
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/jhoicas/Inventario-api/internal/application/dto"
 	"github.com/jhoicas/Inventario-api/internal/application/ports"
@@ -21,24 +20,14 @@ func NewAIUseCase(llm ports.LLMService) *AIUseCase {
 	return &AIUseCase{llm: llm}
 }
 
-// SuggestClassification valida la entrada y delega al servicio de LLM.
-// Envuelve el contexto con un timeout de 10 s para respetar los SLAs de la API.
+// SuggestClassification está deshabilitado: parametrización de impuestos y códigos DIAN es manual.
+// Se mantiene la firma por si algún código sigue llamándola.
 func (uc *AIUseCase) SuggestClassification(
-	ctx context.Context,
-	req dto.AIClassificationRequest,
+	_ context.Context,
+	_ dto.AIClassificationRequest,
 ) (*dto.AIClassificationDTO, error) {
-	if req.ProductName == "" {
-		return nil, fmt.Errorf("product_name es obligatorio")
-	}
-
-	// Timeout de 10 s: las llamadas a LLMs pueden demorar varios segundos.
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	result, err := uc.llm.SuggestProductClassification(ctx, req.ProductName, req.Description)
-	if err != nil {
-		return nil, fmt.Errorf("clasificación IA: %w", err)
-	}
-
-	return result, nil
+	return nil, fmt.Errorf("sugerencia de clasificación IA deshabilitada: parametrización manual")
+	// Lógica anterior (LLM) eliminada por requerimiento de negocio:
+	// ctx, cancel := context.WithTimeout(ctx, 10*time.Second); defer cancel()
+	// return uc.llm.SuggestProductClassification(ctx, req.ProductName, req.Description)
 }

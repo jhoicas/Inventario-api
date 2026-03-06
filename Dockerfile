@@ -1,53 +1,44 @@
-# ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  ETAPA 1 – Builder (modo vendor: sin descargas externas)                    ║
-# ║  • COPY . . incluye vendor/; no se ejecuta go mod download                   ║
-# ║  • Tests y build usan -mod=vendor                                            ║
-# ╚══════════════════════════════════════════════════════════════════════════════╝
-FROM golang:1.24-alpine AS builder
+# ─────────────────────────────────────────────────────────────────────────────
+# Multi-stage build: compilación estática y imagen mínima para producción.
+# Base de datos PostgreSQL es externa (servicio administrado); no va en Compose.
+# ─────────────────────────────────────────────────────────────────────────────
 
-RUN apk add --no-cache git
+# Stage 1: builder
+FROM golang:1.22-alpine AS builder
 
-WORKDIR /app
-# Copiar todo el árbol (incluye go.mod, go.sum y vendor/)
+RUN apk add --no-cache git ca-certificates tzdata
+
+WORKDIR /build
+
+COPY go.mod go.sum ./
+RUN go mod download
+
 COPY . .
-
-# ── CI Gate (usa -mod=vendor, sin descargas externas) ───────────────────────────
-RUN go test -mod=vendor -count=1 -timeout 120s ./...
-
-# ── Compilación usando solo vendor/ ───────────────────────────────────────────
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-    go build -mod=vendor -a -installsuffix cgo \
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
     -ldflags="-w -s" \
-    -o erp-api ./cmd/api
+    -o api \
+    ./cmd/api
 
-# ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  ETAPA 2 – Runtime                                                          ║
-# ║  Imagen mínima: solo el binario + librerías del sistema esenciales          ║
-# ╚══════════════════════════════════════════════════════════════════════════════╝
-FROM alpine:3.20
+# Stage 2: runner
+FROM alpine:latest
 
-# ca-certificates → necesario para TLS saliente (Anthropic, DIAN, Supabase, etc.)
-# tzdata         → permite configurar la zona horaria del proceso
-# curl           → healthcheck del contenedor
-RUN apk --no-cache add ca-certificates tzdata curl
-
-# Zona horaria Colombia para que los timestamps del servidor sean correctos.
-ENV TZ=America/Bogota
+RUN apk add --no-cache ca-certificates tzdata
 
 WORKDIR /app
 
-# ── Usuario no-root (principio de mínimo privilegio) ──────────────────────────
-# El proceso de la API no necesita privilegios de root en runtime.
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
-COPY --from=builder --chown=appuser:appgroup /app/erp-api .
+# Binario compilado
+COPY --from=builder /build/api .
 
-USER appuser
+# Swagger: el servidor sirve ./docs/swagger.json (FilePath en main.go)
+COPY --from=builder /build/docs ./docs
+
+# Opcional: certificado DIAN (.p12). Si usa certificados en la imagen, cree
+# la carpeta certs/ en la raíz del proyecto, coloque allí su .p12 y descomente:
+# COPY --from=builder /build/certs ./certs
+# Luego en .env.prod: DIAN_CERT_PATH=/app/certs/certificado_prueba.p12
 
 EXPOSE 8080
 
-# Healthcheck: verifica que la API responde antes de que el load balancer
-# (Caddy) empiece a enviarle tráfico.
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
+USER 1000:1000
 
-ENTRYPOINT ["./erp-api"]
+CMD ["./api"]
