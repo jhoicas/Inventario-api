@@ -3,16 +3,22 @@ package http
 import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/jhoicas/Inventario-api/internal/application/dto"
-	"github.com/jhoicas/Inventario-api/internal/application/usecase"
 )
+
+// WarehouseUseCase interfaz local para permitir mocking en tests.
+type WarehouseUseCase interface {
+	Create(companyID string, in dto.CreateWarehouseRequest) (*dto.WarehouseResponse, error)
+	GetByID(id string) (*dto.WarehouseResponse, error)
+	List(companyID string, limit, offset int) (*dto.WarehouseListResponse, error)
+}
 
 // WarehouseHandler maneja las peticiones HTTP para Warehouse (protegido).
 type WarehouseHandler struct {
-	uc *usecase.WarehouseUseCase
+	uc WarehouseUseCase
 }
 
 // NewWarehouseHandler construye el handler.
-func NewWarehouseHandler(uc *usecase.WarehouseUseCase) *WarehouseHandler {
+func NewWarehouseHandler(uc WarehouseUseCase) *WarehouseHandler {
 	return &WarehouseHandler{uc: uc}
 }
 

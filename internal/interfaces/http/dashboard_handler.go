@@ -1,18 +1,24 @@
 package http
 
 import (
+	"context"
+
 	"github.com/gofiber/fiber/v2"
-	appanalytics "github.com/jhoicas/Inventario-api/internal/application/analytics"
 	"github.com/jhoicas/Inventario-api/internal/application/dto"
 )
 
+// DashboardUseCase interfaz local para permitir mocking en tests.
+type DashboardUseCase interface {
+	GetSummary(ctx context.Context, companyID string) (*dto.DashboardSummaryDTO, error)
+}
+
 // DashboardHandler maneja los endpoints del módulo de Dashboard.
 type DashboardHandler struct {
-	uc *appanalytics.DashboardUseCase
+	uc DashboardUseCase
 }
 
 // NewDashboardHandler construye el handler.
-func NewDashboardHandler(uc *appanalytics.DashboardUseCase) *DashboardHandler {
+func NewDashboardHandler(uc DashboardUseCase) *DashboardHandler {
 	return &DashboardHandler{uc: uc}
 }
 

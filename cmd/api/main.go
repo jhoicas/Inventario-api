@@ -13,6 +13,7 @@ import (
 	appanalytics "github.com/jhoicas/Inventario-api/internal/application/analytics"
 	"github.com/jhoicas/Inventario-api/internal/application/auth"
 	"github.com/jhoicas/Inventario-api/internal/application/billing"
+	"github.com/jhoicas/Inventario-api/internal/application/crm"
 	"github.com/jhoicas/Inventario-api/internal/application/inventory"
 	"github.com/jhoicas/Inventario-api/internal/application/usecase"
 	infraai "github.com/jhoicas/Inventario-api/internal/infrastructure/ai"
@@ -108,6 +109,19 @@ func main() {
 	anthropicSvc := infraai.NewAnthropicService(cfg.AI.AnthropicAPIKey, cfg.AI.AnthropicModel)
 	aiUC := usecase.NewAIUseCase(anthropicSvc)
 
+	// CRM: repositorios y casos de uso (módulo crm)
+	crmCategoryRepo := postgres.NewCRMCategoryRepository(pool)
+	crmBenefitRepo := postgres.NewCRMBenefitRepository(pool)
+	crmProfileRepo := postgres.NewCRMProfileRepository(pool)
+	crmInteractionRepo := postgres.NewCRMInteractionRepository(pool)
+	crmTaskRepo := postgres.NewCRMTaskRepository(pool)
+	crmTicketRepo := postgres.NewCRMTicketRepository(pool)
+	loyaltyUC := crm.NewLoyaltyUseCase(crmProfileRepo, customerRepo, crmCategoryRepo, crmBenefitRepo)
+	taskUC := crm.NewTaskUseCase(crmTaskRepo)
+	aiCRMUC := crm.NewAICRMUseCase(anthropicSvc)
+	pqrUC := crm.NewPQRUseCase(crmTicketRepo, customerRepo, aiCRMUC)
+	crmHandler := httpRouter.NewCRMHandler(loyaltyUC, taskUC, pqrUC, aiCRMUC, crmInteractionRepo)
+
 	// PDF: representación gráfica de la factura electrónica DIAN
 	pdfGenerator := infrapdf.NewMarotoPDFGenerator()
 	invoicePDFUC := billing.NewPDFUseCase(
@@ -155,6 +169,7 @@ func main() {
 		RawMaterialAnalyticsUC:  rawMaterialAnalyticsUC,
 		DashboardUC:            dashboardUC,
 		AIUC:             aiUC,
+		CRMHandler:       crmHandler,
 		JWTSecret:        cfg.JWT.Secret,
 	})
 

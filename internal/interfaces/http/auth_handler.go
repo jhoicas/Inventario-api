@@ -2,18 +2,23 @@ package http
 
 import (
 	"github.com/gofiber/fiber/v2"
-	"github.com/jhoicas/Inventario-api/internal/application/auth"
 	"github.com/jhoicas/Inventario-api/internal/application/dto"
 	"github.com/jhoicas/Inventario-api/internal/domain"
 )
 
+// AuthUseCase interfaz local para permitir mocking en tests.
+type AuthUseCase interface {
+	RegisterUser(in dto.RegisterRequest) (*dto.UserResponse, error)
+	Login(in dto.LoginRequest) (*dto.LoginResponse, error)
+}
+
 // AuthHandler maneja registro y login.
 type AuthHandler struct {
-	uc *auth.AuthUseCase
+	uc AuthUseCase
 }
 
 // NewAuthHandler construye el handler de auth.
-func NewAuthHandler(uc *auth.AuthUseCase) *AuthHandler {
+func NewAuthHandler(uc AuthUseCase) *AuthHandler {
 	return &AuthHandler{uc: uc}
 }
 

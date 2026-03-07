@@ -189,6 +189,57 @@ func (s *AnthropicService) SuggestProductClassification(
 	}, nil
 }
 
+// GenerateText genera texto libre a partir de un prompt (CRM: copy, resúmenes, sentimiento).
+func (s *AnthropicService) GenerateText(ctx context.Context, prompt string) (string, error) {
+	if s.apiKey == "" {
+		return "", fmt.Errorf("AI: ANTHROPIC_API_KEY no configurado")
+	}
+	payload := anthropicRequest{
+		Model:     s.model,
+		MaxTokens: 1024,
+		System:    "You are a helpful assistant. Reply only with the requested content, no markdown or code blocks.",
+		Messages:  []anthropicMessage{{Role: "user", Content: prompt}},
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return "", fmt.Errorf("AI: serializar request: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, anthropicMessagesURL, bytes.NewReader(body))
+	if err != nil {
+		return "", fmt.Errorf("AI: crear HTTP request: %w", err)
+	}
+	req.Header.Set("x-api-key", s.apiKey)
+	req.Header.Set("anthropic-version", anthropicVersion)
+	req.Header.Set("content-type", "application/json")
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		if ctx.Err() != nil {
+			return "", fmt.Errorf("AI: timeout o cancelación: %w", ctx.Err())
+		}
+		return "", fmt.Errorf("AI: llamada HTTP fallida: %w", err)
+	}
+	defer resp.Body.Close()
+	rawBody, err := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
+	if err != nil {
+		return "", fmt.Errorf("AI: leer respuesta: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		var errResp anthropicResponse
+		if json.Unmarshal(rawBody, &errResp) == nil && errResp.Error != nil {
+			return "", fmt.Errorf("AI: Anthropic error (%s): %s", errResp.Error.Type, errResp.Error.Message)
+		}
+		return "", fmt.Errorf("AI: Anthropic HTTP %d: %s", resp.StatusCode, string(rawBody))
+	}
+	var anthResp anthropicResponse
+	if err := json.Unmarshal(rawBody, &anthResp); err != nil {
+		return "", fmt.Errorf("AI: deserializar respuesta Anthropic: %w", err)
+	}
+	if len(anthResp.Content) == 0 {
+		return "", fmt.Errorf("AI: Claude devolvió respuesta vacía")
+	}
+	return strings.TrimSpace(anthResp.Content[0].Text), nil
+}
+
 // extractJSON extrae el primer objeto JSON bien formado de un texto libre.
 // Estrategia en dos pasos:
 //  1. Eliminar bloques de código markdown (```json … ``` o ``` … ```).

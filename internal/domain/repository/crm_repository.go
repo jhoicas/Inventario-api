@@ -1,0 +1,56 @@
+package repository
+
+import (
+	"context"
+
+	"github.com/jhoicas/Inventario-api/internal/domain/entity"
+)
+
+// CRMCategoryRepository puerto de persistencia para categorías de fidelización.
+type CRMCategoryRepository interface {
+	Create(category *entity.CRMCategory) error
+	GetByID(id string) (*entity.CRMCategory, error)
+	ListByCompany(companyID string, limit, offset int) ([]*entity.CRMCategory, error)
+	Update(category *entity.CRMCategory) error
+	Delete(id string) error
+}
+
+// CRMBenefitRepository puerto de persistencia para beneficios por categoría.
+type CRMBenefitRepository interface {
+	Create(benefit *entity.CRMBenefit) error
+	GetByID(id string) (*entity.CRMBenefit, error)
+	ListByCategory(categoryID string, limit, offset int) ([]*entity.CRMBenefit, error)
+	Update(benefit *entity.CRMBenefit) error
+	Delete(id string) error
+}
+
+// CRMProfileRepository puerto de persistencia para perfiles CRM (y vista 360).
+type CRMProfileRepository interface {
+	GetByCustomerID(customerID string) (*entity.CRMCustomerProfile, error)
+	GetProfile360(ctx context.Context, companyID, customerID string) (*entity.Profile360, error)
+	Upsert(profile *entity.CRMCustomerProfile) error
+	ListByCompany(companyID string, limit, offset int) ([]*entity.CRMCustomerProfile, error)
+}
+
+// CRMInteractionRepository puerto de persistencia para interacciones.
+type CRMInteractionRepository interface {
+	Create(interaction *entity.CRMInteraction) error
+	GetByID(id string) (*entity.CRMInteraction, error)
+	ListByCustomer(customerID string, limit, offset int) ([]*entity.CRMInteraction, error)
+}
+
+// CRMTaskRepository puerto de persistencia para tareas.
+type CRMTaskRepository interface {
+	Create(task *entity.CRMTask) error
+	GetByID(id string) (*entity.CRMTask, error)
+	Update(task *entity.CRMTask) error
+	ListByCompany(companyID string, status string, limit, offset int) ([]*entity.CRMTask, error)
+}
+
+// CRMTicketRepository puerto de persistencia para tickets PQR.
+type CRMTicketRepository interface {
+	Create(ticket *entity.CRMTicket) error
+	GetByID(id string) (*entity.CRMTicket, error)
+	Update(ticket *entity.CRMTicket) error
+	ListByCompany(companyID string, limit, offset int) ([]*entity.CRMTicket, error)
+}

@@ -1,20 +1,31 @@
 package http
 
 import (
+	"context"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/jhoicas/Inventario-api/internal/application/dto"
-	"github.com/jhoicas/Inventario-api/internal/application/inventory"
 	"github.com/jhoicas/Inventario-api/internal/domain"
 )
 
+// RegisterMovementUseCase interfaz local para registrar movimientos de inventario.
+type RegisterMovementUseCase interface {
+	RegisterMovementFromRequest(ctx context.Context, companyID, userID string, in dto.RegisterMovementRequest) error
+}
+
+// ReplenishmentUseCase interfaz local para generar listas de reposición.
+type ReplenishmentUseCase interface {
+	GenerateReplenishmentList(ctx context.Context, companyID, warehouseID string) ([]dto.ReplenishmentSuggestionDTO, error)
+}
+
 // InventoryHandler maneja las peticiones HTTP de movimientos e inventario (protegido).
 type InventoryHandler struct {
-	uc            *inventory.RegisterMovementUseCase
-	replenishment *inventory.ReplenishmentUseCase
+	uc            RegisterMovementUseCase
+	replenishment ReplenishmentUseCase
 }
 
 // NewInventoryHandler construye el handler.
-func NewInventoryHandler(uc *inventory.RegisterMovementUseCase, replenishment *inventory.ReplenishmentUseCase) *InventoryHandler {
+func NewInventoryHandler(uc RegisterMovementUseCase, replenishment ReplenishmentUseCase) *InventoryHandler {
 	return &InventoryHandler{uc: uc, replenishment: replenishment}
 }
 

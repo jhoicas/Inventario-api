@@ -3,17 +3,23 @@ package http
 import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/jhoicas/Inventario-api/internal/application/dto"
-	"github.com/jhoicas/Inventario-api/internal/application/usecase"
 	"github.com/jhoicas/Inventario-api/internal/domain"
 )
 
+// CompanyUseCase interfaz local para permitir mocking en tests.
+type CompanyUseCase interface {
+	Create(in dto.CreateCompanyRequest) (*dto.CompanyResponse, error)
+	GetByID(id string) (*dto.CompanyResponse, error)
+	List(limit, offset int) (*dto.CompanyListResponse, error)
+}
+
 // CompanyHandler maneja las peticiones HTTP para el recurso Company.
 type CompanyHandler struct {
-	uc *usecase.CompanyUseCase
+	uc CompanyUseCase
 }
 
 // NewCompanyHandler construye el handler inyectando el caso de uso.
-func NewCompanyHandler(uc *usecase.CompanyUseCase) *CompanyHandler {
+func NewCompanyHandler(uc CompanyUseCase) *CompanyHandler {
 	return &CompanyHandler{uc: uc}
 }
 

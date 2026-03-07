@@ -19,4 +19,7 @@ type LLMService interface {
 		productName string,
 		description string,
 	) (*dto.AIClassificationDTO, error)
+
+	// GenerateText genera texto libre a partir de un prompt (para CRM: copy de campaña, resúmenes, sentimiento).
+	GenerateText(ctx context.Context, prompt string) (string, error)
 }

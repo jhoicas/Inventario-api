@@ -203,6 +203,59 @@ func (s *GeminiService) SuggestProductClassification(
 	}, nil
 }
 
+// GenerateText genera texto libre a partir de un prompt (CRM: copy, resúmenes, sentimiento).
+func (s *GeminiService) GenerateText(ctx context.Context, prompt string) (string, error) {
+	if s.apiKey == "" {
+		return "", fmt.Errorf("AI: GEMINI_API_KEY no configurado")
+	}
+	payload := geminiRequest{
+		Contents: []geminiContent{
+			{Role: "user", Parts: []geminiPart{{Text: prompt}}},
+		},
+		GenerationConfig: genConfig{
+			Temperature:     0.3,
+			MaxOutputTokens: 1024,
+		},
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return "", fmt.Errorf("AI: serializar request: %w", err)
+	}
+	url := fmt.Sprintf(geminiBaseURL, s.model, s.apiKey)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return "", fmt.Errorf("AI: crear HTTP request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		if ctx.Err() != nil {
+			return "", fmt.Errorf("AI: timeout o cancelación: %w", ctx.Err())
+		}
+		return "", fmt.Errorf("AI: llamada HTTP fallida: %w", err)
+	}
+	defer resp.Body.Close()
+	rawBody, err := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
+	if err != nil {
+		return "", fmt.Errorf("AI: leer respuesta: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		var errResp geminiResponse
+		if json.Unmarshal(rawBody, &errResp) == nil && errResp.Error != nil {
+			return "", fmt.Errorf("AI: Gemini error %d: %s", errResp.Error.Code, errResp.Error.Message)
+		}
+		return "", fmt.Errorf("AI: Gemini HTTP %d", resp.StatusCode)
+	}
+	var gemResp geminiResponse
+	if err := json.Unmarshal(rawBody, &gemResp); err != nil {
+		return "", fmt.Errorf("AI: deserializar respuesta Gemini: %w", err)
+	}
+	if len(gemResp.Candidates) == 0 || len(gemResp.Candidates[0].Content.Parts) == 0 {
+		return "", fmt.Errorf("AI: Gemini devolvió respuesta vacía")
+	}
+	return strings.TrimSpace(gemResp.Candidates[0].Content.Parts[0].Text), nil
+}
+
 // normalizeTaxRate fuerza el valor al conjunto {0, 5, 19}.
 // Si el modelo devuelve algo distinto, elige el más cercano.
 func normalizeTaxRate(raw float64) float64 {

@@ -4,18 +4,23 @@ import (
 	"strconv"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/jhoicas/Inventario-api/internal/application/billing"
 	"github.com/jhoicas/Inventario-api/internal/application/dto"
 	"github.com/jhoicas/Inventario-api/internal/domain"
 )
 
+// CustomerUseCase interfaz local para permitir mocking en tests.
+type CustomerUseCase interface {
+	Create(companyID string, in dto.CreateCustomerRequest) (*dto.CustomerResponse, error)
+	List(companyID string, limit, offset int) ([]*dto.CustomerResponse, error)
+}
+
 // CustomerHandler maneja las peticiones HTTP de clientes (facturación, protegido).
 type CustomerHandler struct {
-	uc *billing.CustomerUseCase
+	uc CustomerUseCase
 }
 
 // NewCustomerHandler construye el handler.
-func NewCustomerHandler(uc *billing.CustomerUseCase) *CustomerHandler {
+func NewCustomerHandler(uc CustomerUseCase) *CustomerHandler {
 	return &CustomerHandler{uc: uc}
 }
 

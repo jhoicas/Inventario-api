@@ -27,6 +27,7 @@ type RouterDeps struct {
 	RawMaterialAnalyticsUC   *usecase.RawMaterialAnalyticsUseCase
 	DashboardUC      *appanalytics.DashboardUseCase
 	AIUC             *usecase.AIUseCase
+	CRMHandler       *CRMHandler
 	JWTSecret        string
 }
 
@@ -128,6 +129,27 @@ func Router(app *fiber.App, deps RouterDeps) {
 	dashboardHandler := NewDashboardHandler(deps.DashboardUC)
 	dashboardGroup := protected.Group("/dashboard", RequireRole(entity.RoleAdmin))
 	dashboardGroup.Get("/summary", dashboardHandler.GetSummary)
+
+	// ── CRM (módulo 'crm') ─────────────────────────────────────────────────────
+	if deps.CRMHandler != nil {
+		crmGroup := protected.Group("/crm", RequireModule(entity.ModuleCRM, deps.ModuleService))
+		h := deps.CRMHandler
+		crmGroup.Get("/customers/:id/profile360", h.GetProfile360)
+		crmGroup.Put("/customers/:id/category", h.AssignCategory)
+		crmGroup.Get("/categories", h.ListCategories)
+		crmGroup.Get("/categories/:id/benefits", h.ListBenefitsByCategory)
+		crmGroup.Post("/tasks", h.CreateTask)
+		crmGroup.Get("/tasks", h.ListTasks)
+		crmGroup.Get("/tasks/:id", h.GetTask)
+		crmGroup.Put("/tasks/:id", h.UpdateTask)
+		crmGroup.Post("/interactions", h.CreateInteraction)
+		crmGroup.Post("/tickets", h.CreateTicket)
+		crmGroup.Get("/tickets", h.ListTickets)
+		crmGroup.Get("/tickets/:id", h.GetTicket)
+		crmGroup.Put("/tickets/:id", h.UpdateTicket)
+		crmGroup.Post("/ai/campaign-copy", h.GenerateCampaignCopy)
+		crmGroup.Post("/ai/summarize-timeline", h.SummarizeTimeline)
+	}
 
 	// ── IA (reservado para futuros usos; sugerencia de clasificación de productos deshabilitada — parametrización manual)
 	// aiHandler := NewAIHandler(deps.AIUC)
