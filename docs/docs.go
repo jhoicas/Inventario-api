@@ -342,6 +342,7 @@ const docTemplate = `{
         },
         "/api/crm/ai/campaign-copy": {
             "post": {
+                "description": "Genera textos de campañas de marketing personalizados usando IA",
                 "consumes": [
                     "application/json"
                 ],
@@ -384,6 +385,7 @@ const docTemplate = `{
         },
         "/api/crm/ai/summarize-timeline": {
             "post": {
+                "description": "Resume el historial de interacciones de un cliente usando IA",
                 "consumes": [
                     "application/json"
                 ],
@@ -426,6 +428,10 @@ const docTemplate = `{
         },
         "/api/crm/categories": {
             "get": {
+                "description": "Lista las categorías de fidelización configuradas para la empresa",
+                "consumes": [
+                    "application/json"
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -462,6 +468,10 @@ const docTemplate = `{
         },
         "/api/crm/categories/{id}/benefits": {
             "get": {
+                "description": "Lista los beneficios asociados a una categoría de fidelización",
+                "consumes": [
+                    "application/json"
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -505,6 +515,7 @@ const docTemplate = `{
         },
         "/api/crm/customers/{id}/category": {
             "put": {
+                "description": "Asigna o actualiza la categoría de fidelización y el LTV de un cliente",
                 "consumes": [
                     "application/json"
                 ],
@@ -560,6 +571,7 @@ const docTemplate = `{
         },
         "/api/crm/customers/{id}/profile360": {
             "get": {
+                "description": "Obtiene la vista 360 del cliente con datos base, perfil CRM y categoría de fidelización",
                 "consumes": [
                     "application/json"
                 ],
@@ -609,6 +621,7 @@ const docTemplate = `{
         },
         "/api/crm/interactions": {
             "post": {
+                "description": "Registra una interacción con el cliente (llamada, correo, reunión, etc.)",
                 "consumes": [
                     "application/json"
                 ],
@@ -648,6 +661,10 @@ const docTemplate = `{
         },
         "/api/crm/tasks": {
             "get": {
+                "description": "Lista las tareas CRM de la empresa, opcionalmente filtradas por estado",
+                "consumes": [
+                    "application/json"
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -685,6 +702,7 @@ const docTemplate = `{
                 }
             },
             "post": {
+                "description": "Crea una tarea de seguimiento o gestión comercial para un cliente",
                 "consumes": [
                     "application/json"
                 ],
@@ -724,6 +742,10 @@ const docTemplate = `{
         },
         "/api/crm/tasks/{id}": {
             "get": {
+                "description": "Obtiene el detalle de una tarea CRM por su identificador",
+                "consumes": [
+                    "application/json"
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -756,6 +778,7 @@ const docTemplate = `{
                 }
             },
             "put": {
+                "description": "Actualiza los datos y el estado de una tarea CRM",
                 "consumes": [
                     "application/json"
                 ],
@@ -808,6 +831,10 @@ const docTemplate = `{
         },
         "/api/crm/tickets": {
             "get": {
+                "description": "Lista los tickets PQR de la empresa con paginación",
+                "consumes": [
+                    "application/json"
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -839,6 +866,7 @@ const docTemplate = `{
                 }
             },
             "post": {
+                "description": "Radica un nuevo caso PQR asociado a un cliente y analiza su sentimiento",
                 "consumes": [
                     "application/json"
                 ],
@@ -884,6 +912,10 @@ const docTemplate = `{
         },
         "/api/crm/tickets/{id}": {
             "get": {
+                "description": "Obtiene el detalle de un ticket PQR por su identificador",
+                "consumes": [
+                    "application/json"
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -916,6 +948,7 @@ const docTemplate = `{
                 }
             },
             "put": {
+                "description": "Actualiza los datos o el estado de un ticket PQR existente",
                 "consumes": [
                     "application/json"
                 ],
@@ -953,6 +986,124 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/customers": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Lista los clientes de la empresa autenticada con paginación",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "customers"
+                ],
+                "summary": "Listar clientes",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Límite de resultados",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Desplazamiento",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/dto.CustomerResponse"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Crea un cliente asociado a la empresa autenticada para uso en facturación",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "customers"
+                ],
+                "summary": "Crear cliente",
+                "parameters": [
+                    {
+                        "description": "Datos del cliente",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.CreateCustomerRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/dto.CustomerResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -1073,6 +1224,221 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/invoices": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Crea una factura electrónica y descuenta inventario del almacén",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "billing"
+                ],
+                "summary": "Crear factura",
+                "parameters": [
+                    {
+                        "description": "Datos de la factura",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.CreateInvoiceRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/dto.InvoiceResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/invoices/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Devuelve el detalle completo de una factura electrónica",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "billing"
+                ],
+                "summary": "Obtener factura por ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID de la factura",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.InvoiceResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/invoices/{id}/pdf": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Genera y devuelve la representación gráfica (PDF) de la factura electrónica. La factura debe tener CUFE (estado distinto de DRAFT)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/pdf"
+                ],
+                "tags": [
+                    "billing"
+                ],
+                "summary": "Descargar PDF de la factura",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID de la factura",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "PDF de la factura",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/invoices/{id}/return": {
             "post": {
                 "security": [
@@ -1080,6 +1446,7 @@ const docTemplate = `{
                         "Bearer": []
                     }
                 ],
+                "description": "Registra una Nota Crédito electrónica y revierte parcialmente o totalmente una factura existente",
                 "consumes": [
                     "application/json"
                 ],
@@ -1141,6 +1508,79 @@ const docTemplate = `{
                     },
                     "409": {
                         "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/invoices/{id}/status": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Devuelve el estado de la validación DIAN de una factura electrónica (polling desde el frontend)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "billing"
+                ],
+                "summary": "Obtener estado DIAN de una factura",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID de la factura",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.InvoiceDIANStatusDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -1611,6 +2051,23 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.CreateCustomerRequest": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "tax_id": {
+                    "type": "string"
+                }
+            }
+        },
         "dto.CreateInteractionRequest": {
             "type": "object",
             "required": [
@@ -1629,6 +2086,30 @@ const docTemplate = `{
                 },
                 "type": {
                     "description": "call, email, meeting, other",
+                    "type": "string"
+                }
+            }
+        },
+        "dto.CreateInvoiceRequest": {
+            "type": "object",
+            "properties": {
+                "customer_id": {
+                    "type": "string"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.InvoiceItemRequest"
+                    }
+                },
+                "number": {
+                    "description": "opcional; si va vacío se puede generar",
+                    "type": "string"
+                },
+                "prefix": {
+                    "type": "string"
+                },
+                "warehouse_id": {
                     "type": "string"
                 }
             }
@@ -1792,6 +2273,30 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.InvoiceDIANStatusDTO": {
+            "type": "object",
+            "properties": {
+                "cufe": {
+                    "description": "Código único de factura (SHA-384)",
+                    "type": "string"
+                },
+                "dian_status": {
+                    "description": "DRAFT|SIGNED|EXITOSO|RECHAZADO|ERROR_GENERATION",
+                    "type": "string"
+                },
+                "errors": {
+                    "description": "Mensajes de rechazo de la DIAN (vacío si OK)",
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "track_id": {
+                    "description": "ZipKey devuelto por el WS DIAN",
+                    "type": "string"
+                }
+            }
+        },
         "dto.InvoiceDetailResponse": {
             "type": "object",
             "properties": {
@@ -1808,6 +2313,20 @@ const docTemplate = `{
                     "type": "number"
                 },
                 "tax_rate": {
+                    "type": "number"
+                },
+                "unit_price": {
+                    "type": "number"
+                }
+            }
+        },
+        "dto.InvoiceItemRequest": {
+            "type": "object",
+            "properties": {
+                "product_id": {
+                    "type": "string"
+                },
+                "quantity": {
                     "type": "number"
                 },
                 "unit_price": {

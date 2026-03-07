@@ -46,6 +46,7 @@ func NewCRMHandler(
 
 // GetProfile360 obtiene la vista 360 del cliente.
 // @Summary      Vista 360 del cliente
+// @Description  Obtiene la vista 360 del cliente con datos base, perfil CRM y categoría de fidelización
 // @Tags         crm
 // @Accept       json
 // @Produce      json
@@ -76,6 +77,7 @@ func (h *CRMHandler) GetProfile360(c *fiber.Ctx) error {
 
 // AssignCategory asigna categoría de fidelización al cliente.
 // @Summary      Asignar categoría al cliente
+// @Description  Asigna o actualiza la categoría de fidelización y el LTV de un cliente
 // @Tags         crm
 // @Accept       json
 // @Produce      json
@@ -110,7 +112,9 @@ func (h *CRMHandler) AssignCategory(c *fiber.Ctx) error {
 
 // ListCategories lista categorías de fidelización.
 // @Summary      Listar categorías CRM
+// @Description  Lista las categorías de fidelización configuradas para la empresa
 // @Tags         crm
+// @Accept       json
 // @Produce      json
 // @Param        limit  query     int  false  "Limit"
 // @Param        offset query     int  false  "Offset"
@@ -132,7 +136,9 @@ func (h *CRMHandler) ListCategories(c *fiber.Ctx) error {
 
 // ListBenefitsByCategory lista beneficios de una categoría.
 // @Summary      Listar beneficios por categoría
+// @Description  Lista los beneficios asociados a una categoría de fidelización
 // @Tags         crm
+// @Accept       json
 // @Produce      json
 // @Param        id     path      string  true  "Category ID"
 // @Param        limit  query     int     false "Limit"
@@ -155,6 +161,7 @@ func (h *CRMHandler) ListBenefitsByCategory(c *fiber.Ctx) error {
 
 // CreateTask crea una tarea.
 // @Summary      Crear tarea CRM
+// @Description  Crea una tarea de seguimiento o gestión comercial para un cliente
 // @Tags         crm
 // @Accept       json
 // @Produce      json
@@ -184,7 +191,9 @@ func (h *CRMHandler) CreateTask(c *fiber.Ctx) error {
 
 // GetTask obtiene una tarea por ID.
 // @Summary      Obtener tarea
+// @Description  Obtiene el detalle de una tarea CRM por su identificador
 // @Tags         crm
+// @Accept       json
 // @Produce      json
 // @Param        id   path      string  true  "Task ID"
 // @Success      200  {object}  dto.TaskResponse
@@ -211,6 +220,7 @@ func (h *CRMHandler) GetTask(c *fiber.Ctx) error {
 
 // UpdateTask actualiza una tarea.
 // @Summary      Actualizar tarea
+// @Description  Actualiza los datos y el estado de una tarea CRM
 // @Tags         crm
 // @Accept       json
 // @Produce      json
@@ -248,7 +258,9 @@ func (h *CRMHandler) UpdateTask(c *fiber.Ctx) error {
 
 // ListTasks lista tareas de la empresa.
 // @Summary      Listar tareas
+// @Description  Lista las tareas CRM de la empresa, opcionalmente filtradas por estado
 // @Tags         crm
+// @Accept       json
 // @Produce      json
 // @Param        limit  query     int    false "Limit"
 // @Param        offset query     int    false "Offset"
@@ -272,6 +284,7 @@ func (h *CRMHandler) ListTasks(c *fiber.Ctx) error {
 
 // CreateInteraction registra una interacción.
 // @Summary      Registrar interacción
+// @Description  Registra una interacción con el cliente (llamada, correo, reunión, etc.)
 // @Tags         crm
 // @Accept       json
 // @Produce      json
@@ -325,6 +338,7 @@ func (h *CRMHandler) CreateInteraction(c *fiber.Ctx) error {
 
 // CreateTicket radica un ticket PQR.
 // @Summary      Radicar ticket PQR
+// @Description  Radica un nuevo caso PQR asociado a un cliente y analiza su sentimiento
 // @Tags         crm
 // @Accept       json
 // @Produce      json
@@ -361,7 +375,9 @@ func (h *CRMHandler) CreateTicket(c *fiber.Ctx) error {
 
 // GetTicket obtiene un ticket por ID.
 // @Summary      Obtener ticket PQR
+// @Description  Obtiene el detalle de un ticket PQR por su identificador
 // @Tags         crm
+// @Accept       json
 // @Produce      json
 // @Param        id   path      string  true  "Ticket ID"
 // @Success      200  {object}  dto.TicketResponse
@@ -388,6 +404,7 @@ func (h *CRMHandler) GetTicket(c *fiber.Ctx) error {
 
 // UpdateTicket actualiza un ticket.
 // @Summary      Actualizar ticket PQR
+// @Description  Actualiza los datos o el estado de un ticket PQR existente
 // @Tags         crm
 // @Accept       json
 // @Produce      json
@@ -421,7 +438,9 @@ func (h *CRMHandler) UpdateTicket(c *fiber.Ctx) error {
 
 // ListTickets lista tickets de la empresa.
 // @Summary      Listar tickets PQR
+// @Description  Lista los tickets PQR de la empresa con paginación
 // @Tags         crm
+// @Accept       json
 // @Produce      json
 // @Param        limit  query     int  false "Limit"
 // @Param        offset query     int  false "Offset"
@@ -443,6 +462,7 @@ func (h *CRMHandler) ListTickets(c *fiber.Ctx) error {
 
 // GenerateCampaignCopy genera copy de campaña con IA.
 // @Summary      Generar copy de campaña con IA
+// @Description  Genera textos de campañas de marketing personalizados usando IA
 // @Tags         crm
 // @Accept       json
 // @Produce      json
@@ -470,6 +490,7 @@ func (h *CRMHandler) GenerateCampaignCopy(c *fiber.Ctx) error {
 
 // SummarizeTimeline resume el timeline de interacciones de un cliente con IA.
 // @Summary      Resumir timeline de interacciones con IA
+// @Description  Resume el historial de interacciones de un cliente usando IA
 // @Tags         crm
 // @Accept       json
 // @Produce      json

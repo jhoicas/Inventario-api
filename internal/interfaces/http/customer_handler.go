@@ -24,7 +24,20 @@ func NewCustomerHandler(uc CustomerUseCase) *CustomerHandler {
 	return &CustomerHandler{uc: uc}
 }
 
-// Create POST /api/customers
+// Create godoc
+// @Summary      Crear cliente
+// @Description  Crea un cliente asociado a la empresa autenticada para uso en facturación
+// @Tags         customers
+// @Security     Bearer
+// @Accept       json
+// @Produce      json
+// @Param        body  body      dto.CreateCustomerRequest  true  "Datos del cliente"
+// @Success      201   {object}  dto.CustomerResponse
+// @Failure      400   {object}  dto.ErrorResponse
+// @Failure      401   {object}  dto.ErrorResponse
+// @Failure      409   {object}  dto.ErrorResponse
+// @Failure      500   {object}  dto.ErrorResponse
+// @Router       /api/customers [post]
 func (h *CustomerHandler) Create(c *fiber.Ctx) error {
 	companyID := GetCompanyID(c)
 	if companyID == "" {
@@ -47,7 +60,19 @@ func (h *CustomerHandler) Create(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(customer)
 }
 
-// List GET /api/customers?limit=20&offset=0
+// List godoc
+// @Summary      Listar clientes
+// @Description  Lista los clientes de la empresa autenticada con paginación
+// @Tags         customers
+// @Security     Bearer
+// @Accept       json
+// @Produce      json
+// @Param        limit   query     int   false  "Límite de resultados"
+// @Param        offset  query     int   false  "Desplazamiento"
+// @Success      200     {array}   dto.CustomerResponse
+// @Failure      401     {object}  dto.ErrorResponse
+// @Failure      500     {object}  dto.ErrorResponse
+// @Router       /api/customers [get]
 func (h *CustomerHandler) List(c *fiber.Ctx) error {
 	companyID := GetCompanyID(c)
 	if companyID == "" {

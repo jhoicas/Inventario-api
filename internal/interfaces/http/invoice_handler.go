@@ -47,8 +47,22 @@ func NewInvoiceHandler(
 	}
 }
 
-// Create crea una factura y descuenta inventario.
-// POST /api/invoices
+// Create godoc
+// @Summary      Crear factura
+// @Description  Crea una factura electrónica y descuenta inventario del almacén
+// @Tags         billing
+// @Security     Bearer
+// @Accept       json
+// @Produce      json
+// @Param        body  body      dto.CreateInvoiceRequest  true  "Datos de la factura"
+// @Success      201   {object}  dto.InvoiceResponse
+// @Failure      400   {object}  dto.ErrorResponse
+// @Failure      401   {object}  dto.ErrorResponse
+// @Failure      403   {object}  dto.ErrorResponse
+// @Failure      404   {object}  dto.ErrorResponse
+// @Failure      409   {object}  dto.ErrorResponse
+// @Failure      500   {object}  dto.ErrorResponse
+// @Router       /api/invoices [post]
 func (h *InvoiceHandler) Create(c *fiber.Ctx) error {
 	companyID := GetCompanyID(c)
 	userID := GetUserID(c)
@@ -84,18 +98,20 @@ func (h *InvoiceHandler) Create(c *fiber.Ctx) error {
 
 // HandleReturn godoc
 // @Summary      Registrar devolución de factura (Nota Crédito)
+// @Description  Registra una Nota Crédito electrónica y revierte parcialmente o totalmente una factura existente
 // @Tags         billing
 // @Security     Bearer
 // @Accept       json
 // @Produce      json
-// @Param        id    path   string                     true  "ID de la factura original"
-// @Param        body  body   dto.ReturnInvoiceRequest   true  "Productos devueltos y bodega de reingreso"
+// @Param        id    path      string                   true  "ID de la factura original"
+// @Param        body  body      dto.ReturnInvoiceRequest true  "Productos devueltos y bodega de reingreso"
 // @Success      201   {object}  dto.InvoiceResponse
 // @Failure      400   {object}  dto.ErrorResponse
 // @Failure      401   {object}  dto.ErrorResponse
 // @Failure      403   {object}  dto.ErrorResponse
 // @Failure      404   {object}  dto.ErrorResponse
 // @Failure      409   {object}  dto.ErrorResponse
+// @Failure      500   {object}  dto.ErrorResponse
 // @Router       /api/invoices/{id}/return [post]
 func (h *InvoiceHandler) HandleReturn(c *fiber.Ctx) error {
 	companyID := GetCompanyID(c)
@@ -136,10 +152,21 @@ func (h *InvoiceHandler) HandleReturn(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(creditNote)
 }
 
-// GetDIANStatus devuelve el estado DIAN de una factura (endpoint de polling para el frontend).
-// GET /api/invoices/:id/status
-// El frontend consulta este endpoint periódicamente hasta que dian_status sea
-// EXITOSO o RECHAZADO, evitando websockets complejos para un flujo que suele tardar <5 s.
+// GetDIANStatus godoc
+// @Summary      Obtener estado DIAN de una factura
+// @Description  Devuelve el estado de la validación DIAN de una factura electrónica (polling desde el frontend)
+// @Tags         billing
+// @Security     Bearer
+// @Accept       json
+// @Produce      json
+// @Param        id   path      string  true  "ID de la factura"
+// @Success      200  {object}  dto.InvoiceDIANStatusDTO
+// @Failure      400  {object}  dto.ErrorResponse
+// @Failure      401  {object}  dto.ErrorResponse
+// @Failure      403  {object}  dto.ErrorResponse
+// @Failure      404  {object}  dto.ErrorResponse
+// @Failure      500  {object}  dto.ErrorResponse
+// @Router       /api/invoices/{id}/status [get]
 func (h *InvoiceHandler) GetDIANStatus(c *fiber.Ctx) error {
 	companyID := GetCompanyID(c)
 	if companyID == "" {
@@ -162,8 +189,21 @@ func (h *InvoiceHandler) GetDIANStatus(c *fiber.Ctx) error {
 	return c.JSON(status)
 }
 
-// GetByID obtiene el detalle completo de una factura.
-// GET /api/invoices/:id
+// GetByID godoc
+// @Summary      Obtener factura por ID
+// @Description  Devuelve el detalle completo de una factura electrónica
+// @Tags         billing
+// @Security     Bearer
+// @Accept       json
+// @Produce      json
+// @Param        id   path      string  true  "ID de la factura"
+// @Success      200  {object}  dto.InvoiceResponse
+// @Failure      400  {object}  dto.ErrorResponse
+// @Failure      401  {object}  dto.ErrorResponse
+// @Failure      403  {object}  dto.ErrorResponse
+// @Failure      404  {object}  dto.ErrorResponse
+// @Failure      500  {object}  dto.ErrorResponse
+// @Router       /api/invoices/{id} [get]
 func (h *InvoiceHandler) GetByID(c *fiber.Ctx) error {
 	companyID := GetCompanyID(c)
 	if companyID == "" {
@@ -186,12 +226,22 @@ func (h *InvoiceHandler) GetByID(c *fiber.Ctx) error {
 	return c.JSON(invoice)
 }
 
-// DownloadPDF genera y devuelve la representación gráfica (PDF) de la factura.
-// GET /api/invoices/:id/pdf
-//
-// El PDF se devuelve inline para que el navegador lo muestre directamente,
-// o lo descargue si el cliente lo solicita con Accept: application/pdf.
-// La factura debe tener CUFE (estado distinto de DRAFT).
+// DownloadPDF godoc
+// @Summary      Descargar PDF de la factura
+// @Description  Genera y devuelve la representación gráfica (PDF) de la factura electrónica. La factura debe tener CUFE (estado distinto de DRAFT)
+// @Tags         billing
+// @Security     Bearer
+// @Accept       json
+// @Produce      application/pdf
+// @Param        id   path      string  true  "ID de la factura"
+// @Success      200  {string}  binary  "PDF de la factura"
+// @Failure      400  {object}  dto.ErrorResponse
+// @Failure      401  {object}  dto.ErrorResponse
+// @Failure      403  {object}  dto.ErrorResponse
+// @Failure      404  {object}  dto.ErrorResponse
+// @Failure      409  {object}  dto.ErrorResponse
+// @Failure      500  {object}  dto.ErrorResponse
+// @Router       /api/invoices/{id}/pdf [get]
 func (h *InvoiceHandler) DownloadPDF(c *fiber.Ctx) error {
 	companyID := GetCompanyID(c)
 	if companyID == "" {
