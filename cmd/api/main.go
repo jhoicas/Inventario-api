@@ -9,6 +9,7 @@ import (
 
 	"github.com/gofiber/contrib/swagger"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	appanalytics "github.com/jhoicas/Inventario-api/internal/application/analytics"
 	"github.com/jhoicas/Inventario-api/internal/application/auth"
@@ -141,6 +142,18 @@ func main() {
 	})
 	app.Use(recover.New())
 
+	// CORS: restringe orígenes según entorno
+	allowedOrigins := "http://localhost:8080, http://localhost:5173, https://NaturERP.ludoia.com"
+	if cfg.App.Env == "prod" {
+		allowedOrigins = "https://NaturERP.ludoia.com"
+	}
+	app.Use(cors.New(cors.Config{
+		AllowOrigins:     allowedOrigins,
+		AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
+		AllowMethods:     "GET, POST, HEAD, PUT, DELETE, PATCH, OPTIONS",
+		AllowCredentials: true,
+	}))
+
 	// Swagger UI en local: http://localhost:<port>/docs
 	app.Use(swagger.New(swagger.Config{
 		BasePath: "/",
@@ -154,23 +167,23 @@ func main() {
 	})
 
 	httpRouter.Router(app, httpRouter.RouterDeps{
-		CompanyUC:        companyUC,
-		WarehouseUC:      warehouseUC,
-		ProductUC:        productUC,
-		RegisterMovement: registerMovementUC,
-		Replenishment:    replenishmentUC,
-		CustomerUC:       customerUC,
-		CreateInvoice:    createInvoiceUC,
-		ReturnInvoice:    createCreditNoteUC,
-		InvoicePDF:       invoicePDFUC,
-		AuthUC:           authUC,
-		ModuleService:    moduleSvc,
+		CompanyUC:              companyUC,
+		WarehouseUC:            warehouseUC,
+		ProductUC:              productUC,
+		RegisterMovement:       registerMovementUC,
+		Replenishment:          replenishmentUC,
+		CustomerUC:             customerUC,
+		CreateInvoice:          createInvoiceUC,
+		ReturnInvoice:          createCreditNoteUC,
+		InvoicePDF:             invoicePDFUC,
+		AuthUC:                 authUC,
+		ModuleService:          moduleSvc,
 		AnalyticsUC:            analyticsUC,
-		RawMaterialAnalyticsUC:  rawMaterialAnalyticsUC,
+		RawMaterialAnalyticsUC: rawMaterialAnalyticsUC,
 		DashboardUC:            dashboardUC,
-		AIUC:             aiUC,
-		CRMHandler:       crmHandler,
-		JWTSecret:        cfg.JWT.Secret,
+		AIUC:                   aiUC,
+		CRMHandler:             crmHandler,
+		JWTSecret:              cfg.JWT.Secret,
 	})
 
 	go func() {
