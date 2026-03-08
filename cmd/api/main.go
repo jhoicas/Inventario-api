@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	stdlog "log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -10,6 +11,7 @@ import (
 	"github.com/gofiber/contrib/swagger"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
+	fiberlogger "github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	appanalytics "github.com/jhoicas/Inventario-api/internal/application/analytics"
 	"github.com/jhoicas/Inventario-api/internal/application/auth"
@@ -140,12 +142,13 @@ func main() {
 		WriteTimeout: time.Second * 10,
 		IdleTimeout:  time.Second * 60,
 	})
+	app.Use(fiberlogger.New())
 	app.Use(recover.New())
 
-	// CORS: restringe orígenes según entorno
-	allowedOrigins := "http://localhost:8080, http://localhost:5173, https://NaturERP.ludoia.com"
-	if cfg.App.Env == "prod" {
-		allowedOrigins = "https://NaturERP.ludoia.com"
+	// CORS dinámico (Fail-Fast): orígenes desde variable de entorno
+	allowedOrigins := os.Getenv("ALLOWED_ORIGINS")
+	if allowedOrigins == "" {
+		stdlog.Fatal("ERROR CRÍTICO: La variable de entorno ALLOWED_ORIGINS no está configurada o está vacía. El servidor no puede iniciar de forma segura.")
 	}
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     allowedOrigins,
