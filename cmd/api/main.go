@@ -29,6 +29,17 @@ import (
 	"github.com/jhoicas/Inventario-api/pkg/logger"
 )
 
+// @title Tu API ERP
+// @version 1.0
+// @description API para el sistema ERP.
+// @host api.naturerp.ludoia.com
+// @BasePath /
+//
+// @securityDefinitions.apikey Bearer
+// @in header
+// @name Authorization
+// @description Escribe "Bearer " seguido de un espacio y tu token.
+// @description Escribe "Bearer " seguido de un espacio y tu token.
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
