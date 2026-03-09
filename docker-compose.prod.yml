@@ -32,8 +32,10 @@ services:
     image: invorya-erp-ludoia-web
     container_name: invorya-erp-ludoia-web-1
     restart: unless-stopped
-    ports:
-      - "3000:3000"
+    environment:
+      - HOSTNAME=0.0.0.0
+      - HOST=0.0.0.0
+      - PORT=3000
 
 volumes:
   caddy_data:
