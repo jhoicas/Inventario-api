@@ -321,9 +321,11 @@ func (r *CRMTaskRepo) Create(t *entity.CRMTask) error {
 func (r *CRMTaskRepo) GetByID(id string) (*entity.CRMTask, error) {
 	var t entity.CRMTask
 	var status string
+	var customerID *string
+	var createdBy *string
 	err := r.q.QueryRow(context.Background(), `
 		SELECT id, company_id, customer_id, title, description, due_at, status, created_by, created_at, updated_at FROM crm_tasks WHERE id = $1`, id,
-	).Scan(&t.ID, &t.CompanyID, &t.CustomerID, &t.Title, &t.Description, &t.DueAt, &status, &t.CreatedBy, &t.CreatedAt, &t.UpdatedAt)
+	).Scan(&t.ID, &t.CompanyID, &customerID, &t.Title, &t.Description, &t.DueAt, &status, &createdBy, &t.CreatedAt, &t.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
@@ -331,6 +333,12 @@ func (r *CRMTaskRepo) GetByID(id string) (*entity.CRMTask, error) {
 		return nil, err
 	}
 	t.Status = entity.TaskStatus(status)
+	if customerID != nil {
+		t.CustomerID = *customerID
+	}
+	if createdBy != nil {
+		t.CreatedBy = *createdBy
+	}
 	return &t, nil
 }
 
@@ -366,10 +374,18 @@ func (r *CRMTaskRepo) ListByCompany(companyID string, status string, limit, offs
 	for rows.Next() {
 		var t entity.CRMTask
 		var st string
-		if err := rows.Scan(&t.ID, &t.CompanyID, &t.CustomerID, &t.Title, &t.Description, &t.DueAt, &st, &t.CreatedBy, &t.CreatedAt, &t.UpdatedAt); err != nil {
+		var customerID *string
+		var createdBy *string
+		if err := rows.Scan(&t.ID, &t.CompanyID, &customerID, &t.Title, &t.Description, &t.DueAt, &st, &createdBy, &t.CreatedAt, &t.UpdatedAt); err != nil {
 			return nil, err
 		}
 		t.Status = entity.TaskStatus(st)
+		if customerID != nil {
+			t.CustomerID = *customerID
+		}
+		if createdBy != nil {
+			t.CreatedBy = *createdBy
+		}
 		list = append(list, &t)
 	}
 	return list, rows.Err()
