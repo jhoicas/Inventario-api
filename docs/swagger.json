@@ -2969,6 +2969,9 @@
                 },
                 "subject": {
                     "type": "string"
+                },
+                "sentiment": {
+                    "type": "string"
                 }
             }
         },

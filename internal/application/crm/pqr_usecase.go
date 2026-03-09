@@ -107,6 +107,9 @@ func (uc *PQRUseCase) Update(ctx context.Context, companyID, id string, in dto.U
 	if in.Status != nil {
 		ticket.Status = *in.Status
 	}
+	if in.Sentiment != nil {
+		ticket.Sentiment = *in.Sentiment
+	}
 	ticket.UpdatedAt = time.Now()
 	if err := uc.ticketRepo.Update(ticket); err != nil {
 		return nil, err

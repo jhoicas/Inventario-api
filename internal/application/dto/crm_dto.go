@@ -42,6 +42,7 @@ type UpdateTicketRequest struct {
 	Subject     *string `json:"subject"`
 	Description *string `json:"description"`
 	Status      *string `json:"status"`
+	Sentiment   *string `json:"sentiment"`
 }
 
 // AssignCategoryRequest asigna o actualiza la categoría de fidelización del cliente.

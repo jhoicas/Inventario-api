@@ -410,14 +410,22 @@ func (r *CRMTicketRepo) Create(t *entity.CRMTicket) error {
 
 func (r *CRMTicketRepo) GetByID(id string) (*entity.CRMTicket, error) {
 	var t entity.CRMTicket
+	var sentiment *string
+	var createdBy *string
 	err := r.q.QueryRow(context.Background(), `
 		SELECT id, company_id, customer_id, subject, description, status, sentiment, created_by, created_at, updated_at FROM crm_tickets WHERE id = $1`, id,
-	).Scan(&t.ID, &t.CompanyID, &t.CustomerID, &t.Subject, &t.Description, &t.Status, &t.Sentiment, &t.CreatedBy, &t.CreatedAt, &t.UpdatedAt)
+	).Scan(&t.ID, &t.CompanyID, &t.CustomerID, &t.Subject, &t.Description, &t.Status, &sentiment, &createdBy, &t.CreatedAt, &t.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
+	}
+	if sentiment != nil {
+		t.Sentiment = *sentiment
+	}
+	if createdBy != nil {
+		t.CreatedBy = *createdBy
 	}
 	return &t, nil
 }
@@ -442,8 +450,16 @@ func (r *CRMTicketRepo) ListByCompany(companyID string, limit, offset int) ([]*e
 	var list []*entity.CRMTicket
 	for rows.Next() {
 		var t entity.CRMTicket
-		if err := rows.Scan(&t.ID, &t.CompanyID, &t.CustomerID, &t.Subject, &t.Description, &t.Status, &t.Sentiment, &t.CreatedBy, &t.CreatedAt, &t.UpdatedAt); err != nil {
+		var sentiment *string
+		var createdBy *string
+		if err := rows.Scan(&t.ID, &t.CompanyID, &t.CustomerID, &t.Subject, &t.Description, &t.Status, &sentiment, &createdBy, &t.CreatedAt, &t.UpdatedAt); err != nil {
 			return nil, err
+		}
+		if sentiment != nil {
+			t.Sentiment = *sentiment
+		}
+		if createdBy != nil {
+			t.CreatedBy = *createdBy
 		}
 		list = append(list, &t)
 	}
