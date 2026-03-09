@@ -1,8 +1,5 @@
-# Compose de producción: solo la API. PostgreSQL es servicio administrado externo.
-# Uso: docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
-
 services:
-  erp-api:
+  api:
     build:
       context: .
       dockerfile: Dockerfile
@@ -15,5 +12,29 @@ services:
       - .env.prod
     environment:
       - GO_ENV=production
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: erp-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
     volumes:
-      - ./certs:/app/certs:ro
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+
+  ludoia-web:
+    image: invorya-erp-ludoia-web
+    container_name: invorya-erp-ludoia-web-1
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+
+volumes:
+  caddy_data:
+  caddy_config:
