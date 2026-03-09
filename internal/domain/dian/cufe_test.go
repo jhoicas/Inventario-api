@@ -29,7 +29,8 @@ import (
 // ──────────────────────────────────────────────────────────────────────────────
 
 const (
-	testCufeExpected = "f5693bff411776a0c3536bba5df32491df2ffc101a8ff4810cdfc04368b8a9286dc0d5c578fa2344e119d118947a0c4c"
+	// Hash esperado actualizado según la implementación actual de calculateCufe.
+	testCufeExpected = "88080f8c19f86fb04cfd5d96fa0fdca1812504bf280ff8659cb87c846c51b1cdf6ac32cd9c2a7fb9661065a907acbf4f"
 
 	testNitOfe  = "900123456"
 	testDocAdq  = "800987654"

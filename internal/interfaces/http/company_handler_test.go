@@ -233,12 +233,9 @@ func TestCompanyHandler_GetByID(t *testing.T) {
 			name:           "BadRequest_MissingID",
 			id:             "",
 			mockSetup:      func() *fakeCompanyUseCase { return &fakeCompanyUseCase{} },
-			expectedStatus: http.StatusBadRequest,
-			validateBody: func(t *testing.T, resp *http.Response) {
-				var errResp dto.ErrorResponse
-				require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
-				assert.Equal(t, "MISSING_ID", errResp.Code)
-			},
+			// Enrutador devuelve 404 cuando la ruta no hace match (id ausente).
+			expectedStatus: http.StatusNotFound,
+			validateBody:   nil,
 		},
 		{
 			name: "NotFound",

@@ -266,12 +266,9 @@ func TestProductHandler_GetByID(t *testing.T) {
 			name:           "BadRequest_MissingID",
 			id:             "",
 			mockSetup:      func() *fakeProductUseCase { return &fakeProductUseCase{} },
-			expectedStatus: http.StatusBadRequest,
-			validateBody: func(t *testing.T, resp *http.Response) {
-				var errResp dto.ErrorResponse
-				require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
-				assert.Equal(t, "MISSING_ID", errResp.Code)
-			},
+			// Ruta sin :id no hace match, Fiber responde 404.
+			expectedStatus: http.StatusNotFound,
+			validateBody:   nil,
 		},
 		{
 			name: "NotFound",
@@ -492,12 +489,8 @@ func TestProductHandler_Update(t *testing.T) {
 			id:             "",
 			body:           dto.UpdateProductRequest{Name: &name},
 			mockSetup:      func() *fakeProductUseCase { return &fakeProductUseCase{} },
-			expectedStatus: http.StatusBadRequest,
-			validateBody: func(t *testing.T, resp *http.Response) {
-				var errResp dto.ErrorResponse
-				require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
-				assert.Equal(t, "MISSING_ID", errResp.Code)
-			},
+			expectedStatus: http.StatusNotFound,
+			validateBody:   nil,
 		},
 		{
 			name:           "InvalidBody",

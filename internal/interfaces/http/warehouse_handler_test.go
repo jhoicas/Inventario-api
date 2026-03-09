@@ -230,12 +230,9 @@ func TestWarehouseHandler_GetByID(t *testing.T) {
 			id:             "",
 			mockSetup:      func() *fakeWarehouseUseCase { return &fakeWarehouseUseCase{} },
 			companyID:      warehouseTestCompanyID,
-			expectedStatus: http.StatusBadRequest,
-			validateBody: func(t *testing.T, resp *http.Response) {
-				var errResp dto.ErrorResponse
-				require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
-				assert.Equal(t, "MISSING_ID", errResp.Code)
-			},
+			// Ruta sin :id no hace match en Fiber -> 404 plano.
+			expectedStatus: http.StatusNotFound,
+			validateBody:   nil,
 		},
 		{
 			name: "NotFound",

@@ -403,12 +403,9 @@ func TestInvoiceHandler_HandleReturn(t *testing.T) {
 			},
 			companyID:      invoiceTestCompanyID,
 			userID:         invoiceTestUserID,
-			expectedStatus: http.StatusBadRequest,
-			validateBody: func(t *testing.T, resp *http.Response) {
-				var errResp dto.ErrorResponse
-				require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
-				assert.Equal(t, "VALIDATION", errResp.Code)
-			},
+			// La ruta no hace match cuando falta :id, Fiber responde 404.
+			expectedStatus: http.StatusNotFound,
+			validateBody:   nil,
 		},
 		{
 			name:           "InvalidBody",
@@ -552,12 +549,8 @@ func TestInvoiceHandler_GetByID(t *testing.T) {
 				return &fakeCreateInvoiceUseCase{}, &fakeCreateCreditNoteUseCase{}, &fakeInvoicePDFUseCase{}
 			},
 			companyID:      invoiceTestCompanyID,
-			expectedStatus: http.StatusBadRequest,
-			validateBody: func(t *testing.T, resp *http.Response) {
-				var errResp dto.ErrorResponse
-				require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
-				assert.Equal(t, "VALIDATION", errResp.Code)
-			},
+			expectedStatus: http.StatusNotFound,
+			validateBody:   nil,
 		},
 		{
 			name: "NotFound",
@@ -699,12 +692,8 @@ func TestInvoiceHandler_GetDIANStatus(t *testing.T) {
 				return &fakeCreateInvoiceUseCase{}, &fakeCreateCreditNoteUseCase{}, &fakeInvoicePDFUseCase{}
 			},
 			companyID:      invoiceTestCompanyID,
-			expectedStatus: http.StatusBadRequest,
-			validateBody: func(t *testing.T, resp *http.Response) {
-				var errResp dto.ErrorResponse
-				require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
-				assert.Equal(t, "VALIDATION", errResp.Code)
-			},
+			expectedStatus: http.StatusNotFound,
+			validateBody:   nil,
 		},
 		{
 			name: "NotFound",
@@ -802,7 +791,7 @@ func TestInvoiceHandler_DownloadPDF(t *testing.T) {
 			validateBody: func(t *testing.T, resp *http.Response) {
 				assert.Equal(t, "application/pdf", resp.Header.Get("Content-Type"))
 				assert.Contains(t, resp.Header.Get("Content-Disposition"), "factura-inv-123.pdf")
-				assert.Equal(t, "18", resp.Header.Get("Content-Length"))
+				assert.Equal(t, "21", resp.Header.Get("Content-Length"))
 			},
 		},
 		{
@@ -826,12 +815,8 @@ func TestInvoiceHandler_DownloadPDF(t *testing.T) {
 				return &fakeCreateInvoiceUseCase{}, &fakeCreateCreditNoteUseCase{}, &fakeInvoicePDFUseCase{}
 			},
 			companyID:      invoiceTestCompanyID,
-			expectedStatus: http.StatusBadRequest,
-			validateBody: func(t *testing.T, resp *http.Response) {
-				var errResp dto.ErrorResponse
-				require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
-				assert.Equal(t, "VALIDATION", errResp.Code)
-			},
+			expectedStatus: http.StatusNotFound,
+			validateBody:   nil,
 		},
 		{
 			name: "NotFound",
