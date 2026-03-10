@@ -184,6 +184,7 @@ func main() {
 		CompanyUC:              companyUC,
 		WarehouseUC:            warehouseUC,
 		ProductUC:              productUC,
+		UserRepo:               userRepo,
 		RegisterMovement:       registerMovementUC,
 		Replenishment:          replenishmentUC,
 		CustomerUC:             customerUC,
