@@ -53,9 +53,10 @@ func (uc *AuthUseCase) RegisterUser(in dto.RegisterRequest) (*dto.UserResponse, 
 	if name == "" {
 		name = in.Email
 	}
-	role := in.Role
-	if role == "" {
-		role = entity.RoleVendedor
+	roles := in.Roles
+	if len(roles) == 0 {
+		// Rol por defecto para nuevos usuarios registrados vía /auth/register.
+		roles = []string{entity.RoleSales}
 	}
 	user := &entity.User{
 		ID:           uuid.New().String(),
@@ -63,7 +64,7 @@ func (uc *AuthUseCase) RegisterUser(in dto.RegisterRequest) (*dto.UserResponse, 
 		Email:        in.Email,
 		PasswordHash: string(hash),
 		Name:         name,
-		Role:         role,
+		Roles:        roles,
 		Status:       "active",
 		CreatedAt:    now,
 		UpdatedAt:    now,
@@ -89,7 +90,7 @@ func (uc *AuthUseCase) Login(in dto.LoginRequest) (*dto.LoginResponse, error) {
 	if user.Status != "active" {
 		return nil, domain.ErrForbidden
 	}
-	token, err := jwt.Generate(uc.jwtCfg.Secret, user.ID, user.CompanyID, user.Role, uc.jwtCfg.Issuer, uc.jwtCfg.ExpMinutes)
+	token, err := jwt.Generate(uc.jwtCfg.Secret, user.ID, user.CompanyID, user.Roles, uc.jwtCfg.Issuer, uc.jwtCfg.ExpMinutes)
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +109,7 @@ func toUserResponse(u *entity.User) *dto.UserResponse {
 		CompanyID: u.CompanyID,
 		Email:     u.Email,
 		Name:      u.Name,
-		Role:      u.Role,
+		Roles:     u.Roles,
 		Status:    u.Status,
 		CreatedAt: u.CreatedAt,
 		UpdatedAt: u.UpdatedAt,

@@ -15,12 +15,13 @@ import (
 const (
 	LocalUserID    = "user_id"
 	LocalCompanyID = "company_id"
-	LocalRole      = "role" // "admin" | "bodeguero" | "vendedor"
+	LocalRole      = "role"  // compatibilidad: primer rol
+	LocalRoles     = "roles" // slice completo de roles
 )
 
 // ── AuthMiddleware ─────────────────────────────────────────────────────────────
 
-// AuthMiddleware valida el Bearer Token JWT y almacena userID, companyID y role
+// AuthMiddleware valida el Bearer Token JWT y almacena userID, companyID y roles
 // en c.Locals para que los handlers y middlewares posteriores los consuman.
 func AuthMiddleware(jwtSecret string) fiber.Handler {
 	return func(c *fiber.Ctx) error {
@@ -43,7 +44,7 @@ func AuthMiddleware(jwtSecret string) fiber.Handler {
 			})
 		}
 
-		userID, companyID, role, err := jwt.Parse(jwtSecret, tokenString)
+		userID, companyID, roles, err := jwt.Parse(jwtSecret, tokenString)
 		if err != nil {
 			return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{
 				Code: "INVALID_TOKEN", Message: "token inválido o expirado",
@@ -52,15 +53,20 @@ func AuthMiddleware(jwtSecret string) fiber.Handler {
 
 		c.Locals(LocalUserID, userID)
 		c.Locals(LocalCompanyID, companyID)
-		c.Locals(LocalRole, role)
+		c.Locals(LocalRoles, roles)
+		if len(roles) > 0 {
+			// Para compatibilidad con código que solo lee un rol:
+			c.Locals(LocalRole, roles[0])
+		}
 		return c.Next()
 	}
 }
 
 // ── RBAC Middleware ────────────────────────────────────────────────────────────
 
-// RequireRole devuelve un middleware que permite el acceso solo si el rol del
-// usuario (extraído del JWT por AuthMiddleware) está dentro de allowedRoles.
+// RequireRole (RBAC) permite acceso si el usuario:
+//   - tiene rol "admin" en sus claims, O
+//   - tiene al menos uno de los roles pasados en allowedRoles.
 //
 // Uso en el router:
 //
@@ -76,20 +82,29 @@ func RequireRole(allowedRoles ...string) fiber.Handler {
 	}
 
 	return func(c *fiber.Ctx) error {
-		role := GetRole(c)
-		if role == "" {
+		roles := GetRoles(c)
+		if len(roles) == 0 {
 			return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{
 				Code:    "MISSING_ROLE",
-				Message: "el token no contiene información de rol; vuelve a iniciar sesión",
+				Message: "el token no contiene información de roles; vuelve a iniciar sesión",
 			})
 		}
-		if _, ok := allowed[role]; !ok {
-			return c.Status(fiber.StatusForbidden).JSON(dto.ErrorResponse{
-				Code:    "FORBIDDEN",
-				Message: fmt.Sprintf("acceso denegado: se requiere rol %s", strings.Join(allowedRoles, " o ")),
-			})
+		// Acceso siempre permitido para admin.
+		for _, r := range roles {
+			if r == entity.RoleAdmin {
+				return c.Next()
+			}
 		}
-		return c.Next()
+		// Si tiene al menos uno de los roles requeridos se permite acceso.
+		for _, r := range roles {
+			if _, ok := allowed[r]; ok {
+				return c.Next()
+			}
+		}
+		return c.Status(fiber.StatusForbidden).JSON(dto.ErrorResponse{
+			Code:    "FORBIDDEN",
+			Message: fmt.Sprintf("acceso denegado: se requiere rol %s", strings.Join(allowedRoles, " o ")),
+		})
 	}
 }
 
@@ -107,14 +122,35 @@ func GetCompanyID(c *fiber.Ctx) string {
 	return v
 }
 
-// GetRole devuelve el Role almacenado por AuthMiddleware.
-// Devuelve "" si el token no incluía claim de rol (tokens emitidos antes de este cambio).
+// GetRoles devuelve la lista completa de roles almacenada por AuthMiddleware.
+func GetRoles(c *fiber.Ctx) []string {
+	if v, ok := c.Locals(LocalRoles).([]string); ok && len(v) > 0 {
+		return v
+	}
+	// Compatibilidad: tokens antiguos que solo tenían un "role" string.
+	if s, ok := c.Locals(LocalRole).(string); ok && s != "" {
+		return []string{s}
+	}
+	return nil
+}
+
+// GetRole devuelve el primer rol almacenado por AuthMiddleware (helper legacy).
+// Devuelve "" si el token no incluía claims de rol.
 func GetRole(c *fiber.Ctx) string {
-	v, _ := c.Locals(LocalRole).(string)
-	return v
+	roles := GetRoles(c)
+	if len(roles) == 0 {
+		return ""
+	}
+	return roles[0]
 }
 
 // IsAdmin es un helper semántico para comprobar si el usuario tiene rol admin.
 func IsAdmin(c *fiber.Ctx) bool {
-	return GetRole(c) == entity.RoleAdmin
+	roles := GetRoles(c)
+	for _, r := range roles {
+		if r == entity.RoleAdmin {
+			return true
+		}
+	}
+	return false
 }

@@ -16,6 +16,25 @@ func NewUserUseCase(repo repository.UserRepository) *UserUseCase {
 	return &UserUseCase{repo: repo}
 }
 
+// ListByCompany lista usuarios de una empresa con paginación.
+func (uc *UserUseCase) ListByCompany(companyID string, limit, offset int) ([]*dto.UserResponse, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	list, err := uc.repo.ListByCompany(companyID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*dto.UserResponse, 0, len(list))
+	for _, u := range list {
+		out = append(out, entityToUserResponse(u))
+	}
+	return out, nil
+}
+
 // GetByID obtiene un usuario por ID.
 func (uc *UserUseCase) GetByID(id string) (*dto.UserResponse, error) {
 	user, err := uc.repo.GetByID(id)
@@ -49,7 +68,7 @@ func entityToUserResponse(u *entity.User) *dto.UserResponse {
 		CompanyID: u.CompanyID,
 		Email:     u.Email,
 		Name:      u.Name,
-		Role:      u.Role,
+		Roles:     u.Roles,
 		Status:    u.Status,
 		CreatedAt: u.CreatedAt,
 		UpdatedAt: u.UpdatedAt,

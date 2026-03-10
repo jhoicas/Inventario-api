@@ -27,10 +27,10 @@ func NewUserRepository(pool *pgxpool.Pool) *UserRepo {
 // Create persiste un nuevo usuario.
 func (r *UserRepo) Create(user *entity.User) error {
 	query := `
-		INSERT INTO users (id, company_id, email, password_hash, name, role, status, created_at, updated_at)
+		INSERT INTO users (id, company_id, email, password_hash, name, roles, status, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`
 	_, err := r.pool.Exec(context.Background(), query,
-		user.ID, user.CompanyID, user.Email, user.PasswordHash, user.Name, user.Role, user.Status,
+		user.ID, user.CompanyID, user.Email, user.PasswordHash, user.Name, user.Roles, user.Status,
 		user.CreatedAt, user.UpdatedAt,
 	)
 	if err != nil {
@@ -65,11 +65,11 @@ func (r *UserRepo) FindByEmail(email string) (*entity.User, error) {
 // GetByEmailAndCompany obtiene un usuario por email y company.
 func (r *UserRepo) GetByEmailAndCompany(email, companyID string) (*entity.User, error) {
 	query := `
-		SELECT id, company_id, email, password_hash, name, role, status, created_at, updated_at
+		SELECT id, company_id, email, password_hash, name, roles, status, created_at, updated_at
 		FROM users WHERE email = $1 AND company_id = $2`
 	var u entity.User
 	err := r.pool.QueryRow(context.Background(), query, email, companyID).Scan(
-		&u.ID, &u.CompanyID, &u.Email, &u.PasswordHash, &u.Name, &u.Role, &u.Status,
+		&u.ID, &u.CompanyID, &u.Email, &u.PasswordHash, &u.Name, &u.Roles, &u.Status,
 		&u.CreatedAt, &u.UpdatedAt,
 	)
 	if err != nil {
@@ -83,11 +83,11 @@ func (r *UserRepo) GetByEmailAndCompany(email, companyID string) (*entity.User, 
 
 func (r *UserRepo) findByID(ctx context.Context, id string) (*entity.User, error) {
 	query := `
-		SELECT id, company_id, email, password_hash, name, role, status, created_at, updated_at
+		SELECT id, company_id, email, password_hash, name, roles, status, created_at, updated_at
 		FROM users WHERE id = $1`
 	var u entity.User
 	err := r.pool.QueryRow(ctx, query, id).Scan(
-		&u.ID, &u.CompanyID, &u.Email, &u.PasswordHash, &u.Name, &u.Role, &u.Status,
+		&u.ID, &u.CompanyID, &u.Email, &u.PasswordHash, &u.Name, &u.Roles, &u.Status,
 		&u.CreatedAt, &u.UpdatedAt,
 	)
 	if err != nil {
@@ -101,11 +101,11 @@ func (r *UserRepo) findByID(ctx context.Context, id string) (*entity.User, error
 
 func (r *UserRepo) findByEmail(ctx context.Context, email string) (*entity.User, error) {
 	query := `
-		SELECT id, company_id, email, password_hash, name, role, status, created_at, updated_at
+		SELECT id, company_id, email, password_hash, name, roles, status, created_at, updated_at
 		FROM users WHERE email = $1 LIMIT 1`
 	var u entity.User
 	err := r.pool.QueryRow(ctx, query, email).Scan(
-		&u.ID, &u.CompanyID, &u.Email, &u.PasswordHash, &u.Name, &u.Role, &u.Status,
+		&u.ID, &u.CompanyID, &u.Email, &u.PasswordHash, &u.Name, &u.Roles, &u.Status,
 		&u.CreatedAt, &u.UpdatedAt,
 	)
 	if err != nil {
@@ -120,10 +120,10 @@ func (r *UserRepo) findByEmail(ctx context.Context, email string) (*entity.User,
 // Update actualiza un usuario.
 func (r *UserRepo) Update(user *entity.User) error {
 	query := `
-		UPDATE users SET email = $2, password_hash = $3, name = $4, role = $5, status = $6, updated_at = $7
+		UPDATE users SET email = $2, password_hash = $3, name = $4, roles = $5, status = $6, updated_at = $7
 		WHERE id = $1`
 	_, err := r.pool.Exec(context.Background(), query,
-		user.ID, user.Email, user.PasswordHash, user.Name, user.Role, user.Status, user.UpdatedAt,
+		user.ID, user.Email, user.PasswordHash, user.Name, user.Roles, user.Status, user.UpdatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("update user: %w", err)
@@ -134,7 +134,7 @@ func (r *UserRepo) Update(user *entity.User) error {
 // ListByCompany lista usuarios por company con paginación.
 func (r *UserRepo) ListByCompany(companyID string, limit, offset int) ([]*entity.User, error) {
 	query := `
-		SELECT id, company_id, email, password_hash, name, role, status, created_at, updated_at
+		SELECT id, company_id, email, password_hash, name, roles, status, created_at, updated_at
 		FROM users WHERE company_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`
 	rows, err := r.pool.Query(context.Background(), query, companyID, limit, offset)
 	if err != nil {
@@ -144,7 +144,7 @@ func (r *UserRepo) ListByCompany(companyID string, limit, offset int) ([]*entity
 	var list []*entity.User
 	for rows.Next() {
 		var u entity.User
-		if err := rows.Scan(&u.ID, &u.CompanyID, &u.Email, &u.PasswordHash, &u.Name, &u.Role, &u.Status, &u.CreatedAt, &u.UpdatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.CompanyID, &u.Email, &u.PasswordHash, &u.Name, &u.Roles, &u.Status, &u.CreatedAt, &u.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan user: %w", err)
 		}
 		list = append(list, &u)

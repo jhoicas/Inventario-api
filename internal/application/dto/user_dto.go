@@ -8,7 +8,7 @@ type CreateUserRequest struct {
 	Email     string `json:"email" validate:"required,email"`
 	Password  string `json:"password" validate:"required,min=8"`
 	Name      string `json:"name" validate:"required,min=1,max=200"`
-	Role      string `json:"role" validate:"required,oneof=admin bodeguero vendedor"`
+	Roles     []string `json:"roles"` // roles asignados al usuario
 }
 
 // RegisterRequest entrada para registro (auth): email, password, company_id.
@@ -17,7 +17,7 @@ type RegisterRequest struct {
 	Password  string `json:"password" validate:"required,min=8"`
 	CompanyID string `json:"company_id" validate:"required,uuid"`
 	Name      string `json:"name" validate:"omitempty,max=200"`
-	Role      string `json:"role" validate:"omitempty,oneof=admin bodeguero vendedor"`
+	Roles     []string `json:"roles"` // opcional; si se omite se usa rol por defecto
 }
 
 // UserResponse salida de un usuario (sin password).
@@ -26,7 +26,7 @@ type UserResponse struct {
 	CompanyID string    `json:"company_id"`
 	Email     string    `json:"email"`
 	Name      string    `json:"name"`
-	Role      string    `json:"role"`
+	Roles     []string  `json:"roles"`
 	Status    string    `json:"status"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`

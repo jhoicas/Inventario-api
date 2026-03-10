@@ -53,7 +53,7 @@ func validRegisterRequest() dto.RegisterRequest {
 		Password:  "password123",
 		CompanyID: "company-123",
 		Name:      "Usuario Test",
-		Role:      "admin",
+		Roles:     []string{"admin"},
 	}
 }
 
@@ -64,7 +64,7 @@ func validUserResponse() *dto.UserResponse {
 		CompanyID: "company-123",
 		Email:     "user@example.com",
 		Name:      "Usuario Test",
-		Role:      "admin",
+		Roles:     []string{"admin"},
 		Status:    "active",
 		CreatedAt: now,
 		UpdatedAt: now,
@@ -106,7 +106,7 @@ func TestAuthHandler_Register(t *testing.T) {
 				require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
 				assert.Equal(t, "user-123", out.ID)
 				assert.Equal(t, "user@example.com", out.Email)
-				assert.Equal(t, "admin", out.Role)
+				assert.ElementsMatch(t, []string{"admin"}, out.Roles)
 			},
 		},
 		{

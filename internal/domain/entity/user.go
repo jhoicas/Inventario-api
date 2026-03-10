@@ -5,8 +5,12 @@ import "time"
 // Roles válidos para User.
 const (
 	RoleAdmin     = "admin"
-	RoleBodeguero = "bodeguero"
-	RoleVendedor  = "vendedor"
+	RoleBodeguero = "bodeguero" // legado inventario
+	RoleVendedor  = "vendedor"  // legado facturación
+
+	RoleMarketing = "marketing"
+	RoleSales     = "sales"
+	RoleSupport   = "support"
 )
 
 // User representa un usuario del sistema (pertenece a una Company).
@@ -16,7 +20,7 @@ type User struct {
 	Email        string
 	PasswordHash string    // bcrypt hash, nunca plano en dominio después de persistir
 	Name         string
-	Role         string    // admin, bodeguero, vendedor
+	Roles        []string  // lista de roles (p.ej. ["admin","marketing"])
 	Status       string    // active, inactive, suspended
 	CreatedAt    time.Time
 	UpdatedAt    time.Time

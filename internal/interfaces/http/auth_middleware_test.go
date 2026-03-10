@@ -55,7 +55,7 @@ func buildTestApp(allowedRoles ...string) *fiber.App {
 // tokenForRole genera un JWT con el rol indicado.
 func tokenForRole(t *testing.T, role string) string {
 	t.Helper()
-	tok, err := pkgjwt.Generate(testJWTSecret, testUserID, testCompanyID, role, testIssuer, testExpMin)
+	tok, err := pkgjwt.Generate(testJWTSecret, testUserID, testCompanyID, []string{role}, testIssuer, testExpMin)
 	require.NoError(t, err, "debe generarse un token JWT válido")
 	return "Bearer " + tok
 }
@@ -128,7 +128,7 @@ func TestRequireRole_BodegueroBloqueadoEnRutaVendedor(t *testing.T) {
 func TestRequireRole_TokenSinRol_Retorna401(t *testing.T) {
 	// Generamos un token con rol vacío para simular un token legacy sin el claim.
 	app := buildTestApp("admin")
-	tok, err := pkgjwt.Generate(testJWTSecret, testUserID, testCompanyID, "", testIssuer, testExpMin)
+	tok, err := pkgjwt.Generate(testJWTSecret, testUserID, testCompanyID, []string{}, testIssuer, testExpMin)
 	require.NoError(t, err)
 
 	resp := doRequest(t, app, "Bearer "+tok)
@@ -194,21 +194,22 @@ func TestAuthMiddleware_ExtractaClaims(t *testing.T) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 func TestJWT_GenerateAndParse_ConRole(t *testing.T) {
-	tok, err := pkgjwt.Generate(testJWTSecret, testUserID, testCompanyID, "bodeguero", testIssuer, testExpMin)
+	tok, err := pkgjwt.Generate(testJWTSecret, testUserID, testCompanyID, []string{"bodeguero"}, testIssuer, testExpMin)
 	require.NoError(t, err)
 	require.NotEmpty(t, tok)
 
-	userID, companyID, role, err := pkgjwt.Parse(testJWTSecret, tok)
+	userID, companyID, roles, err := pkgjwt.Parse(testJWTSecret, tok)
 	require.NoError(t, err)
 
 	assert.Equal(t, testUserID, userID)
 	assert.Equal(t, testCompanyID, companyID)
-	assert.Equal(t, "bodeguero", role)
+	assert.Len(t, roles, 1)
+	assert.Equal(t, "bodeguero", roles[0])
 }
 
 func TestJWT_TokenExpirado_RetornaError(t *testing.T) {
 	// Token con expiración -1 minuto (ya expirado)
-	tok, err := pkgjwt.Generate(testJWTSecret, testUserID, testCompanyID, "admin", testIssuer, -1)
+	tok, err := pkgjwt.Generate(testJWTSecret, testUserID, testCompanyID, []string{"admin"}, testIssuer, -1)
 	require.NoError(t, err)
 
 	_, _, _, err = pkgjwt.Parse(testJWTSecret, tok)
@@ -216,7 +217,7 @@ func TestJWT_TokenExpirado_RetornaError(t *testing.T) {
 }
 
 func TestJWT_SecretIncorrecto_RetornaError(t *testing.T) {
-	tok, err := pkgjwt.Generate(testJWTSecret, testUserID, testCompanyID, "admin", testIssuer, testExpMin)
+	tok, err := pkgjwt.Generate(testJWTSecret, testUserID, testCompanyID, []string{"admin"}, testIssuer, testExpMin)
 	require.NoError(t, err)
 
 	_, _, _, err = pkgjwt.Parse("otro-secret-completamente-distinto", tok)

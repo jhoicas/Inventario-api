@@ -8,6 +8,7 @@ import (
 	"github.com/jhoicas/Inventario-api/internal/application/inventory"
 	"github.com/jhoicas/Inventario-api/internal/application/usecase"
 	"github.com/jhoicas/Inventario-api/internal/domain/entity"
+	"github.com/jhoicas/Inventario-api/internal/domain/repository"
 )
 
 // RouterDeps dependencias para el router.
@@ -15,6 +16,7 @@ type RouterDeps struct {
 	CompanyUC        *usecase.CompanyUseCase
 	WarehouseUC      *usecase.WarehouseUseCase
 	ProductUC        *usecase.ProductUseCase
+	UserRepo         repository.UserRepository
 	RegisterMovement *inventory.RegisterMovementUseCase
 	Replenishment    *inventory.ReplenishmentUseCase
 	CustomerUC       *billing.CustomerUseCase
@@ -81,6 +83,13 @@ func Router(app *fiber.App, deps RouterDeps) {
 	cust.Get("/", customerHandler.List)
 	// Creación de clientes: admin y vendedor
 	cust.Post("/", RequireRole(entity.RoleAdmin, entity.RoleVendedor), customerHandler.Create)
+
+	// Gestión de usuarios (solo admin)
+	userHandler := NewUserHandler(deps.UserRepo)
+	usersGroup := protected.Group("/users", RequireRole(entity.RoleAdmin))
+	usersGroup.Get("/", userHandler.List)
+	usersGroup.Post("/", userHandler.Create)
+	usersGroup.Put("/:id", userHandler.Update)
 
 	// ── Inventario (módulo 'inventory' + roles) ────────────────────────────────
 	inventoryHandler := NewInventoryHandler(deps.RegisterMovement, deps.Replenishment)
