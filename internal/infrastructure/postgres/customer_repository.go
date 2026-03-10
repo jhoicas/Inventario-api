@@ -78,11 +78,22 @@ func (r *CustomerRepo) GetByCompanyAndTaxID(companyID, taxID string) (*entity.Cu
 }
 
 // ListByCompany lista clientes de la empresa con paginación.
-func (r *CustomerRepo) ListByCompany(companyID string, limit, offset int) ([]*entity.Customer, error) {
-	query := `
+func (r *CustomerRepo) ListByCompany(companyID string, search string, limit, offset int) ([]*entity.Customer, error) {
+	base := `
 		SELECT id, company_id, name, tax_id, email, phone, created_at, updated_at
-		FROM customers WHERE company_id = $1 ORDER BY name LIMIT $2 OFFSET $3`
-	rows, err := r.q.Query(context.Background(), query, companyID, limit, offset)
+		FROM customers
+		WHERE company_id = $1`
+	args := []any{companyID}
+	argIdx := 2
+	if search != "" {
+		base += fmt.Sprintf(" AND (name ILIKE $%d OR tax_id ILIKE $%d)", argIdx, argIdx)
+		args = append(args, "%"+search+"%")
+		argIdx++
+	}
+	base += fmt.Sprintf(" ORDER BY name LIMIT $%d OFFSET $%d", argIdx, argIdx+1)
+	args = append(args, limit, offset)
+
+	rows, err := r.q.Query(context.Background(), base, args...)
 	if err != nil {
 		return nil, fmt.Errorf("list customers: %w", err)
 	}

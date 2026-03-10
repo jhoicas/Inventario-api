@@ -52,5 +52,9 @@ type CRMTicketRepository interface {
 	Create(ticket *entity.CRMTicket) error
 	GetByID(id string) (*entity.CRMTicket, error)
 	Update(ticket *entity.CRMTicket) error
-	ListByCompany(companyID string, limit, offset int) ([]*entity.CRMTicket, error)
+	// ListByCompany lista tickets por empresa con filtros opcionales.
+	// search: busca por asunto (subject) usando ILIKE.
+	// status: filtra por status exacto.
+	// sort: orden por created_at ("asc" | "desc"). Cualquier otro valor usa "desc".
+	ListByCompany(companyID string, search string, status string, sort string, limit, offset int) ([]*entity.CRMTicket, error)
 }

@@ -54,14 +54,14 @@ func (uc *CustomerUseCase) Create(companyID string, in dto.CreateCustomerRequest
 }
 
 // List lista clientes de la empresa.
-func (uc *CustomerUseCase) List(companyID string, limit, offset int) ([]*dto.CustomerResponse, error) {
+func (uc *CustomerUseCase) List(companyID string, search string, limit, offset int) ([]*dto.CustomerResponse, error) {
 	if limit <= 0 {
 		limit = 20
 	}
 	if offset < 0 {
 		offset = 0
 	}
-	list, err := uc.repo.ListByCompany(companyID, limit, offset)
+	list, err := uc.repo.ListByCompany(companyID, search, limit, offset)
 	if err != nil {
 		return nil, err
 	}

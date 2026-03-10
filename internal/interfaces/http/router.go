@@ -138,6 +138,9 @@ func Router(app *fiber.App, deps RouterDeps) {
 		crmGroup.Put("/customers/:id/category", h.AssignCategory)
 		crmGroup.Get("/categories", h.ListCategories)
 		crmGroup.Get("/categories/:id/benefits", h.ListBenefitsByCategory)
+		// Beneficios: escritura solo admin
+		crmGroup.Post("/categories/:categoryId/benefits", RequireRole(entity.RoleAdmin), h.CreateBenefit)
+		crmGroup.Put("/benefits/:benefitId", RequireRole(entity.RoleAdmin), h.UpdateBenefit)
 		crmGroup.Post("/tasks", h.CreateTask)
 		crmGroup.Get("/tasks", h.ListTasks)
 		crmGroup.Get("/tasks/:id", h.GetTask)

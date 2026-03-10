@@ -126,8 +126,9 @@ func (f *fakeCustomerRepo) GetByCompanyAndTaxID(companyID, taxID string) (*entit
 	}
 	return nil, nil
 }
-func (f *fakeCustomerRepo) ListByCompany(companyID string, limit, offset int) ([]*entity.Customer, error) {
+func (f *fakeCustomerRepo) ListByCompany(companyID string, search string, limit, offset int) ([]*entity.Customer, error) {
 	if f.listByCompanyFunc != nil {
+		// tests existentes no usan search; se ignora en el fake
 		return f.listByCompanyFunc(companyID, limit, offset)
 	}
 	return nil, nil

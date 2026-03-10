@@ -20,7 +20,7 @@ import (
 
 type fakeCustomerUseCase struct {
 	createFunc func(companyID string, in dto.CreateCustomerRequest) (*dto.CustomerResponse, error)
-	listFunc   func(companyID string, limit, offset int) ([]*dto.CustomerResponse, error)
+	listFunc   func(companyID string, search string, limit, offset int) ([]*dto.CustomerResponse, error)
 }
 
 func (f *fakeCustomerUseCase) Create(companyID string, in dto.CreateCustomerRequest) (*dto.CustomerResponse, error) {
@@ -30,9 +30,9 @@ func (f *fakeCustomerUseCase) Create(companyID string, in dto.CreateCustomerRequ
 	return nil, errors.New("create not configured")
 }
 
-func (f *fakeCustomerUseCase) List(companyID string, limit, offset int) ([]*dto.CustomerResponse, error) {
+func (f *fakeCustomerUseCase) List(companyID string, search string, limit, offset int) ([]*dto.CustomerResponse, error) {
 	if f.listFunc != nil {
-		return f.listFunc(companyID, limit, offset)
+		return f.listFunc(companyID, search, limit, offset)
 	}
 	return nil, errors.New("list not configured")
 }
@@ -230,8 +230,9 @@ func TestCustomerHandler_List(t *testing.T) {
 			query: "",
 			mockSetup: func() *fakeCustomerUseCase {
 				return &fakeCustomerUseCase{
-					listFunc: func(companyID string, limit, offset int) ([]*dto.CustomerResponse, error) {
+					listFunc: func(companyID string, search string, limit, offset int) ([]*dto.CustomerResponse, error) {
 						assert.Equal(t, customerTestCompanyID, companyID)
+						assert.Equal(t, "", search)
 						assert.Equal(t, 20, limit)
 						assert.Equal(t, 0, offset)
 						return []*dto.CustomerResponse{validCustomerResponse()}, nil
@@ -252,8 +253,9 @@ func TestCustomerHandler_List(t *testing.T) {
 			query: "?limit=10&offset=5",
 			mockSetup: func() *fakeCustomerUseCase {
 				return &fakeCustomerUseCase{
-					listFunc: func(companyID string, limit, offset int) ([]*dto.CustomerResponse, error) {
+					listFunc: func(companyID string, search string, limit, offset int) ([]*dto.CustomerResponse, error) {
 						assert.Equal(t, customerTestCompanyID, companyID)
+						assert.Equal(t, "", search)
 						assert.Equal(t, 10, limit)
 						assert.Equal(t, 5, offset)
 						return []*dto.CustomerResponse{}, nil
@@ -285,7 +287,7 @@ func TestCustomerHandler_List(t *testing.T) {
 			query: "",
 			mockSetup: func() *fakeCustomerUseCase {
 				return &fakeCustomerUseCase{
-					listFunc: func(_ string, _, _ int) ([]*dto.CustomerResponse, error) {
+					listFunc: func(_ string, _ string, _, _ int) ([]*dto.CustomerResponse, error) {
 						return nil, errors.New("db error")
 					},
 				}

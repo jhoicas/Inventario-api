@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -438,11 +439,38 @@ func (r *CRMTicketRepo) Update(t *entity.CRMTicket) error {
 	return err
 }
 
-func (r *CRMTicketRepo) ListByCompany(companyID string, limit, offset int) ([]*entity.CRMTicket, error) {
-	rows, err := r.q.Query(context.Background(), `
-		SELECT id, company_id, customer_id, subject, description, status, sentiment, created_by, created_at, updated_at FROM crm_tickets WHERE company_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
-		companyID, limit, offset,
-	)
+func (r *CRMTicketRepo) ListByCompany(companyID string, search string, status string, sort string, limit, offset int) ([]*entity.CRMTicket, error) {
+	query := `
+		SELECT id, company_id, customer_id, subject, description, status, sentiment, created_by, created_at, updated_at
+		FROM crm_tickets
+		WHERE company_id = $1`
+	args := []any{companyID}
+	argIdx := 2
+
+	if search != "" {
+		query += fmt.Sprintf(" AND subject ILIKE $%d", argIdx)
+		args = append(args, "%"+search+"%")
+		argIdx++
+	}
+	if status != "" {
+		query += fmt.Sprintf(" AND status = $%d", argIdx)
+		args = append(args, status)
+		argIdx++
+	}
+
+	orderDir := "DESC"
+	switch strings.ToLower(strings.TrimSpace(sort)) {
+	case "asc", "created_at_asc":
+		orderDir = "ASC"
+	case "desc", "created_at_desc", "":
+		orderDir = "DESC"
+	}
+
+	query += " ORDER BY created_at " + orderDir
+	query += fmt.Sprintf(" LIMIT $%d OFFSET $%d", argIdx, argIdx+1)
+	args = append(args, limit, offset)
+
+	rows, err := r.q.Query(context.Background(), query, args...)
 	if err != nil {
 		return nil, err
 	}

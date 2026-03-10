@@ -51,6 +51,18 @@ type AssignCategoryRequest struct {
 	LTV        decimal.Decimal `json:"ltv"`
 }
 
+// CreateBenefitRequest body para crear un beneficio en una categoría.
+type CreateBenefitRequest struct {
+	Name        string `json:"name" validate:"required,min=1,max=200"`
+	Description string `json:"description"`
+}
+
+// UpdateBenefitRequest body para actualizar un beneficio.
+type UpdateBenefitRequest struct {
+	Name        string `json:"name" validate:"required,min=1,max=200"`
+	Description string `json:"description"`
+}
+
 // Profile360Response vista 360 del cliente (datos base + perfil CRM).
 type Profile360Response struct {
 	Customer   CustomerResponse `json:"customer"`

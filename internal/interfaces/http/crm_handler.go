@@ -163,6 +163,88 @@ func (h *CRMHandler) ListBenefitsByCategory(c *fiber.Ctx) error {
 	return c.JSON(list)
 }
 
+// CreateBenefit crea un beneficio dentro de una categoría (solo admin).
+// @Summary      Crear beneficio
+// @Description  Crea un beneficio asociado a una categoría de fidelización (solo admin)
+// @Tags         crm
+// @Security     Bearer
+// @Accept       json
+// @Produce      json
+// @Param        categoryId  path      string  true  "Category ID"
+// @Param        body        body      dto.CreateBenefitRequest  true  "Benefit"
+// @Success      201         {object}  dto.BenefitResponse
+// @Failure      400         {object}  dto.ErrorResponse
+// @Failure      401         {object}  dto.ErrorResponse
+// @Failure      403         {object}  dto.ErrorResponse
+// @Failure      404         {object}  dto.ErrorResponse
+// @Router       /api/crm/categories/{categoryId}/benefits [post]
+func (h *CRMHandler) CreateBenefit(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	categoryID := c.Params("categoryId")
+	if companyID == "" || categoryID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	var in dto.CreateBenefitRequest
+	if err := c.BodyParser(&in); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
+	}
+	out, err := h.LoyaltyUC.CreateBenefit(c.Context(), companyID, categoryID, in)
+	if err != nil {
+		if err == domain.ErrInvalidInput {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "name requerido"})
+		}
+		if err == domain.ErrNotFound {
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "categoría no encontrada"})
+		}
+		if err == domain.ErrForbidden {
+			return c.Status(fiber.StatusForbidden).JSON(dto.ErrorResponse{Code: "FORBIDDEN", Message: "acceso denegado"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.Status(fiber.StatusCreated).JSON(out)
+}
+
+// UpdateBenefit actualiza un beneficio (solo admin).
+// @Summary      Actualizar beneficio
+// @Description  Actualiza un beneficio de fidelización (solo admin)
+// @Tags         crm
+// @Security     Bearer
+// @Accept       json
+// @Produce      json
+// @Param        benefitId  path      string  true  "Benefit ID"
+// @Param        body       body      dto.UpdateBenefitRequest  true  "Benefit"
+// @Success      200        {object}  dto.BenefitResponse
+// @Failure      400        {object}  dto.ErrorResponse
+// @Failure      401        {object}  dto.ErrorResponse
+// @Failure      403        {object}  dto.ErrorResponse
+// @Failure      404        {object}  dto.ErrorResponse
+// @Router       /api/crm/benefits/{benefitId} [put]
+func (h *CRMHandler) UpdateBenefit(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	benefitID := c.Params("benefitId")
+	if companyID == "" || benefitID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	var in dto.UpdateBenefitRequest
+	if err := c.BodyParser(&in); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
+	}
+	out, err := h.LoyaltyUC.UpdateBenefit(c.Context(), companyID, benefitID, in)
+	if err != nil {
+		if err == domain.ErrInvalidInput {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "name requerido"})
+		}
+		if err == domain.ErrNotFound {
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "beneficio no encontrado"})
+		}
+		if err == domain.ErrForbidden {
+			return c.Status(fiber.StatusForbidden).JSON(dto.ErrorResponse{Code: "FORBIDDEN", Message: "acceso denegado"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.JSON(out)
+}
+
 // CreateTask crea una tarea.
 // @Summary      Crear tarea CRM
 // @Description  Crea una tarea de seguimiento o gestión comercial para un cliente
@@ -427,15 +509,16 @@ func (h *CRMHandler) GetTicket(c *fiber.Ctx) error {
 // @Router       /api/crm/tickets/{id} [put]
 func (h *CRMHandler) UpdateTicket(c *fiber.Ctx) error {
 	companyID := GetCompanyID(c)
+	userID := GetUserID(c)
 	id := c.Params("id")
-	if companyID == "" || id == "" {
+	if companyID == "" || userID == "" || id == "" {
 		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
 	}
 	var in dto.UpdateTicketRequest
 	if err := c.BodyParser(&in); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
 	}
-	out, err := h.PQRUC.Update(c.Context(), companyID, id, in)
+	out, err := h.PQRUC.Update(c.Context(), companyID, userID, id, in)
 	if err != nil {
 		if err == domain.ErrNotFound {
 			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "ticket no encontrado"})
@@ -455,8 +538,11 @@ func (h *CRMHandler) UpdateTicket(c *fiber.Ctx) error {
 // @Security     Bearer
 // @Accept       json
 // @Produce      json
+// @Param        search  query     string  false "Buscar por asunto (subject)"
 // @Param        limit  query     int  false "Limit"
 // @Param        offset query     int  false "Offset"
+// @Param        status query     string false "Filtrar por status"
+// @Param        sort   query     string false "Orden por created_at: asc|desc"
 // @Success      200    {object}  dto.TicketResponseList
 // @Router       /api/crm/tickets [get]
 func (h *CRMHandler) ListTickets(c *fiber.Ctx) error {
@@ -464,9 +550,23 @@ func (h *CRMHandler) ListTickets(c *fiber.Ctx) error {
 	if companyID == "" {
 		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
 	}
+	search := c.Query("search")
+	status := c.Query("status")
+	sort := c.Query("sort")
+
 	limit, _ := strconv.Atoi(c.Query("limit", "20"))
 	offset, _ := strconv.Atoi(c.Query("offset", "0"))
-	out, err := h.PQRUC.ListByCompany(c.Context(), companyID, limit, offset)
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	out, err := h.PQRUC.ListByCompany(c.Context(), companyID, search, status, sort, limit, offset)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}

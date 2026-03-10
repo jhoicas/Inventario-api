@@ -156,3 +156,71 @@ func (uc *LoyaltyUseCase) ListBenefitsByCategory(ctx context.Context, categoryID
 	}
 	return out, nil
 }
+
+// CreateBenefit crea un beneficio dentro de una categoría (admin).
+func (uc *LoyaltyUseCase) CreateBenefit(ctx context.Context, companyID, categoryID string, in dto.CreateBenefitRequest) (*dto.BenefitResponse, error) {
+	if categoryID == "" || in.Name == "" {
+		return nil, domain.ErrInvalidInput
+	}
+	cat, err := uc.categoryRepo.GetByID(categoryID)
+	if err != nil || cat == nil {
+		return nil, domain.ErrNotFound
+	}
+	if cat.CompanyID != companyID {
+		return nil, domain.ErrForbidden
+	}
+	now := time.Now()
+	b := &entity.CRMBenefit{
+		ID:          uuid.New().String(),
+		CompanyID:   companyID,
+		CategoryID:  categoryID,
+		Name:        in.Name,
+		Description: in.Description,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	if err := uc.benefitRepo.Create(b); err != nil {
+		return nil, err
+	}
+	return &dto.BenefitResponse{
+		ID:          b.ID,
+		CompanyID:   b.CompanyID,
+		CategoryID:  b.CategoryID,
+		Name:        b.Name,
+		Description: b.Description,
+		CreatedAt:   b.CreatedAt,
+		UpdatedAt:   b.UpdatedAt,
+	}, nil
+}
+
+// UpdateBenefit actualiza un beneficio existente (admin).
+func (uc *LoyaltyUseCase) UpdateBenefit(ctx context.Context, companyID, benefitID string, in dto.UpdateBenefitRequest) (*dto.BenefitResponse, error) {
+	if benefitID == "" || in.Name == "" {
+		return nil, domain.ErrInvalidInput
+	}
+	b, err := uc.benefitRepo.GetByID(benefitID)
+	if err != nil {
+		return nil, err
+	}
+	if b == nil {
+		return nil, domain.ErrNotFound
+	}
+	if b.CompanyID != companyID {
+		return nil, domain.ErrForbidden
+	}
+	b.Name = in.Name
+	b.Description = in.Description
+	b.UpdatedAt = time.Now()
+	if err := uc.benefitRepo.Update(b); err != nil {
+		return nil, err
+	}
+	return &dto.BenefitResponse{
+		ID:          b.ID,
+		CompanyID:   b.CompanyID,
+		CategoryID:  b.CategoryID,
+		Name:        b.Name,
+		Description: b.Description,
+		CreatedAt:   b.CreatedAt,
+		UpdatedAt:   b.UpdatedAt,
+	}, nil
+}

@@ -11,7 +11,7 @@ import (
 // CustomerUseCase interfaz local para permitir mocking en tests.
 type CustomerUseCase interface {
 	Create(companyID string, in dto.CreateCustomerRequest) (*dto.CustomerResponse, error)
-	List(companyID string, limit, offset int) ([]*dto.CustomerResponse, error)
+	List(companyID string, search string, limit, offset int) ([]*dto.CustomerResponse, error)
 }
 
 // CustomerHandler maneja las peticiones HTTP de clientes (facturación, protegido).
@@ -67,6 +67,7 @@ func (h *CustomerHandler) Create(c *fiber.Ctx) error {
 // @Security     Bearer
 // @Accept       json
 // @Produce      json
+// @Param        search  query     string  false  "Buscar por nombre o NIT (tax_id)"
 // @Param        limit   query     int   false  "Límite de resultados"
 // @Param        offset  query     int   false  "Desplazamiento"
 // @Success      200     {array}   dto.CustomerResponse
@@ -78,9 +79,10 @@ func (h *CustomerHandler) List(c *fiber.Ctx) error {
 	if companyID == "" {
 		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
 	}
+	search := c.Query("search")
 	limit, _ := strconv.Atoi(c.Query("limit", "20"))
 	offset, _ := strconv.Atoi(c.Query("offset", "0"))
-	list, err := h.uc.List(companyID, limit, offset)
+	list, err := h.uc.List(companyID, search, limit, offset)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}
