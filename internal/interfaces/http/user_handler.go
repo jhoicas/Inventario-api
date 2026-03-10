@@ -155,8 +155,14 @@ func (h *UserHandler) Create(c *fiber.Ctx) error {
 func (h *UserHandler) Update(c *fiber.Ctx) error {
 	companyID := GetCompanyID(c)
 	id := c.Params("id")
-	if companyID == "" || id == "" {
+	if companyID == "" {
 		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if id == "" || id == "undefined" {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_ID", Message: "ID de usuario inválido"})
+	}
+	if _, err := uuid.Parse(id); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_ID", Message: "ID de usuario inválido"})
 	}
 	user, err := h.repo.GetByID(id)
 	if err != nil {
@@ -169,11 +175,19 @@ func (h *UserHandler) Update(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusForbidden).JSON(dto.ErrorResponse{Code: "FORBIDDEN", Message: "acceso denegado"})
 	}
 	var body struct {
+		Name   string   `json:"name"`
+		Email  string   `json:"email"`
 		Roles  []string `json:"roles"`
 		Status string   `json:"status"`
 	}
 	if err := c.BodyParser(&body); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
+	}
+	if body.Name != "" {
+		user.Name = body.Name
+	}
+	if body.Email != "" {
+		user.Email = body.Email
 	}
 	if len(body.Roles) > 0 {
 		user.Roles = body.Roles
