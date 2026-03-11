@@ -7,30 +7,32 @@ import (
 	"github.com/jhoicas/Inventario-api/internal/application/billing"
 	"github.com/jhoicas/Inventario-api/internal/application/inventory"
 	"github.com/jhoicas/Inventario-api/internal/application/usecase"
+	dianws "github.com/jhoicas/Inventario-api/internal/billing"
 	"github.com/jhoicas/Inventario-api/internal/domain/entity"
 	"github.com/jhoicas/Inventario-api/internal/domain/repository"
 )
 
 // RouterDeps dependencias para el router.
 type RouterDeps struct {
-	CompanyUC        *usecase.CompanyUseCase
-	WarehouseUC      *usecase.WarehouseUseCase
-	ProductUC        *usecase.ProductUseCase
-	UserRepo         repository.UserRepository
-	RegisterMovement *inventory.RegisterMovementUseCase
-	Replenishment    *inventory.ReplenishmentUseCase
-	CustomerUC       *billing.CustomerUseCase
-	CreateInvoice    *billing.CreateInvoiceUseCase
-	ReturnInvoice    *billing.CreateCreditNoteUseCase
-	InvoicePDF       *billing.PDFUseCase
-	AuthUC           *auth.AuthUseCase
-	ModuleService    *usecase.ModuleService
-	AnalyticsUC             *usecase.AnalyticsUseCase
-	RawMaterialAnalyticsUC   *usecase.RawMaterialAnalyticsUseCase
-	DashboardUC      *appanalytics.DashboardUseCase
-	AIUC             *usecase.AIUseCase
-	CRMHandler       *CRMHandler
-	JWTSecret        string
+	CompanyUC              *usecase.CompanyUseCase
+	WarehouseUC            *usecase.WarehouseUseCase
+	ProductUC              *usecase.ProductUseCase
+	UserRepo               repository.UserRepository
+	RegisterMovement       *inventory.RegisterMovementUseCase
+	Replenishment          *inventory.ReplenishmentUseCase
+	CustomerUC             *billing.CustomerUseCase
+	CreateInvoice          *billing.CreateInvoiceUseCase
+	ReturnInvoice          *billing.CreateCreditNoteUseCase
+	InvoicePDF             *billing.PDFUseCase
+	AuthUC                 *auth.AuthUseCase
+	ModuleService          *usecase.ModuleService
+	AnalyticsUC            *usecase.AnalyticsUseCase
+	RawMaterialAnalyticsUC *usecase.RawMaterialAnalyticsUseCase
+	DashboardUC            *appanalytics.DashboardUseCase
+	AIUC                   *usecase.AIUseCase
+	CRMHandler             *CRMHandler
+	CustomerLookup         *dianws.CustomerLookupHandler
+	JWTSecret              string
 }
 
 // Router registra todas las rutas de la API aplicando:
@@ -83,6 +85,13 @@ func Router(app *fiber.App, deps RouterDeps) {
 	cust.Get("/", customerHandler.List)
 	// Creación de clientes: admin y vendedor
 	cust.Post("/", RequireRole(entity.RoleAdmin, entity.RoleVendedor), customerHandler.Create)
+	// Consulta DIAN por documento: JWT + RequireModule(billing)
+	if deps.CustomerLookup != nil {
+		cust.Get("/lookup",
+			RequireModule(entity.ModuleBilling, deps.ModuleService),
+			deps.CustomerLookup.Lookup,
+		)
+	}
 
 	// Gestión de usuarios (solo admin)
 	userHandler := NewUserHandler(deps.UserRepo)
@@ -131,8 +140,8 @@ func Router(app *fiber.App, deps RouterDeps) {
 		RequireModule(entity.ModuleAnalytics, deps.ModuleService),
 		RequireRole(entity.RoleAdmin),
 	)
-		analyticsGroup.Get("/margins", analyticsHandler.GetMargins)
-		analyticsGroup.Get("/raw-materials-impact", analyticsHandler.GetRawMaterialImpactRanking)
+	analyticsGroup.Get("/margins", analyticsHandler.GetMargins)
+	analyticsGroup.Get("/raw-materials-impact", analyticsHandler.GetRawMaterialImpactRanking)
 
 	// ── Dashboard (JWT + solo admin) ───────────────────────────────────────────
 	dashboardHandler := NewDashboardHandler(deps.DashboardUC)

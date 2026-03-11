@@ -19,6 +19,7 @@ import (
 	"github.com/jhoicas/Inventario-api/internal/application/crm"
 	"github.com/jhoicas/Inventario-api/internal/application/inventory"
 	"github.com/jhoicas/Inventario-api/internal/application/usecase"
+	dianws "github.com/jhoicas/Inventario-api/internal/billing"
 	infraai "github.com/jhoicas/Inventario-api/internal/infrastructure/ai"
 	infradian "github.com/jhoicas/Inventario-api/internal/infrastructure/dian"
 	"github.com/jhoicas/Inventario-api/internal/infrastructure/dian/signer"
@@ -147,6 +148,9 @@ func main() {
 		Issuer:     cfg.JWT.Issuer,
 	})
 
+	// DIAN GetAcquirer: consulta de contribuyentes por tipo y número de documento
+	customerLookupHandler := dianws.NewCustomerLookupHandler(cfg.DIAN.AppEnv)
+
 	app := fiber.New(fiber.Config{
 		AppName:      cfg.App.Name,
 		ReadTimeout:  time.Second * 10,
@@ -198,6 +202,7 @@ func main() {
 		DashboardUC:            dashboardUC,
 		AIUC:                   aiUC,
 		CRMHandler:             crmHandler,
+		CustomerLookup:         customerLookupHandler,
 		JWTSecret:              cfg.JWT.Secret,
 	})
 
