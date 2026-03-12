@@ -3,6 +3,7 @@ package billing
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"log"
@@ -167,6 +168,10 @@ func (m *InvoiceMailer) send(ctx context.Context, invoiceID string) error {
 
 	// ── 8. Enviar ─────────────────────────────────────────────────────────────
 	dialer := gomail.NewDialer(m.smtp.Host, m.smtp.Port, m.smtp.User, m.smtp.Password)
+	dialer.TLSConfig = &tls.Config{
+		InsecureSkipVerify: false,
+		ServerName:         m.smtp.Host,
+	}
 	if err := dialer.DialAndSend(msg); err != nil {
 		return fmt.Errorf("error al enviar correo SMTP: %w", err)
 	}

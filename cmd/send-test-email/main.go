@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"log"
@@ -71,5 +72,9 @@ func sendTestEmail(to string, smtpCfg dianws.SMTPConfig) error {
 
 	_ = ctx // ctx no se usa directamente con gomail, pero lo mantenemos para future use
 	dialer := gomail.NewDialer(smtpCfg.Host, smtpCfg.Port, smtpCfg.User, smtpCfg.Password)
+	dialer.TLSConfig = &tls.Config{
+		InsecureSkipVerify: false,
+		ServerName:         smtpCfg.Host,
+	}
 	return dialer.DialAndSend(msg)
 }
