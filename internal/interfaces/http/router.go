@@ -34,6 +34,7 @@ type RouterDeps struct {
 	AIUC                   *usecase.AIUseCase
 	CRMHandler             *CRMHandler
 	CustomerLookup         *dianws.CustomerLookupHandler
+	InvoiceMailer          InvoiceMailerUseCase
 	JWTSecret              string
 }
 
@@ -120,7 +121,7 @@ func Router(app *fiber.App, deps RouterDeps) {
 	)
 
 	// ── Facturación (módulo 'billing' + roles) ─────────────────────────────────
-	invoiceHandler := NewInvoiceHandlerWithBillingOps(deps.CreateInvoice, deps.ReturnInvoice, deps.DebitNote, deps.VoidInvoice, deps.InvoicePDF)
+	invoiceHandler := NewInvoiceHandlerWithBillingOps(deps.CreateInvoice, deps.ReturnInvoice, deps.DebitNote, deps.VoidInvoice, deps.InvoicePDF, deps.InvoiceMailer)
 	invGroup2 := protected.Group("/invoices", RequireModule(entity.ModuleBilling, deps.ModuleService))
 
 	// GET — listar facturas con filtros y paginación: admin y vendedor
@@ -147,6 +148,11 @@ func Router(app *fiber.App, deps RouterDeps) {
 	invGroup2.Post("/:id/void",
 		RequireRole(entity.RoleAdmin, entity.RoleVendedor),
 		invoiceHandler.HandleVoidInvoice,
+	)
+	// POST — enviar factura por correo al cliente: admin y vendedor
+	invGroup2.Post("/:id/send-email",
+		RequireRole(entity.RoleAdmin, entity.RoleVendedor),
+		invoiceHandler.SendEmail,
 	)
 	// GET (consultas y descarga) — todos los roles con billing activo
 	invGroup2.Get("/:id/status", invoiceHandler.GetDIANStatus)

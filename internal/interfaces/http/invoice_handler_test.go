@@ -99,6 +99,17 @@ func (f *fakeInvoicePDFUseCase) DownloadInvoicePDF(ctx context.Context, companyI
 	return nil, "", errors.New("downloadInvoicePDF not configured")
 }
 
+type fakeInvoiceMailerUseCase struct {
+	sendInvoiceEmailSyncFunc func(ctx context.Context, companyID, invoiceID string) error
+}
+
+func (f *fakeInvoiceMailerUseCase) SendInvoiceEmailSync(ctx context.Context, companyID, invoiceID string) error {
+	if f.sendInvoiceEmailSyncFunc != nil {
+		return f.sendInvoiceEmailSyncFunc(ctx, companyID, invoiceID)
+	}
+	return errors.New("sendInvoiceEmailSync not configured")
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 const invoiceTestCompanyID = "company-123"
@@ -1286,6 +1297,140 @@ func TestInvoiceHandler_DownloadPDF(t *testing.T) {
 			if tt.validateBody != nil {
 				tt.validateBody(t, resp)
 			}
+		})
+	}
+}
+
+// ── Tests SendEmail ───────────────────────────────────────────────────────────
+
+func TestInvoiceHandler_SendEmail(t *testing.T) {
+	tests := []struct {
+		name           string
+		id             string
+		companyID      string
+		mailer         InvoiceMailerUseCase
+		expectedStatus int
+		expectedCode   string
+		expectedMsg    string
+	}{
+		{
+			name:      "Success",
+			id:        "inv-123",
+			companyID: invoiceTestCompanyID,
+			mailer: &fakeInvoiceMailerUseCase{
+				sendInvoiceEmailSyncFunc: func(_ context.Context, companyID, invoiceID string) error {
+					assert.Equal(t, invoiceTestCompanyID, companyID)
+					assert.Equal(t, "inv-123", invoiceID)
+					return nil
+				},
+			},
+			expectedStatus: http.StatusOK,
+			expectedMsg:    "correo enviado correctamente",
+		},
+		{
+			name:           "Unauthorized_NoCompanyID",
+			id:             "inv-123",
+			companyID:      "",
+			mailer:         &fakeInvoiceMailerUseCase{},
+			expectedStatus: http.StatusUnauthorized,
+			expectedCode:   "UNAUTHORIZED",
+		},
+		{
+			name:           "Validation_MissingID",
+			id:             "",
+			companyID:      invoiceTestCompanyID,
+			mailer:         &fakeInvoiceMailerUseCase{},
+			expectedStatus: http.StatusNotFound,
+			expectedCode:   "",
+		},
+		{
+			name:           "MailerDisabled",
+			id:             "inv-123",
+			companyID:      invoiceTestCompanyID,
+			mailer:         nil,
+			expectedStatus: http.StatusServiceUnavailable,
+			expectedCode:   "MAILER_DISABLED",
+		},
+		{
+			name:      "NotFound",
+			id:        "inv-404",
+			companyID: invoiceTestCompanyID,
+			mailer: &fakeInvoiceMailerUseCase{
+				sendInvoiceEmailSyncFunc: func(_ context.Context, _, _ string) error {
+					return domain.ErrNotFound
+				},
+			},
+			expectedStatus: http.StatusNotFound,
+			expectedCode:   "NOT_FOUND",
+		},
+		{
+			name:      "Forbidden",
+			id:        "inv-403",
+			companyID: invoiceTestCompanyID,
+			mailer: &fakeInvoiceMailerUseCase{
+				sendInvoiceEmailSyncFunc: func(_ context.Context, _, _ string) error {
+					return domain.ErrForbidden
+				},
+			},
+			expectedStatus: http.StatusForbidden,
+			expectedCode:   "FORBIDDEN",
+		},
+		{
+			name:      "InternalError",
+			id:        "inv-500",
+			companyID: invoiceTestCompanyID,
+			mailer: &fakeInvoiceMailerUseCase{
+				sendInvoiceEmailSyncFunc: func(_ context.Context, _, _ string) error {
+					return errors.New("smtp timeout")
+				},
+			},
+			expectedStatus: http.StatusInternalServerError,
+			expectedCode:   "INTERNAL",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := NewInvoiceHandlerWithBillingOps(
+				&fakeCreateInvoiceUseCase{},
+				&fakeCreateCreditNoteUseCase{},
+				&fakeCreateDebitNoteUseCase{},
+				&fakeVoidInvoiceUseCase{},
+				&fakeInvoicePDFUseCase{},
+				tt.mailer,
+			)
+
+			app := fiber.New(fiber.Config{DisableStartupMessage: true})
+			app.Use(mockInvoiceAuthCompanyOnly(tt.companyID))
+			app.Post("/invoices/:id/send-email", handler.SendEmail)
+
+			path := "/invoices/"
+			if tt.id != "" {
+				path += tt.id + "/send-email"
+			} else {
+				path = "/invoices//send-email"
+			}
+
+			req := httptest.NewRequest(http.MethodPost, path, nil)
+			resp, err := app.Test(req, -1)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+
+			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
+
+			if tt.expectedStatus == http.StatusOK {
+				var body map[string]string
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+				assert.Equal(t, tt.expectedMsg, body["message"])
+				return
+			}
+			if tt.expectedCode == "" {
+				return
+			}
+
+			var errResp dto.ErrorResponse
+			require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
+			assert.Equal(t, tt.expectedCode, errResp.Code)
 		})
 	}
 }

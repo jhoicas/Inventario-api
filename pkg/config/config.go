@@ -11,18 +11,28 @@ import (
 
 // Config agrupa la configuración de la aplicación (lectura vía Viper desde env y opcionalmente archivo).
 type Config struct {
-	App   AppConfig
-	DB    DBConfig
-	JWT   JWTConfig
-	HTTP  HTTPConfig
-	DIAN  DIANConfig
-	AI    AIConfig
+	App  AppConfig
+	DB   DBConfig
+	JWT  JWTConfig
+	HTTP HTTPConfig
+	DIAN DIANConfig
+	AI   AIConfig
+	SMTP SMTPConfig
 }
 
 // AIConfig configuración para servicios de Inteligencia Artificial.
 type AIConfig struct {
 	AnthropicAPIKey string // clave de la API de Anthropic (ANTHROPIC_API_KEY)
 	AnthropicModel  string // modelo a usar, p.ej. "claude-3-5-haiku-20241022" (ANTHROPIC_MODEL)
+}
+
+// SMTPConfig configuración del servidor de correo saliente.
+type SMTPConfig struct {
+	Host     string // SMTP_HOST
+	Port     int    // SMTP_PORT (default 587)
+	User     string // SMTP_USER
+	Password string // SMTP_PASSWORD
+	From     string // SMTP_FROM (dirección From del correo)
 }
 
 // DIANConfig configuración para factura electrónica DIAN (Colombia).
@@ -154,6 +164,13 @@ func Load() (*Config, error) {
 		AI: AIConfig{
 			AnthropicAPIKey: getString(v, "ANTHROPIC_API_KEY", ""),
 			AnthropicModel:  getString(v, "ANTHROPIC_MODEL", "claude-3-5-haiku-20241022"),
+		},
+		SMTP: SMTPConfig{
+			Host:     getString(v, "SMTP_HOST", ""),
+			Port:     getInt(v, "SMTP_PORT", 587),
+			User:     getString(v, "SMTP_USER", ""),
+			Password: getString(v, "SMTP_PASSWORD", ""),
+			From:     getString(v, "SMTP_FROM", ""),
 		},
 	}
 

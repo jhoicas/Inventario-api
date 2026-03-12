@@ -98,6 +98,14 @@ func main() {
 		resolutionRepo, xmlBuilder, signerSvc, dianSubmitter, dianCfg,
 	)
 
+	smtpCfg := dianws.SMTPConfig{
+		Host:     cfg.SMTP.Host,
+		Port:     cfg.SMTP.Port,
+		User:     cfg.SMTP.User,
+		Password: cfg.SMTP.Password,
+		From:     cfg.SMTP.From,
+	}
+
 	createInvoiceUC := billing.NewCreateInvoiceUseCase(
 		txRunner, registerMovementUC,
 		customerRepo, companyRepo, productRepo, warehouseRepo, invoiceRepo,
@@ -154,6 +162,10 @@ func main() {
 	invoicePDFUC := billing.NewPDFUseCase(
 		invoiceRepo, companyRepo, customerRepo, productRepo, pdfGenerator,
 	)
+	invoiceMailer := dianws.NewInvoiceMailer(
+		invoiceRepo, companyRepo, customerRepo, productRepo, pdfGenerator, smtpCfg,
+	)
+	dianOrchestrator.SetMailer(invoiceMailer)
 	authUC := auth.NewAuthUseCase(userRepo, companyRepo, auth.JWTConfig{
 		Secret:     cfg.JWT.Secret,
 		ExpMinutes: cfg.JWT.Expiration,
@@ -217,6 +229,7 @@ func main() {
 		AIUC:                   aiUC,
 		CRMHandler:             crmHandler,
 		CustomerLookup:         customerLookupHandler,
+		InvoiceMailer:          invoiceMailer,
 		JWTSecret:              cfg.JWT.Secret,
 	})
 

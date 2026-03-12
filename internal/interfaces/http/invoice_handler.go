@@ -38,6 +38,11 @@ type InvoicePDFUseCase interface {
 	DownloadInvoicePDF(ctx context.Context, companyID, invoiceID string) (pdfBytes []byte, filename string, err error)
 }
 
+// InvoiceMailerUseCase interfaz para el envío manual de correo de factura.
+type InvoiceMailerUseCase interface {
+	SendInvoiceEmailSync(ctx context.Context, companyID, invoiceID string) error
+}
+
 // InvoiceHandler maneja las peticiones HTTP de facturación (protegido).
 type InvoiceHandler struct {
 	uc       CreateInvoiceUseCase
@@ -45,6 +50,7 @@ type InvoiceHandler struct {
 	debitUC  CreateDebitNoteUseCase
 	voidUC   VoidInvoiceUseCase
 	pdfUC    InvoicePDFUseCase
+	mailerUC InvoiceMailerUseCase
 }
 
 // NewInvoiceHandler construye el handler.
@@ -72,16 +78,20 @@ func NewInvoiceHandlerWithDebit(
 	return h
 }
 
-// NewInvoiceHandlerWithBillingOps construye el handler con nota débito y anulación.
+// NewInvoiceHandlerWithBillingOps construye el handler con nota débito, anulación y mailer.
 func NewInvoiceHandlerWithBillingOps(
 	uc CreateInvoiceUseCase,
 	returnUC CreateCreditNoteUseCase,
 	debitUC CreateDebitNoteUseCase,
 	voidUC VoidInvoiceUseCase,
 	pdfUC InvoicePDFUseCase,
+	mailerUC ...InvoiceMailerUseCase,
 ) *InvoiceHandler {
 	h := NewInvoiceHandlerWithDebit(uc, returnUC, debitUC, pdfUC)
 	h.voidUC = voidUC
+	if len(mailerUC) > 0 {
+		h.mailerUC = mailerUC[0]
+	}
 	return h
 }
 
@@ -463,4 +473,46 @@ func (h *InvoiceHandler) DownloadPDF(c *fiber.Ctx) error {
 	c.Set("Content-Disposition", fmt.Sprintf(`inline; filename="%s"`, filename))
 	c.Set("Content-Length", fmt.Sprintf("%d", len(pdfBytes)))
 	return c.Send(pdfBytes)
+}
+
+// SendEmail godoc
+// @Summary      Enviar factura por correo
+// @Description  Envía la factura electrónica (PDF + XML firmado) al correo del cliente
+// @Tags         billing
+// @Security     Bearer
+// @Param        id   path      string  true  "ID de la factura"
+// @Success      200  {object}  map[string]string
+// @Failure      400  {object}  dto.ErrorResponse
+// @Failure      401  {object}  dto.ErrorResponse
+// @Failure      404  {object}  dto.ErrorResponse
+// @Failure      409  {object}  dto.ErrorResponse
+// @Failure      500  {object}  dto.ErrorResponse
+// @Router       /api/invoices/{id}/send-email [post]
+func (h *InvoiceHandler) SendEmail(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	if companyID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	id := c.Params("id")
+	if id == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "id requerido"})
+	}
+	if h.mailerUC == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "MAILER_DISABLED", Message: "envío de correo no configurado"})
+	}
+
+	if err := h.mailerUC.SendInvoiceEmailSync(c.Context(), companyID, id); err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "factura no encontrada"})
+		}
+		if errors.Is(err, domain.ErrForbidden) {
+			return c.Status(fiber.StatusForbidden).JSON(dto.ErrorResponse{Code: "FORBIDDEN", Message: "acceso denegado"})
+		}
+		if errors.Is(err, domain.ErrInvalidInput) {
+			return c.Status(fiber.StatusConflict).JSON(dto.ErrorResponse{Code: "NOT_READY", Message: err.Error()})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "correo enviado correctamente"})
 }

@@ -37,6 +37,12 @@ type DIANOrchestrator struct {
 	signer         pkgdian.Signer
 	submitter      infradian.DIANSubmitter // cliente SOAP; nil en dev
 	dianConfig     DIANConfig
+	mailer         InvoiceMailerPort       // optional; nil → no email
+}
+
+// InvoiceMailerPort es el puerto opcional de envío de correo tras validación DIAN.
+type InvoiceMailerPort interface {
+	SendInvoiceEmail(invoiceID string)
 }
 
 // NewDIANOrchestrator construye el orquestador con todas sus dependencias.
@@ -63,6 +69,11 @@ func NewDIANOrchestrator(
 		submitter:      submitter,
 		dianConfig:     dianConfig,
 	}
+}
+
+// SetMailer inyecta el mailer después de la construcción (evita ciclo de dependencias).
+func (o *DIANOrchestrator) SetMailer(m InvoiceMailerPort) {
+	o.mailer = m
 }
 
 // ProcessAsync dispara el procesamiento DIAN en una goroutine independiente.
@@ -292,7 +303,14 @@ func (o *DIANOrchestrator) process(invoiceID string) {
 	}
 
 	log.Printf("[DIAN][%s] procesada → %s (TrackID: %s)", invoiceID, finalStatus, trackID)
-}
+
+	// ═══════════════════════════════════════════════════════════════════════════════
+	// 8. Enviar correo electrónico cuando la factura es EXITOSO
+	// ═══════════════════════════════════════════════════════════════════════════════
+	if finalStatus == entity.DIANStatusExitoso && o.mailer != nil {
+		o.mailer.SendInvoiceEmail(invoiceID)
+	}
+	}
 
 // ── helpers privados ──────────────────────────────────────────────────────────
 
