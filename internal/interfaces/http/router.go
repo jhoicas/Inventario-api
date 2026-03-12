@@ -159,6 +159,13 @@ func Router(app *fiber.App, deps RouterDeps) {
 	invGroup2.Get("/:id/pdf", invoiceHandler.DownloadPDF)
 	invGroup2.Get("/:id", invoiceHandler.GetByID)
 
+	// ── Correos manuales (módulo 'billing' + roles) ───────────────────────────
+	emailGroup := protected.Group("/emails", RequireModule(entity.ModuleBilling, deps.ModuleService))
+	emailGroup.Post("/send",
+		RequireRole(entity.RoleAdmin, entity.RoleVendedor),
+		invoiceHandler.SendCustomEmail,
+	)
+
 	// ── Analytics (módulo 'analytics' + solo admin) ────────────────────────────
 	analyticsHandler := NewAnalyticsHandler(deps.AnalyticsUC, deps.RawMaterialAnalyticsUC)
 	analyticsGroup := protected.Group("/analytics",

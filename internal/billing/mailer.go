@@ -81,9 +81,46 @@ func (m *InvoiceMailer) SendInvoiceEmailSync(ctx context.Context, companyID, inv
 	return m.send(ctx, invoiceID)
 }
 
+// SendCustomEmailSync envía un correo libre sin adjuntos.
+func (m *InvoiceMailer) SendCustomEmailSync(ctx context.Context, companyID, to, subject, body string) error {
+	if m.smtp.Host == "" && !m.hasResendAPIConfig() {
+		return fmt.Errorf("no hay proveedor de correo configurado (SMTP_HOST o RESEND_API_KEY)")
+	}
+
+	from := m.smtp.From
+	if companyID != "" && m.companyRepo != nil {
+		if company, err := m.companyRepo.GetByID(companyID); err == nil && company != nil {
+			if sender := buildSenderEmail(company.Email); sender != "" {
+				from = sender
+			}
+		}
+	}
+	if from == "" {
+		from = m.smtp.User
+	}
+
+	if m.smtp.Host == "" && m.hasResendAPIConfig() {
+		return m.sendWithResendAPI(ctx, from, to, subject, body, "", nil, "", "")
+	}
+
+	err := m.sendWithSMTP(from, to, subject, body, "", nil, "", "")
+	if err == nil {
+		return nil
+	}
+	if m.hasResendAPIConfig() && isSMTPConnectivityError(err) {
+		if apiErr := m.sendWithResendAPI(ctx, from, to, subject, body, "", nil, "", ""); apiErr == nil {
+			return nil
+		} else {
+			return fmt.Errorf("error SMTP: %v; error Resend API: %w", err, apiErr)
+		}
+	}
+
+	return fmt.Errorf("error al enviar correo SMTP: %w", err)
+}
+
 // send es la implementación interna del envío.
 func (m *InvoiceMailer) send(ctx context.Context, invoiceID string) error {
-	if m.smtp.Host == "" && m.smtp.ResendAPIKey == "" {
+	if m.smtp.Host == "" && !m.hasResendAPIConfig() {
 		return fmt.Errorf("no hay proveedor de correo configurado (SMTP_HOST o RESEND_API_KEY)")
 	}
 
@@ -158,7 +195,7 @@ func (m *InvoiceMailer) send(ctx context.Context, invoiceID string) error {
 	}
 
 	// ── 8. Enviar ─────────────────────────────────────────────────────────────
-	if m.smtp.Host == "" && m.smtp.ResendAPIKey != "" {
+	if m.smtp.Host == "" && m.hasResendAPIConfig() {
 		if err := m.sendWithResendAPI(ctx, from, customer.Email, subject, body, pdfName, pdfBytes, xmlName, inv.XMLSigned); err != nil {
 			return fmt.Errorf("error al enviar correo Resend API: %w", err)
 		}
@@ -170,7 +207,7 @@ func (m *InvoiceMailer) send(ctx context.Context, invoiceID string) error {
 		return nil
 	}
 
-	if m.smtp.ResendAPIKey != "" && isSMTPConnectivityError(err) {
+	if m.hasResendAPIConfig() && isSMTPConnectivityError(err) {
 		if apiErr := m.sendWithResendAPI(ctx, from, customer.Email, subject, body, pdfName, pdfBytes, xmlName, inv.XMLSigned); apiErr == nil {
 			log.Printf("[MAILER][%s] SMTP falló por conectividad, enviado vía Resend API", invoiceID)
 			return nil
@@ -189,12 +226,14 @@ func (m *InvoiceMailer) sendWithSMTP(from, to, subject, body, pdfName string, pd
 	msg.SetHeader("Subject", subject)
 	msg.SetBody("text/plain", body)
 
-	pdfCopy := make([]byte, len(pdfBytes))
-	copy(pdfCopy, pdfBytes)
-	msg.Attach(pdfName, gomail.SetCopyFunc(func(w io.Writer) error {
-		_, err := io.Copy(w, bytes.NewReader(pdfCopy))
-		return err
-	}))
+	if pdfName != "" && len(pdfBytes) > 0 {
+		pdfCopy := make([]byte, len(pdfBytes))
+		copy(pdfCopy, pdfBytes)
+		msg.Attach(pdfName, gomail.SetCopyFunc(func(w io.Writer) error {
+			_, err := io.Copy(w, bytes.NewReader(pdfCopy))
+			return err
+		}))
+	}
 
 	if xmlName != "" && xmlContent != "" {
 		xmlCopy := xmlContent
@@ -247,9 +286,9 @@ func (m *InvoiceMailer) sendWithResendAPI(ctx context.Context, from, to, subject
 		To:      []string{to},
 		Subject: subject,
 		Text:    body,
-		Attachments: []resendAttachment{
-			{Filename: pdfName, Content: base64.StdEncoding.EncodeToString(pdfBytes)},
-		},
+	}
+	if pdfName != "" && len(pdfBytes) > 0 {
+		reqBody.Attachments = append(reqBody.Attachments, resendAttachment{Filename: pdfName, Content: base64.StdEncoding.EncodeToString(pdfBytes)})
 	}
 
 	if xmlName != "" && xmlContent != "" {
@@ -301,6 +340,10 @@ func isSMTPConnectivityError(err error) bool {
 		strings.Contains(msg, "connection timed out") ||
 		strings.Contains(msg, "no route to host") ||
 		strings.Contains(msg, "connection refused")
+}
+
+func (m *InvoiceMailer) hasResendAPIConfig() bool {
+	return strings.TrimSpace(m.smtp.ResendAPIKey) != "" || strings.TrimSpace(m.smtp.Password) != ""
 }
 
 // buildSenderEmail extrae el dominio del email de la empresa y construye noresponde@dominio.

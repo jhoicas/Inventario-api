@@ -101,6 +101,7 @@ func (f *fakeInvoicePDFUseCase) DownloadInvoicePDF(ctx context.Context, companyI
 
 type fakeInvoiceMailerUseCase struct {
 	sendInvoiceEmailSyncFunc func(ctx context.Context, companyID, invoiceID string) error
+	sendCustomEmailSyncFunc  func(ctx context.Context, companyID, to, subject, body string) error
 }
 
 func (f *fakeInvoiceMailerUseCase) SendInvoiceEmailSync(ctx context.Context, companyID, invoiceID string) error {
@@ -108,6 +109,13 @@ func (f *fakeInvoiceMailerUseCase) SendInvoiceEmailSync(ctx context.Context, com
 		return f.sendInvoiceEmailSyncFunc(ctx, companyID, invoiceID)
 	}
 	return errors.New("sendInvoiceEmailSync not configured")
+}
+
+func (f *fakeInvoiceMailerUseCase) SendCustomEmailSync(ctx context.Context, companyID, to, subject, body string) error {
+	if f.sendCustomEmailSyncFunc != nil {
+		return f.sendCustomEmailSyncFunc(ctx, companyID, to, subject, body)
+	}
+	return errors.New("sendCustomEmailSync not configured")
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -1425,6 +1433,121 @@ func TestInvoiceHandler_SendEmail(t *testing.T) {
 				return
 			}
 			if tt.expectedCode == "" {
+				return
+			}
+
+			var errResp dto.ErrorResponse
+			require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
+			assert.Equal(t, tt.expectedCode, errResp.Code)
+		})
+	}
+}
+
+func TestInvoiceHandler_SendCustomEmail(t *testing.T) {
+	tests := []struct {
+		name           string
+		companyID      string
+		body           any
+		mailer         InvoiceMailerUseCase
+		expectedStatus int
+		expectedCode   string
+		expectedMsg    string
+	}{
+		{
+			name:      "Success",
+			companyID: invoiceTestCompanyID,
+			body: dto.SendCustomEmailRequest{
+				To:      "destino@example.com",
+				Subject: "Prueba",
+				Body:    "Hola desde el ERP",
+			},
+			mailer: &fakeInvoiceMailerUseCase{
+				sendCustomEmailSyncFunc: func(_ context.Context, companyID, to, subject, body string) error {
+					assert.Equal(t, invoiceTestCompanyID, companyID)
+					assert.Equal(t, "destino@example.com", to)
+					assert.Equal(t, "Prueba", subject)
+					assert.Equal(t, "Hola desde el ERP", body)
+					return nil
+				},
+			},
+			expectedStatus: http.StatusOK,
+			expectedMsg:    "correo enviado correctamente",
+		},
+		{
+			name:           "Unauthorized_NoCompanyID",
+			companyID:      "",
+			body:           dto.SendCustomEmailRequest{To: "destino@example.com", Subject: "Prueba", Body: "Hola"},
+			mailer:         &fakeInvoiceMailerUseCase{},
+			expectedStatus: http.StatusUnauthorized,
+			expectedCode:   "UNAUTHORIZED",
+		},
+		{
+			name:           "Validation_MissingFields",
+			companyID:      invoiceTestCompanyID,
+			body:           dto.SendCustomEmailRequest{To: "", Subject: "Prueba", Body: "Hola"},
+			mailer:         &fakeInvoiceMailerUseCase{},
+			expectedStatus: http.StatusBadRequest,
+			expectedCode:   "VALIDATION",
+		},
+		{
+			name:           "Validation_InvalidEmail",
+			companyID:      invoiceTestCompanyID,
+			body:           dto.SendCustomEmailRequest{To: "destino-invalido", Subject: "Prueba", Body: "Hola"},
+			mailer:         &fakeInvoiceMailerUseCase{},
+			expectedStatus: http.StatusBadRequest,
+			expectedCode:   "VALIDATION",
+		},
+		{
+			name:           "MailerDisabled",
+			companyID:      invoiceTestCompanyID,
+			body:           dto.SendCustomEmailRequest{To: "destino@example.com", Subject: "Prueba", Body: "Hola"},
+			mailer:         nil,
+			expectedStatus: http.StatusServiceUnavailable,
+			expectedCode:   "MAILER_DISABLED",
+		},
+		{
+			name:      "InternalError",
+			companyID: invoiceTestCompanyID,
+			body:      dto.SendCustomEmailRequest{To: "destino@example.com", Subject: "Prueba", Body: "Hola"},
+			mailer: &fakeInvoiceMailerUseCase{
+				sendCustomEmailSyncFunc: func(_ context.Context, _, _, _, _ string) error {
+					return errors.New("smtp timeout")
+				},
+			},
+			expectedStatus: http.StatusInternalServerError,
+			expectedCode:   "INTERNAL",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := NewInvoiceHandlerWithBillingOps(
+				&fakeCreateInvoiceUseCase{},
+				&fakeCreateCreditNoteUseCase{},
+				&fakeCreateDebitNoteUseCase{},
+				&fakeVoidInvoiceUseCase{},
+				&fakeInvoicePDFUseCase{},
+				tt.mailer,
+			)
+
+			app := fiber.New(fiber.Config{DisableStartupMessage: true})
+			app.Use(mockInvoiceAuthCompanyOnly(tt.companyID))
+			app.Post("/emails/send", handler.SendCustomEmail)
+
+			bodyBytes, _ := json.Marshal(tt.body)
+			req := httptest.NewRequest(http.MethodPost, "/emails/send", bytes.NewReader(bodyBytes))
+			req.Header.Set("Content-Type", "application/json")
+
+			resp, err := app.Test(req, -1)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+
+			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
+
+			if tt.expectedStatus == http.StatusOK {
+				var body map[string]string
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+				assert.Equal(t, tt.expectedMsg, body["message"])
 				return
 			}
 

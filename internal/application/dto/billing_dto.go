@@ -78,6 +78,13 @@ type CreateVoidInvoiceRequest struct {
 	Reason      string `json:"reason"`
 }
 
+// SendCustomEmailRequest body para POST /api/emails/send.
+type SendCustomEmailRequest struct {
+	To      string `json:"to"`
+	Subject string `json:"subject"`
+	Body    string `json:"body"`
+}
+
 // VoidInvoiceResponse respuesta resumida de anulación por nota crédito.
 type VoidInvoiceResponse struct {
 	CreditNoteID string `json:"credit_note_id"`

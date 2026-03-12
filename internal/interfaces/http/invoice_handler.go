@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jhoicas/Inventario-api/internal/application/dto"
@@ -41,6 +42,7 @@ type InvoicePDFUseCase interface {
 // InvoiceMailerUseCase interfaz para el envío manual de correo de factura.
 type InvoiceMailerUseCase interface {
 	SendInvoiceEmailSync(ctx context.Context, companyID, invoiceID string) error
+	SendCustomEmailSync(ctx context.Context, companyID, to, subject, body string) error
 }
 
 // InvoiceHandler maneja las peticiones HTTP de facturación (protegido).
@@ -510,6 +512,57 @@ func (h *InvoiceHandler) SendEmail(c *fiber.Ctx) error {
 		}
 		if errors.Is(err, domain.ErrInvalidInput) {
 			return c.Status(fiber.StatusConflict).JSON(dto.ErrorResponse{Code: "NOT_READY", Message: err.Error()})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "correo enviado correctamente"})
+}
+
+// SendCustomEmail godoc
+// @Summary      Enviar correo libre
+// @Description  Envía un correo manual indicando destinatario, asunto y cuerpo
+// @Tags         billing
+// @Security     Bearer
+// @Accept       json
+// @Produce      json
+// @Param        body  body      dto.SendCustomEmailRequest  true  "Datos del correo"
+// @Success      200  {object}  map[string]string
+// @Failure      400  {object}  dto.ErrorResponse
+// @Failure      401  {object}  dto.ErrorResponse
+// @Failure      500  {object}  dto.ErrorResponse
+// @Router       /api/emails/send [post]
+func (h *InvoiceHandler) SendCustomEmail(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	if companyID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if h.mailerUC == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "MAILER_DISABLED", Message: "envío de correo no configurado"})
+	}
+
+	var in dto.SendCustomEmailRequest
+	if err := c.BodyParser(&in); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
+	}
+
+	in.To = strings.TrimSpace(in.To)
+	in.Subject = strings.TrimSpace(in.Subject)
+	in.Body = strings.TrimSpace(in.Body)
+
+	if in.To == "" || in.Subject == "" || in.Body == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "to, subject y body son requeridos"})
+	}
+	if !strings.Contains(in.To, "@") {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "email destino inválido"})
+	}
+
+	if err := h.mailerUC.SendCustomEmailSync(c.Context(), companyID, in.To, in.Subject, in.Body); err != nil {
+		if errors.Is(err, domain.ErrForbidden) {
+			return c.Status(fiber.StatusForbidden).JSON(dto.ErrorResponse{Code: "FORBIDDEN", Message: "acceso denegado"})
+		}
+		if errors.Is(err, domain.ErrInvalidInput) {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: err.Error()})
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}
