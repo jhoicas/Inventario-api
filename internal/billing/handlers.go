@@ -43,7 +43,15 @@ func (h *CustomerLookupHandler) Lookup(c *fiber.Ctx) error {
 		})
 	}
 
-	info, err := GetAcquirer(c.Context(), h.dianEnv, idType, idNumber)
+	// Obtener configuración DIAN inyectada por el middleware
+	dianURL, dianCert, err := GetDIANConfigFromContext(c)
+	if err != nil {
+		// Fallback a variables globales si no está disponible
+		dianURL = "https://vpfe-hab.dian.gov.co/WcfDianCustomerServices.svc"
+		dianCert = ""
+	}
+
+	info, err := GetAcquirer(c.Context(), dianURL, idType, idNumber, dianCert)
 	if err != nil {
 		if errors.Is(err, ErrAcquirerNotFound) {
 			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{

@@ -69,11 +69,11 @@ var dianHTTPClient = &http.Client{Timeout: 30 * time.Second}
 // GetAcquirer consulta WcfDianCustomerServices para obtener la información
 // de un contribuyente por tipo y número de documento.
 //
-// env: "prod" usa el endpoint de producción; cualquier otro valor usa habilitación.
-func GetAcquirer(ctx context.Context, env, idType, idNumber string) (*AcquirerInfo, error) {
-	soapURL := dianSoapURLTest
-	if env == "prod" {
-		soapURL = dianSoapURLProd
+// url: endpoint SOAP de la DIAN (vpfe-hab o vpfe)
+// cert: certificado para autenticación (puede estar vacío si no se requiere)
+func GetAcquirer(ctx context.Context, url, idType, idNumber string, cert string) (*AcquirerInfo, error) {
+	if url == "" {
+		url = dianSoapURLTest
 	}
 
 	soapBody := fmt.Sprintf(
@@ -89,12 +89,16 @@ func GetAcquirer(ctx context.Context, env, idType, idNumber string) (*AcquirerIn
 		xmlEscape(idType),
 	)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, soapURL, bytes.NewBufferString(soapBody))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBufferString(soapBody))
 	if err != nil {
 		return nil, fmt.Errorf("dian_ws: construir petición: %w", err)
 	}
 	req.Header.Set("Content-Type", "text/xml; charset=utf-8")
 	req.Header.Set("SOAPAction", dianSOAPAction)
+
+	// Si hay certificado, podría usarse para autenticación cliente (TLS mutual)
+	// Por ahora se ignora; puede implementarse en versiones futuras
+	_ = cert
 
 	resp, err := dianHTTPClient.Do(req)
 	if err != nil {

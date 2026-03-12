@@ -4,15 +4,28 @@ import "time"
 
 // Company representa una organización/tenant del sistema (multi-tenant, enfoque Colombia).
 type Company struct {
-	ID        string
-	Name      string
-	NIT       string    // NIT colombiano (con o sin dígito de verificación)
-	Address   string
-	Phone     string
-	Email     string
-	Status    string    // active, suspended, inactive
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID          string
+	Name        string
+	NIT         string // NIT colombiano (con o sin dígito de verificación)
+	Address     string
+	Phone       string
+	Email       string
+	Status      string // active, suspended, inactive
+	Environment string // "habilitacion" o "produccion" para DIAN
+	CertHab     string // Certificado para ambiente de habilitación (PEM o base64)
+	CertProd    string // Certificado para ambiente de producción (PEM o base64)
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
+// DianConfig retorna la configuración de DIAN según el environment de la empresa.
+func (c *Company) DianConfig() (url, cert string) {
+	switch c.Environment {
+	case "produccion":
+		return "https://vpfe.dian.gov.co/WcfDianCustomerServices.svc", c.CertProd
+	default:
+		return "https://vpfe-hab.dian.gov.co/WcfDianCustomerServices.svc", c.CertHab
+	}
 }
 
 // Módulos SaaS disponibles (deben coincidir con el CHECK de la tabla company_modules).
@@ -28,7 +41,7 @@ const (
 type CompanyModule struct {
 	ID          string
 	CompanyID   string
-	ModuleName  string    // ver constantes Module*
+	ModuleName  string // ver constantes Module*
 	IsActive    bool
 	ActivatedAt time.Time
 	ExpiresAt   *time.Time // nil = sin vencimiento

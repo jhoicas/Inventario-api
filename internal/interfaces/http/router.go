@@ -15,6 +15,7 @@ import (
 // RouterDeps dependencias para el router.
 type RouterDeps struct {
 	CompanyUC              *usecase.CompanyUseCase
+	CompanyRepo            repository.CompanyRepository // Para inyectar configuración DIAN
 	WarehouseUC            *usecase.WarehouseUseCase
 	ProductUC              *usecase.ProductUseCase
 	UserRepo               repository.UserRepository
@@ -90,10 +91,11 @@ func Router(app *fiber.App, deps RouterDeps) {
 	cust.Get("/", customerHandler.List)
 	// Creación de clientes: admin y vendedor
 	cust.Post("/", RequireRole(entity.RoleAdmin, entity.RoleVendedor), customerHandler.Create)
-	// Consulta DIAN por documento: JWT + RequireModule(billing)
-	if deps.CustomerLookup != nil {
+	// Consulta DIAN por documento: JWT + RequireModule(billing) + DIANConfigMiddleware
+	if deps.CustomerLookup != nil && deps.CompanyRepo != nil {
 		cust.Get("/lookup",
 			RequireModule(entity.ModuleBilling, deps.ModuleService),
+			dianws.DIANConfigMiddleware(deps.CompanyRepo),
 			deps.CustomerLookup.Lookup,
 		)
 	}
