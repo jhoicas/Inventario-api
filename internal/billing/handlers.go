@@ -1,10 +1,12 @@
 package billing
 
 import (
+	"context"
 	"errors"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jhoicas/Inventario-api/internal/application/dto"
+	"github.com/jhoicas/Inventario-api/internal/domain"
 )
 
 // CustomerLookupHandler expone el servicio GetAcquirer de la DIAN vía HTTP.
@@ -60,4 +62,74 @@ func (h *CustomerLookupHandler) Lookup(c *fiber.Ctx) error {
 
 // Similar to CreateCreditNote handler above
 
+type VoidInvoiceUseCase interface {
+	VoidInvoice(ctx context.Context, companyID, userID, invoiceID string, in dto.CreateVoidInvoiceRequest) (*dto.VoidInvoiceResponse, error)
+}
+
+type BillingHandler struct {
+	voidUC VoidInvoiceUseCase
+}
+
+func NewBillingHandler(voidUC VoidInvoiceUseCase) *BillingHandler {
+	return &BillingHandler{voidUC: voidUC}
+}
+
 // VoidInvoice handles POST /api/invoices/{id}/void
+func (h *BillingHandler) VoidInvoice(c *fiber.Ctx) error {
+	if h.voidUC == nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{
+			Code:    "INTERNAL",
+			Message: "servicio de anulación no disponible",
+		})
+	}
+
+	invoiceID := c.Params("id")
+	if invoiceID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{
+			Code:    "VALIDATION",
+			Message: "id requerido",
+		})
+	}
+
+	companyID, _ := c.Locals("company_id").(string)
+	userID, _ := c.Locals("user_id").(string)
+	if companyID == "" || userID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{
+			Code:    "UNAUTHORIZED",
+			Message: "token inválido",
+		})
+	}
+
+	var in dto.CreateVoidInvoiceRequest
+	if err := c.BodyParser(&in); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{
+			Code:    "INVALID_BODY",
+			Message: "cuerpo inválido",
+		})
+	}
+	if in.ConceptCode < 1 || in.ConceptCode > 5 {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{
+			Code:    "VALIDATION",
+			Message: "concept_code debe estar entre 1 y 5",
+		})
+	}
+
+	out, err := h.voidUC.VoidInvoice(c.Context(), companyID, userID, invoiceID, in)
+	if err != nil {
+		if err == domain.ErrInvalidInput {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "datos inválidos"})
+		}
+		if err == domain.ErrNotFound {
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "factura no encontrada"})
+		}
+		if err == domain.ErrForbidden {
+			return c.Status(fiber.StatusForbidden).JSON(dto.ErrorResponse{Code: "FORBIDDEN", Message: "acceso denegado al recurso"})
+		}
+		if err == domain.ErrConflict {
+			return c.Status(fiber.StatusConflict).JSON(dto.ErrorResponse{Code: "CONFLICT", Message: "la factura debe estar en estado Sent"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(out)
+}

@@ -60,6 +60,8 @@ func Router(app *fiber.App, deps RouterDeps) {
 	api.Get("/companies", companyHandler.List)
 	api.Post("/companies", companyHandler.Create)
 	api.Get("/companies/:id", companyHandler.GetByID)
+	api.Post("/companies/:id/resolutions", companyHandler.CreateResolution)
+	api.Get("/companies/:id/resolutions", companyHandler.ListResolutions)
 
 	// ── Rutas protegidas (JWT obligatorio) ────────────────────────────────────
 	// Todos los grupos siguientes heredan AuthMiddleware.

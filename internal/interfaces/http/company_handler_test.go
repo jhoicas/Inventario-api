@@ -20,9 +20,11 @@ import (
 // ── Fake CompanyUseCase (mock manual para tests) ──────────────────────────────────
 
 type fakeCompanyUseCase struct {
-	createFunc  func(in dto.CreateCompanyRequest) (*dto.CompanyResponse, error)
-	getByIDFunc func(id string) (*dto.CompanyResponse, error)
-	listFunc    func(limit, offset int) (*dto.CompanyListResponse, error)
+	createFunc           func(in dto.CreateCompanyRequest) (*dto.CompanyResponse, error)
+	getByIDFunc          func(id string) (*dto.CompanyResponse, error)
+	listFunc             func(limit, offset int) (*dto.CompanyListResponse, error)
+	createResolutionFunc func(companyID string, in dto.CreateResolutionRequest) (*dto.ResolutionResponse, error)
+	listResolutionsFunc  func(companyID string) ([]dto.ResolutionResponse, error)
 }
 
 func (f *fakeCompanyUseCase) Create(in dto.CreateCompanyRequest) (*dto.CompanyResponse, error) {
@@ -44,6 +46,20 @@ func (f *fakeCompanyUseCase) List(limit, offset int) (*dto.CompanyListResponse, 
 		return f.listFunc(limit, offset)
 	}
 	return nil, errors.New("list not configured")
+}
+
+func (f *fakeCompanyUseCase) CreateResolution(companyID string, in dto.CreateResolutionRequest) (*dto.ResolutionResponse, error) {
+	if f.createResolutionFunc != nil {
+		return f.createResolutionFunc(companyID, in)
+	}
+	return nil, errors.New("createResolution not configured")
+}
+
+func (f *fakeCompanyUseCase) ListResolutions(companyID string) ([]dto.ResolutionResponse, error) {
+	if f.listResolutionsFunc != nil {
+		return f.listResolutionsFunc(companyID)
+	}
+	return nil, errors.New("listResolutions not configured")
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -130,8 +146,8 @@ func TestCompanyHandler_Create(t *testing.T) {
 			},
 		},
 		{
-			name: "Validation_NameAndNITRequired",
-			body: dto.CreateCompanyRequest{Name: "", NIT: ""},
+			name:           "Validation_NameAndNITRequired",
+			body:           dto.CreateCompanyRequest{Name: "", NIT: ""},
 			mockSetup:      func() *fakeCompanyUseCase { return &fakeCompanyUseCase{} },
 			expectedStatus: http.StatusBadRequest,
 			validateBody: func(t *testing.T, resp *http.Response) {
@@ -230,9 +246,9 @@ func TestCompanyHandler_GetByID(t *testing.T) {
 			},
 		},
 		{
-			name:           "BadRequest_MissingID",
-			id:             "",
-			mockSetup:      func() *fakeCompanyUseCase { return &fakeCompanyUseCase{} },
+			name:      "BadRequest_MissingID",
+			id:        "",
+			mockSetup: func() *fakeCompanyUseCase { return &fakeCompanyUseCase{} },
 			// Enrutador devuelve 404 cuando la ruta no hace match (id ausente).
 			expectedStatus: http.StatusNotFound,
 			validateBody:   nil,
@@ -388,6 +404,220 @@ func TestCompanyHandler_List(t *testing.T) {
 			app.Get("/companies", handler.List)
 
 			req := httptest.NewRequest(http.MethodGet, "/companies"+tt.query, nil)
+
+			resp, err := app.Test(req, -1)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+
+			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
+			if tt.validateBody != nil {
+				tt.validateBody(t, resp)
+			}
+		})
+	}
+}
+
+// ── Tests Resolutions ─────────────────────────────────────────────────────────
+
+func validCreateResolutionRequest() dto.CreateResolutionRequest {
+	return dto.CreateResolutionRequest{
+		Prefix:           "FE",
+		ResolutionNumber: "18764000000001",
+		FromNumber:       1,
+		ToNumber:         1000,
+		ValidFrom:        "2026-01-01",
+		ValidUntil:       "2026-12-31",
+		Environment:      "test",
+	}
+}
+
+func validResolutionResponse() *dto.ResolutionResponse {
+	now := time.Now()
+	return &dto.ResolutionResponse{
+		ID:               "res-123",
+		CompanyID:        companyTestID,
+		Prefix:           "FE",
+		ResolutionNumber: "18764000000001",
+		FromNumber:       1,
+		ToNumber:         1000,
+		ValidFrom:        now,
+		ValidUntil:       now.AddDate(0, 6, 0),
+		Environment:      "test",
+		AlertThreshold:   false,
+		CreatedAt:        now,
+		UpdatedAt:        now,
+	}
+}
+
+func TestCompanyHandler_CreateResolution(t *testing.T) {
+	tests := []struct {
+		name           string
+		companyID      string
+		body           interface{}
+		mockSetup      func() *fakeCompanyUseCase
+		expectedStatus int
+		validateBody   func(*testing.T, *http.Response)
+	}{
+		{
+			name:      "Success",
+			companyID: companyTestID,
+			body:      validCreateResolutionRequest(),
+			mockSetup: func() *fakeCompanyUseCase {
+				return &fakeCompanyUseCase{
+					createResolutionFunc: func(companyID string, in dto.CreateResolutionRequest) (*dto.ResolutionResponse, error) {
+						assert.Equal(t, companyTestID, companyID)
+						assert.Equal(t, "FE", in.Prefix)
+						return validResolutionResponse(), nil
+					},
+				}
+			},
+			expectedStatus: http.StatusCreated,
+			validateBody: func(t *testing.T, resp *http.Response) {
+				var out dto.ResolutionResponse
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+				assert.Equal(t, "res-123", out.ID)
+				assert.Equal(t, "FE", out.Prefix)
+			},
+		},
+		{
+			name:           "InvalidBody",
+			companyID:      companyTestID,
+			body:           "invalid json",
+			mockSetup:      func() *fakeCompanyUseCase { return &fakeCompanyUseCase{} },
+			expectedStatus: http.StatusBadRequest,
+			validateBody: func(t *testing.T, resp *http.Response) {
+				var errResp dto.ErrorResponse
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
+				assert.Equal(t, "INVALID_BODY", errResp.Code)
+			},
+		},
+		{
+			name:      "ValidationError",
+			companyID: companyTestID,
+			body:      validCreateResolutionRequest(),
+			mockSetup: func() *fakeCompanyUseCase {
+				return &fakeCompanyUseCase{
+					createResolutionFunc: func(_ string, _ dto.CreateResolutionRequest) (*dto.ResolutionResponse, error) {
+						return nil, domain.ErrInvalidInput
+					},
+				}
+			},
+			expectedStatus: http.StatusBadRequest,
+			validateBody: func(t *testing.T, resp *http.Response) {
+				var errResp dto.ErrorResponse
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
+				assert.Equal(t, "VALIDATION", errResp.Code)
+			},
+		},
+		{
+			name:      "CompanyNotFound",
+			companyID: companyTestID,
+			body:      validCreateResolutionRequest(),
+			mockSetup: func() *fakeCompanyUseCase {
+				return &fakeCompanyUseCase{
+					createResolutionFunc: func(_ string, _ dto.CreateResolutionRequest) (*dto.ResolutionResponse, error) {
+						return nil, domain.ErrNotFound
+					},
+				}
+			},
+			expectedStatus: http.StatusNotFound,
+			validateBody: func(t *testing.T, resp *http.Response) {
+				var errResp dto.ErrorResponse
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
+				assert.Equal(t, "NOT_FOUND", errResp.Code)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := NewCompanyHandler(tt.mockSetup())
+			app := fiber.New(fiber.Config{DisableStartupMessage: true})
+			app.Post("/companies/:id/resolutions", handler.CreateResolution)
+
+			path := "/companies/"
+			if tt.companyID != "" {
+				path += tt.companyID + "/resolutions"
+			} else {
+				path = "/companies//resolutions"
+			}
+
+			bodyBytes, _ := json.Marshal(tt.body)
+			req := httptest.NewRequest(http.MethodPost, path, bytes.NewReader(bodyBytes))
+			req.Header.Set("Content-Type", "application/json")
+
+			resp, err := app.Test(req, -1)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+
+			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
+			if tt.validateBody != nil {
+				tt.validateBody(t, resp)
+			}
+		})
+	}
+}
+
+func TestCompanyHandler_ListResolutions(t *testing.T) {
+	tests := []struct {
+		name           string
+		companyID      string
+		mockSetup      func() *fakeCompanyUseCase
+		expectedStatus int
+		validateBody   func(*testing.T, *http.Response)
+	}{
+		{
+			name:      "Success",
+			companyID: companyTestID,
+			mockSetup: func() *fakeCompanyUseCase {
+				return &fakeCompanyUseCase{
+					listResolutionsFunc: func(companyID string) ([]dto.ResolutionResponse, error) {
+						assert.Equal(t, companyTestID, companyID)
+						return []dto.ResolutionResponse{*validResolutionResponse()}, nil
+					},
+				}
+			},
+			expectedStatus: http.StatusOK,
+			validateBody: func(t *testing.T, resp *http.Response) {
+				var out []dto.ResolutionResponse
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+				require.Len(t, out, 1)
+				assert.Equal(t, "res-123", out[0].ID)
+			},
+		},
+		{
+			name:      "NotFound",
+			companyID: companyTestID,
+			mockSetup: func() *fakeCompanyUseCase {
+				return &fakeCompanyUseCase{
+					listResolutionsFunc: func(_ string) ([]dto.ResolutionResponse, error) {
+						return nil, domain.ErrNotFound
+					},
+				}
+			},
+			expectedStatus: http.StatusNotFound,
+			validateBody: func(t *testing.T, resp *http.Response) {
+				var errResp dto.ErrorResponse
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
+				assert.Equal(t, "NOT_FOUND", errResp.Code)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := NewCompanyHandler(tt.mockSetup())
+			app := fiber.New(fiber.Config{DisableStartupMessage: true})
+			app.Get("/companies/:id/resolutions", handler.ListResolutions)
+
+			path := "/companies/"
+			if tt.companyID != "" {
+				path += tt.companyID + "/resolutions"
+			} else {
+				path = "/companies//resolutions"
+			}
+
+			req := httptest.NewRequest(http.MethodGet, path, nil)
 
 			resp, err := app.Test(req, -1)
 			require.NoError(t, err)

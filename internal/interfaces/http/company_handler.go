@@ -11,6 +11,8 @@ type CompanyUseCase interface {
 	Create(in dto.CreateCompanyRequest) (*dto.CompanyResponse, error)
 	GetByID(id string) (*dto.CompanyResponse, error)
 	List(limit, offset int) (*dto.CompanyListResponse, error)
+	CreateResolution(companyID string, in dto.CreateResolutionRequest) (*dto.ResolutionResponse, error)
+	ListResolutions(companyID string) ([]dto.ResolutionResponse, error)
 }
 
 // CompanyHandler maneja las peticiones HTTP para el recurso Company.
@@ -95,6 +97,65 @@ func (h *CompanyHandler) List(c *fiber.Ctx) error {
 	}
 	out, err := h.uc.List(limit, offset)
 	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.JSON(out)
+}
+
+// CreateResolution godoc
+// @Summary      Crear resolución DIAN de una empresa
+// @Tags         companies
+// @Accept       json
+// @Produce      json
+// @Param        id    path      string                     true  "ID de la empresa"
+// @Param        body  body      dto.CreateResolutionRequest true  "Datos de la resolución"
+// @Success      201   {object}  dto.ResolutionResponse
+// @Failure      400   {object}  dto.ErrorResponse
+// @Failure      404   {object}  dto.ErrorResponse
+// @Router       /api/companies/{id}/resolutions [post]
+func (h *CompanyHandler) CreateResolution(c *fiber.Ctx) error {
+	companyID := c.Params("id")
+	if companyID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "MISSING_ID", Message: "id es requerido"})
+	}
+	var in dto.CreateResolutionRequest
+	if err := c.BodyParser(&in); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
+	}
+	out, err := h.uc.CreateResolution(companyID, in)
+	if err != nil {
+		if err == domain.ErrInvalidInput {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "datos inválidos"})
+		}
+		if err == domain.ErrNotFound {
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "empresa no encontrada"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.Status(fiber.StatusCreated).JSON(out)
+}
+
+// ListResolutions godoc
+// @Summary      Listar resoluciones DIAN de una empresa
+// @Tags         companies
+// @Produce      json
+// @Param        id   path      string  true  "ID de la empresa"
+// @Success      200  {array}   dto.ResolutionResponse
+// @Failure      404  {object}  dto.ErrorResponse
+// @Router       /api/companies/{id}/resolutions [get]
+func (h *CompanyHandler) ListResolutions(c *fiber.Ctx) error {
+	companyID := c.Params("id")
+	if companyID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "MISSING_ID", Message: "id es requerido"})
+	}
+	out, err := h.uc.ListResolutions(companyID)
+	if err != nil {
+		if err == domain.ErrNotFound {
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "empresa no encontrada"})
+		}
+		if err == domain.ErrInvalidInput {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "datos inválidos"})
+		}
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}
 	return c.JSON(out)

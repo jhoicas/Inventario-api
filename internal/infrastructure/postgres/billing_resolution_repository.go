@@ -26,12 +26,12 @@ func NewBillingResolutionRepository(pool *pgxpool.Pool) *BillingResolutionRepo {
 func (r *BillingResolutionRepo) Create(ctx context.Context, res *entity.BillingResolution) error {
 	const q = `
 		INSERT INTO billing_resolutions
-			(id, company_id, resolution_number, prefix, range_from, range_to, date_from, date_to, is_active, created_at, updated_at)
+			(id, company_id, resolution_number, prefix, range_from, range_to, date_from, date_to, environment, is_active, created_at, updated_at)
 		VALUES
-			($1, $2, $3, $4, $5, $6, $7, $8, $9, now(), now())`
+			($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now(), now())`
 	_, err := r.pool.Exec(ctx, q,
 		res.ID, res.CompanyID, res.ResolutionNumber, res.Prefix,
-		res.RangeFrom, res.RangeTo, res.DateFrom, res.DateTo, res.IsActive,
+		res.RangeFrom, res.RangeTo, res.DateFrom, res.DateTo, res.Environment, res.IsActive,
 	)
 	if err != nil {
 		return fmt.Errorf("insert billing_resolution: %w", err)
@@ -42,7 +42,7 @@ func (r *BillingResolutionRepo) Create(ctx context.Context, res *entity.BillingR
 func (r *BillingResolutionRepo) GetByID(ctx context.Context, id string) (*entity.BillingResolution, error) {
 	const q = `
 		SELECT id, company_id, resolution_number, prefix, range_from, range_to,
-		       date_from, date_to, is_active, created_at, updated_at
+		       date_from, date_to, environment, 0::bigint AS used_numbers, is_active, created_at, updated_at
 		FROM billing_resolutions WHERE id = $1`
 	res, err := scanResolution(r.pool.QueryRow(ctx, q, id))
 	if err != nil {
@@ -59,7 +59,7 @@ func (r *BillingResolutionRepo) GetByID(ctx context.Context, id string) (*entity
 func (r *BillingResolutionRepo) GetActiveByCompanyAndPrefix(ctx context.Context, companyID, prefix string) (*entity.BillingResolution, error) {
 	const q = `
 		SELECT id, company_id, resolution_number, prefix, range_from, range_to,
-		       date_from, date_to, is_active, created_at, updated_at
+		       date_from, date_to, environment, 0::bigint AS used_numbers, is_active, created_at, updated_at
 		FROM billing_resolutions
 		WHERE company_id = $1
 		  AND prefix     = $2
@@ -79,10 +79,19 @@ func (r *BillingResolutionRepo) GetActiveByCompanyAndPrefix(ctx context.Context,
 
 func (r *BillingResolutionRepo) ListByCompany(ctx context.Context, companyID string) ([]*entity.BillingResolution, error) {
 	const q = `
-		SELECT id, company_id, resolution_number, prefix, range_from, range_to,
-		       date_from, date_to, is_active, created_at, updated_at
+		SELECT br.id, br.company_id, br.resolution_number, br.prefix, br.range_from, br.range_to,
+		       br.date_from, br.date_to, br.environment,
+		       COALESCE((
+			   SELECT COUNT(1)::bigint
+			   FROM invoices i
+			   WHERE i.company_id = br.company_id
+				 AND i.prefix = br.prefix
+				 AND i.number ~ '^[0-9]+$'
+				 AND i.number::bigint BETWEEN br.range_from AND br.range_to
+		   ), 0) AS used_numbers,
+		       br.is_active, br.created_at, br.updated_at
 		FROM billing_resolutions
-		WHERE company_id = $1
+		WHERE br.company_id = $1
 		ORDER BY date_from DESC`
 	rows, err := r.pool.Query(ctx, q, companyID)
 	if err != nil {
@@ -104,11 +113,11 @@ func (r *BillingResolutionRepo) Update(ctx context.Context, res *entity.BillingR
 	const q = `
 		UPDATE billing_resolutions
 		SET resolution_number = $2, prefix = $3, range_from = $4, range_to = $5,
-		    date_from = $6, date_to = $7, is_active = $8, updated_at = now()
+		    date_from = $6, date_to = $7, environment = $8, is_active = $9, updated_at = now()
 		WHERE id = $1`
 	_, err := r.pool.Exec(ctx, q,
 		res.ID, res.ResolutionNumber, res.Prefix,
-		res.RangeFrom, res.RangeTo, res.DateFrom, res.DateTo, res.IsActive,
+		res.RangeFrom, res.RangeTo, res.DateFrom, res.DateTo, res.Environment, res.IsActive,
 	)
 	if err != nil {
 		return fmt.Errorf("update billing_resolution: %w", err)
@@ -129,6 +138,7 @@ func scanResolution(row pgxScanner) (*entity.BillingResolution, error) {
 		&res.ID, &res.CompanyID, &res.ResolutionNumber, &res.Prefix,
 		&res.RangeFrom, &res.RangeTo,
 		&res.DateFrom, &res.DateTo,
+		&res.Environment, &res.UsedNumbers,
 		&res.IsActive, &res.CreatedAt, &res.UpdatedAt,
 	)
 	if err != nil {

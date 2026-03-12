@@ -124,7 +124,7 @@ func main() {
 
 	analyticsRepo := postgres.NewAnalyticsRepository(pool)
 	levelRepo := postgres.NewInventoryLevelRepository(pool)
-	companyUC := usecase.NewCompanyUseCase(companyRepo)
+	companyUC := usecase.NewCompanyUseCase(companyRepo, resolutionRepo)
 	warehouseUC := usecase.NewWarehouseUseCase(warehouseRepo)
 	productUC := usecase.NewProductUseCase(productRepo)
 	moduleSvc := usecase.NewModuleService(companyRepo)

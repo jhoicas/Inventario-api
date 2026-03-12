@@ -14,6 +14,8 @@ type BillingResolution struct {
 	RangeTo          int64     // Número final del rango autorizado
 	DateFrom         time.Time // Fecha de inicio de vigencia
 	DateTo           time.Time // Fecha de vencimiento
+	Environment      string    // test|prod
+	UsedNumbers      int64     // Conteo de números consumidos del rango (calculado)
 	IsActive         bool
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
