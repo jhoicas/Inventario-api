@@ -26,12 +26,17 @@ func NewCompanyRepository(pool *pgxpool.Pool) *CompanyRepo {
 
 // Create persiste una nueva empresa.
 func (r *CompanyRepo) Create(company *entity.Company) error {
+	environment := company.Environment
+	if environment == "" {
+		environment = "habilitacion"
+	}
 	query := `
-		INSERT INTO companies (id, name, nit, address, phone, email, status, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`
+		INSERT INTO companies (id, name, nit, address, phone, email, status, environment, cert_hab, cert_prod, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`
 	_, err := r.pool.Exec(context.Background(), query,
 		company.ID, company.Name, company.NIT, company.Address,
 		company.Phone, company.Email, company.Status,
+		environment, nullIfEmpty(company.CertHab), nullIfEmpty(company.CertProd),
 		company.CreatedAt, company.UpdatedAt,
 	)
 	if err != nil {
@@ -43,11 +48,14 @@ func (r *CompanyRepo) Create(company *entity.Company) error {
 // GetByID obtiene una empresa por ID.
 func (r *CompanyRepo) GetByID(id string) (*entity.Company, error) {
 	query := `
-		SELECT id, name, nit, address, phone, email, status, created_at, updated_at
+		SELECT id, name, nit, address, phone, email, status,
+		       COALESCE(environment, 'habilitacion'), COALESCE(cert_hab, ''), COALESCE(cert_prod, ''),
+		       created_at, updated_at
 		FROM companies WHERE id = $1`
 	var c entity.Company
 	err := r.pool.QueryRow(context.Background(), query, id).Scan(
 		&c.ID, &c.Name, &c.NIT, &c.Address, &c.Phone, &c.Email, &c.Status,
+		&c.Environment, &c.CertHab, &c.CertProd,
 		&c.CreatedAt, &c.UpdatedAt,
 	)
 	if err != nil {
@@ -62,11 +70,14 @@ func (r *CompanyRepo) GetByID(id string) (*entity.Company, error) {
 // GetByNIT obtiene una empresa por NIT.
 func (r *CompanyRepo) GetByNIT(nit string) (*entity.Company, error) {
 	query := `
-		SELECT id, name, nit, address, phone, email, status, created_at, updated_at
+		SELECT id, name, nit, address, phone, email, status,
+		       COALESCE(environment, 'habilitacion'), COALESCE(cert_hab, ''), COALESCE(cert_prod, ''),
+		       created_at, updated_at
 		FROM companies WHERE nit = $1`
 	var c entity.Company
 	err := r.pool.QueryRow(context.Background(), query, nit).Scan(
 		&c.ID, &c.Name, &c.NIT, &c.Address, &c.Phone, &c.Email, &c.Status,
+		&c.Environment, &c.CertHab, &c.CertProd,
 		&c.CreatedAt, &c.UpdatedAt,
 	)
 	if err != nil {
@@ -80,12 +91,19 @@ func (r *CompanyRepo) GetByNIT(nit string) (*entity.Company, error) {
 
 // Update actualiza una empresa existente.
 func (r *CompanyRepo) Update(company *entity.Company) error {
+	environment := company.Environment
+	if environment == "" {
+		environment = "habilitacion"
+	}
 	query := `
-		UPDATE companies SET name = $2, nit = $3, address = $4, phone = $5, email = $6, status = $7, updated_at = $8
+		UPDATE companies
+		SET name = $2, nit = $3, address = $4, phone = $5, email = $6, status = $7,
+		    environment = $8, cert_hab = $9, cert_prod = $10, updated_at = $11
 		WHERE id = $1`
 	cmd, err := r.pool.Exec(context.Background(), query,
 		company.ID, company.Name, company.NIT, company.Address,
-		company.Phone, company.Email, company.Status, company.UpdatedAt,
+		company.Phone, company.Email, company.Status,
+		environment, nullIfEmpty(company.CertHab), nullIfEmpty(company.CertProd), company.UpdatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("update company: %w", err)
@@ -99,7 +117,9 @@ func (r *CompanyRepo) Update(company *entity.Company) error {
 // List devuelve empresas con paginación.
 func (r *CompanyRepo) List(limit, offset int) ([]*entity.Company, error) {
 	query := `
-		SELECT id, name, nit, address, phone, email, status, created_at, updated_at
+		SELECT id, name, nit, address, phone, email, status,
+		       COALESCE(environment, 'habilitacion'), COALESCE(cert_hab, ''), COALESCE(cert_prod, ''),
+		       created_at, updated_at
 		FROM companies ORDER BY created_at DESC LIMIT $1 OFFSET $2`
 	rows, err := r.pool.Query(context.Background(), query, limit, offset)
 	if err != nil {
@@ -110,7 +130,7 @@ func (r *CompanyRepo) List(limit, offset int) ([]*entity.Company, error) {
 	var list []*entity.Company
 	for rows.Next() {
 		var c entity.Company
-		if err := rows.Scan(&c.ID, &c.Name, &c.NIT, &c.Address, &c.Phone, &c.Email, &c.Status, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.Name, &c.NIT, &c.Address, &c.Phone, &c.Email, &c.Status, &c.Environment, &c.CertHab, &c.CertProd, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan company: %w", err)
 		}
 		list = append(list, &c)

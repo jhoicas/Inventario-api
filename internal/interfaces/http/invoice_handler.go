@@ -39,6 +39,11 @@ type InvoicePDFUseCase interface {
 	DownloadInvoicePDF(ctx context.Context, companyID, invoiceID string) (pdfBytes []byte, filename string, err error)
 }
 
+// InvoiceDIANRetryUseCase interface para reintento manual DIAN.
+type InvoiceDIANRetryUseCase interface {
+	RetryDIAN(ctx context.Context, companyID, invoiceID string) (*dto.InvoiceDIANStatusDTO, error)
+}
+
 // InvoiceMailerUseCase interfaz para el envío manual de correo de factura.
 type InvoiceMailerUseCase interface {
 	SendInvoiceEmailSync(ctx context.Context, companyID, invoiceID string) error
@@ -53,6 +58,7 @@ type InvoiceHandler struct {
 	voidUC   VoidInvoiceUseCase
 	pdfUC    InvoicePDFUseCase
 	mailerUC InvoiceMailerUseCase
+	retryUC  InvoiceDIANRetryUseCase
 }
 
 // NewInvoiceHandler construye el handler.
@@ -65,6 +71,12 @@ func NewInvoiceHandler(
 		uc:       uc,
 		returnUC: returnUC,
 		pdfUC:    pdfUC,
+		retryUC: func() InvoiceDIANRetryUseCase {
+			if r, ok := uc.(InvoiceDIANRetryUseCase); ok {
+				return r
+			}
+			return nil
+		}(),
 	}
 }
 
@@ -568,4 +580,49 @@ func (h *InvoiceHandler) SendCustomEmail(c *fiber.Ctx) error {
 	}
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "correo enviado correctamente"})
+}
+
+// RetryDIAN godoc
+// @Summary      Reintentar envío DIAN
+// @Description  Reintenta el envío a la DIAN de una factura en estado CONTINGENCIA
+// @Tags         billing
+// @Security     Bearer
+// @Param        id   path      string  true  "ID de la factura"
+// @Success      200  {object}  dto.InvoiceDIANStatusDTO
+// @Failure      400  {object}  dto.ErrorResponse
+// @Failure      401  {object}  dto.ErrorResponse
+// @Failure      403  {object}  dto.ErrorResponse
+// @Failure      404  {object}  dto.ErrorResponse
+// @Failure      409  {object}  dto.ErrorResponse
+// @Failure      500  {object}  dto.ErrorResponse
+// @Router       /api/invoices/{id}/retry-dian [post]
+func (h *InvoiceHandler) RetryDIAN(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	if companyID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if h.retryUC == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "RETRY_DISABLED", Message: "reintento DIAN no configurado"})
+	}
+
+	id := c.Params("id")
+	if id == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "id requerido"})
+	}
+
+	status, err := h.retryUC.RetryDIAN(c.Context(), companyID, id)
+	if err != nil {
+		if err == domain.ErrNotFound {
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "factura no encontrada"})
+		}
+		if err == domain.ErrForbidden {
+			return c.Status(fiber.StatusForbidden).JSON(dto.ErrorResponse{Code: "FORBIDDEN", Message: "acceso denegado"})
+		}
+		if err == domain.ErrConflict {
+			return c.Status(fiber.StatusConflict).JSON(dto.ErrorResponse{Code: "INVALID_STATE", Message: "la factura debe estar en estado CONTINGENCIA"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(status)
 }

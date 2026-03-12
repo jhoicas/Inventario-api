@@ -9,6 +9,7 @@ import (
 // Estados de envío a la DIAN (Colombia).
 const (
 	DIANStatusDraft           = "DRAFT"            // Guardada para reservar ID y consecutivo
+	DIANStatusContingencia    = "CONTINGENCIA"     // Falló envío por timeout; pendiente de reintento
 	DIANStatusPending         = "Pending"          // En proceso
 	DIANStatusSigned          = "SIGNED"           // XML firmado, pendiente de envío al WS
 	DIANStatusSent            = "Sent"             // Enviada al WS DIAN, respuesta pendiente

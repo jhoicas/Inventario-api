@@ -3,8 +3,10 @@ package billing
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"log"
+	"net"
 	"strings"
 	"time"
 
@@ -37,7 +39,8 @@ type DIANOrchestrator struct {
 	signer         pkgdian.Signer
 	submitter      infradian.DIANSubmitter // cliente SOAP; nil en dev
 	dianConfig     DIANConfig
-	mailer         InvoiceMailerPort       // optional; nil → no email
+	mailer         InvoiceMailerPort // optional; nil → no email
+	retryQueue     *DIANRetryQueue
 }
 
 // InvoiceMailerPort es el puerto opcional de envío de correo tras validación DIAN.
@@ -76,20 +79,35 @@ func (o *DIANOrchestrator) SetMailer(m InvoiceMailerPort) {
 	o.mailer = m
 }
 
+// SetRetryQueue inyecta una cola para reintentos DIAN en estado CONTINGENCIA.
+func (o *DIANOrchestrator) SetRetryQueue(q *DIANRetryQueue) {
+	o.retryQueue = q
+}
+
 // ProcessAsync dispara el procesamiento DIAN en una goroutine independiente.
 // invoiceID es el ID de la factura ya persistida en estado DRAFT.
 func (o *DIANOrchestrator) ProcessAsync(invoiceID string) {
-	go o.process(invoiceID)
+	go o.process(invoiceID, false)
 }
 
 // ProcessSync ejecuta el procesamiento DIAN de manera síncrona.
 func (o *DIANOrchestrator) ProcessSync(invoiceID string) {
-	o.process(invoiceID)
+	o.process(invoiceID, false)
+}
+
+// RetryAsync reintenta una factura en contingencia.
+func (o *DIANOrchestrator) RetryAsync(invoiceID string) {
+	go o.process(invoiceID, true)
+}
+
+// RetrySync reintenta una factura en contingencia de forma síncrona.
+func (o *DIANOrchestrator) RetrySync(invoiceID string) {
+	o.process(invoiceID, true)
 }
 
 // process es el núcleo síncrono del orquestador. Siempre termina actualizando
 // dian_status en la DB (EXITOSO, RECHAZADO o ERROR_GENERATION).
-func (o *DIANOrchestrator) process(invoiceID string) {
+func (o *DIANOrchestrator) process(invoiceID string, isRetry bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -103,6 +121,20 @@ func (o *DIANOrchestrator) process(invoiceID string) {
 		log.Printf("[DIAN][%s] ERROR en %s: %s", invoiceID, step, msg)
 	}
 
+	markContingency := func(inv *entity.Invoice, msg string) {
+		inv.DIAN_Status = entity.DIANStatusContingencia
+		inv.DIANErrors = msg
+		inv.UpdatedAt = time.Now()
+		if err := o.invoiceRepo.Update(inv); err != nil {
+			log.Printf("[DIAN][%s] no se pudo persistir CONTINGENCIA: %v", invoiceID, err)
+			return
+		}
+		if o.retryQueue != nil {
+			o.retryQueue.Enqueue(invoiceID)
+		}
+		log.Printf("[DIAN][%s] timeout DIAN: factura enviada a CONTINGENCIA y encolada", invoiceID)
+	}
+
 	// ═══════════════════════════════════════════════════════════════════════════
 	// 0. Re-fetch datos frescos (evita data races con el goroutine HTTP)
 	// ═══════════════════════════════════════════════════════════════════════════
@@ -111,7 +143,12 @@ func (o *DIANOrchestrator) process(invoiceID string) {
 		log.Printf("[DIAN][%s] factura no encontrada: %v", invoiceID, err)
 		return
 	}
-	if inv.DIAN_Status != entity.DIANStatusDraft {
+	if isRetry {
+		if inv.DIAN_Status != entity.DIANStatusContingencia {
+			log.Printf("[DIAN][%s] retry omitido: estado actual %q (se esperaba CONTINGENCIA)", invoiceID, inv.DIAN_Status)
+			return
+		}
+	} else if inv.DIAN_Status != entity.DIANStatusDraft {
 		log.Printf("[DIAN][%s] estado %q inesperado (ya procesada?), saltando", invoiceID, inv.DIAN_Status)
 		return
 	}
@@ -271,6 +308,10 @@ func (o *DIANOrchestrator) process(invoiceID string) {
 		}
 		result, soapErr := o.submitter.SubmitZip(ctx, zipBytes, zipName, appEnv)
 		if soapErr != nil {
+			if isDIANTimeoutError(soapErr) {
+				markContingency(inv, soapErr.Error())
+				return
+			}
 			markError(inv, "soap", soapErr.Error())
 			return
 		}
@@ -310,7 +351,24 @@ func (o *DIANOrchestrator) process(invoiceID string) {
 	if finalStatus == entity.DIANStatusExitoso && o.mailer != nil {
 		o.mailer.SendInvoiceEmail(invoiceID)
 	}
+}
+
+func isDIANTimeoutError(err error) bool {
+	if err == nil {
+		return false
 	}
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+		return true
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return true
+	}
+	lower := strings.ToLower(err.Error())
+	return strings.Contains(lower, "timeout") ||
+		strings.Contains(lower, "deadline exceeded") ||
+		strings.Contains(lower, "timeout o cancelación")
+}
 
 // ── helpers privados ──────────────────────────────────────────────────────────
 

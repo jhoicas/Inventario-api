@@ -25,6 +25,25 @@ type fakeCreateInvoiceUseCase struct {
 	getInvoiceDIANStatusFunc func(ctx context.Context, companyID, id string) (*dto.InvoiceDIANStatusDTO, error)
 	getInvoiceFunc           func(ctx context.Context, companyID, id string) (*dto.InvoiceResponse, error)
 	listInvoicesFunc         func(ctx context.Context, companyID string, in dto.InvoiceFilter) (*dto.InvoiceListResponse, error)
+	retryDIANFunc            func(ctx context.Context, companyID, id string) (*dto.InvoiceDIANStatusDTO, error)
+}
+
+type fakeCreateInvoiceUseCaseNoRetry struct{}
+
+func (f *fakeCreateInvoiceUseCaseNoRetry) CreateInvoice(ctx context.Context, companyID, userID string, in dto.CreateInvoiceRequest) (*dto.InvoiceResponse, error) {
+	return nil, errors.New("createInvoice not configured")
+}
+
+func (f *fakeCreateInvoiceUseCaseNoRetry) GetInvoiceDIANStatus(ctx context.Context, companyID, id string) (*dto.InvoiceDIANStatusDTO, error) {
+	return nil, errors.New("getInvoiceDIANStatus not configured")
+}
+
+func (f *fakeCreateInvoiceUseCaseNoRetry) GetInvoice(ctx context.Context, companyID, id string) (*dto.InvoiceResponse, error) {
+	return nil, errors.New("getInvoice not configured")
+}
+
+func (f *fakeCreateInvoiceUseCaseNoRetry) ListInvoices(ctx context.Context, companyID string, in dto.InvoiceFilter) (*dto.InvoiceListResponse, error) {
+	return nil, errors.New("listInvoices not configured")
 }
 
 func (f *fakeCreateInvoiceUseCase) CreateInvoice(ctx context.Context, companyID, userID string, in dto.CreateInvoiceRequest) (*dto.InvoiceResponse, error) {
@@ -53,6 +72,13 @@ func (f *fakeCreateInvoiceUseCase) ListInvoices(ctx context.Context, companyID s
 		return f.listInvoicesFunc(ctx, companyID, in)
 	}
 	return nil, errors.New("listInvoices not configured")
+}
+
+func (f *fakeCreateInvoiceUseCase) RetryDIAN(ctx context.Context, companyID, id string) (*dto.InvoiceDIANStatusDTO, error) {
+	if f.retryDIANFunc != nil {
+		return f.retryDIANFunc(ctx, companyID, id)
+	}
+	return nil, errors.New("retryDIAN not configured")
 }
 
 type fakeCreateCreditNoteUseCase struct {
@@ -1548,6 +1574,133 @@ func TestInvoiceHandler_SendCustomEmail(t *testing.T) {
 				var body map[string]string
 				require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
 				assert.Equal(t, tt.expectedMsg, body["message"])
+				return
+			}
+
+			var errResp dto.ErrorResponse
+			require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
+			assert.Equal(t, tt.expectedCode, errResp.Code)
+		})
+	}
+}
+
+func TestInvoiceHandler_RetryDIAN(t *testing.T) {
+	tests := []struct {
+		name           string
+		invoiceID      string
+		companyID      string
+		uc             *fakeCreateInvoiceUseCase
+		useNoRetryUC   bool
+		expectedStatus int
+		expectedCode   string
+		expectedBody   *dto.InvoiceDIANStatusDTO
+	}{
+		{
+			name:      "Success",
+			invoiceID: "inv-123",
+			companyID: invoiceTestCompanyID,
+			uc: &fakeCreateInvoiceUseCase{
+				retryDIANFunc: func(_ context.Context, companyID, id string) (*dto.InvoiceDIANStatusDTO, error) {
+					assert.Equal(t, invoiceTestCompanyID, companyID)
+					assert.Equal(t, "inv-123", id)
+					return &dto.InvoiceDIANStatusDTO{
+						ID:         id,
+						DIANStatus: "CONTINGENCIA",
+						CUFE:       "",
+						TrackID:    "",
+						Errors:     "timeout SOAP",
+					}, nil
+				},
+			},
+			expectedStatus: http.StatusOK,
+			expectedBody: &dto.InvoiceDIANStatusDTO{
+				ID:         "inv-123",
+				DIANStatus: "CONTINGENCIA",
+				Errors:     "timeout SOAP",
+			},
+		},
+		{
+			name:           "Unauthorized_NoCompanyID",
+			invoiceID:      "inv-unauth",
+			companyID:      "",
+			uc:             &fakeCreateInvoiceUseCase{},
+			expectedStatus: http.StatusUnauthorized,
+			expectedCode:   "UNAUTHORIZED",
+		},
+		{
+			name:           "RetryDisabled",
+			invoiceID:      "inv-disabled",
+			companyID:      invoiceTestCompanyID,
+			useNoRetryUC:   true,
+			expectedStatus: http.StatusServiceUnavailable,
+			expectedCode:   "RETRY_DISABLED",
+		},
+		{
+			name:      "InvalidState",
+			invoiceID: "inv-invalid",
+			companyID: invoiceTestCompanyID,
+			uc: &fakeCreateInvoiceUseCase{
+				retryDIANFunc: func(_ context.Context, _, _ string) (*dto.InvoiceDIANStatusDTO, error) {
+					return nil, domain.ErrConflict
+				},
+			},
+			expectedStatus: http.StatusConflict,
+			expectedCode:   "INVALID_STATE",
+		},
+		{
+			name:      "NotFound",
+			invoiceID: "inv-404",
+			companyID: invoiceTestCompanyID,
+			uc: &fakeCreateInvoiceUseCase{
+				retryDIANFunc: func(_ context.Context, _, _ string) (*dto.InvoiceDIANStatusDTO, error) {
+					return nil, domain.ErrNotFound
+				},
+			},
+			expectedStatus: http.StatusNotFound,
+			expectedCode:   "NOT_FOUND",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var handler *InvoiceHandler
+			if tt.useNoRetryUC {
+				handler = NewInvoiceHandlerWithBillingOps(
+					&fakeCreateInvoiceUseCaseNoRetry{},
+					&fakeCreateCreditNoteUseCase{},
+					&fakeCreateDebitNoteUseCase{},
+					&fakeVoidInvoiceUseCase{},
+					&fakeInvoicePDFUseCase{},
+					&fakeInvoiceMailerUseCase{},
+				)
+			} else {
+				handler = NewInvoiceHandlerWithBillingOps(
+					tt.uc,
+					&fakeCreateCreditNoteUseCase{},
+					&fakeCreateDebitNoteUseCase{},
+					&fakeVoidInvoiceUseCase{},
+					&fakeInvoicePDFUseCase{},
+					&fakeInvoiceMailerUseCase{},
+				)
+			}
+
+			app := fiber.New(fiber.Config{DisableStartupMessage: true})
+			app.Use(mockInvoiceAuthCompanyOnly(tt.companyID))
+			app.Post("/invoices/:id/retry-dian", handler.RetryDIAN)
+
+			req := httptest.NewRequest(http.MethodPost, "/invoices/"+tt.invoiceID+"/retry-dian", nil)
+			resp, err := app.Test(req, -1)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+
+			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
+
+			if tt.expectedStatus == http.StatusOK {
+				var out dto.InvoiceDIANStatusDTO
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+				assert.Equal(t, tt.expectedBody.ID, out.ID)
+				assert.Equal(t, tt.expectedBody.DIANStatus, out.DIANStatus)
+				assert.Equal(t, tt.expectedBody.Errors, out.Errors)
 				return
 			}
 

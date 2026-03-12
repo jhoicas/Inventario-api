@@ -97,6 +97,12 @@ func main() {
 		invoiceRepo, companyRepo, customerRepo, productRepo,
 		resolutionRepo, xmlBuilder, signerSvc, dianSubmitter, dianCfg,
 	)
+	dianRetryQueue := billing.NewDIANRetryQueue(1024)
+	dianOrchestrator.SetRetryQueue(dianRetryQueue)
+	dianRetryWorker := billing.NewDIANRetryWorker(dianOrchestrator, dianRetryQueue, 15*time.Minute, 50)
+	workerCtx, workerCancel := context.WithCancel(context.Background())
+	defer workerCancel()
+	go dianRetryWorker.Start(workerCtx)
 
 	smtpCfg := dianws.SMTPConfig{
 		Host:         cfg.SMTP.Host,
@@ -212,6 +218,7 @@ func main() {
 
 	httpRouter.Router(app, httpRouter.RouterDeps{
 		CompanyUC:              companyUC,
+		CompanyRepo:            companyRepo,
 		WarehouseUC:            warehouseUC,
 		ProductUC:              productUC,
 		UserRepo:               userRepo,
@@ -246,6 +253,7 @@ func main() {
 	<-quit
 
 	log.Info().Msg("señal de apagado recibida, cerrando servidor...")
+	workerCancel()
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

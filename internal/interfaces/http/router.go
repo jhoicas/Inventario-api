@@ -156,6 +156,11 @@ func Router(app *fiber.App, deps RouterDeps) {
 		RequireRole(entity.RoleAdmin, entity.RoleVendedor),
 		invoiceHandler.SendEmail,
 	)
+	// POST — reintentar envío DIAN de factura en contingencia: admin y vendedor
+	invGroup2.Post("/:id/retry-dian",
+		RequireRole(entity.RoleAdmin, entity.RoleVendedor),
+		invoiceHandler.RetryDIAN,
+	)
 	// GET (consultas y descarga) — todos los roles con billing activo
 	invGroup2.Get("/:id/status", invoiceHandler.GetDIANStatus)
 	invGroup2.Get("/:id/pdf", invoiceHandler.DownloadPDF)

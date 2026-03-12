@@ -354,3 +354,30 @@ func (uc *CreateInvoiceUseCase) GetInvoice(ctx context.Context, companyID, id st
 	}
 	return uc.toResponse(inv, customerName, details), nil
 }
+
+// RetryDIAN reintenta el envío de una factura que esté en estado CONTINGENCIA.
+func (uc *CreateInvoiceUseCase) RetryDIAN(ctx context.Context, companyID, id string) (*dto.InvoiceDIANStatusDTO, error) {
+	inv, err := uc.invoiceRepo.GetByID(id)
+	if err != nil {
+		return nil, err
+	}
+	if inv == nil {
+		return nil, domain.ErrNotFound
+	}
+	if inv.CompanyID != companyID {
+		return nil, domain.ErrForbidden
+	}
+	if inv.DIAN_Status != entity.DIANStatusContingencia {
+		return nil, domain.ErrConflict
+	}
+
+	uc.dianOrchestrator.RetryAsync(id)
+
+	return &dto.InvoiceDIANStatusDTO{
+		ID:         inv.ID,
+		DIANStatus: inv.DIAN_Status,
+		CUFE:       inv.CUFE,
+		TrackID:    inv.TrackID,
+		Errors:     inv.DIANErrors,
+	}, nil
+}

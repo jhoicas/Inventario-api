@@ -1,7 +1,6 @@
 package billing
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/gofiber/fiber/v2"
@@ -11,7 +10,7 @@ import (
 // CompanyRepository define las operaciones de consulta para Company.
 // Inyectado por el caller (ej: main.go)
 type CompanyRepository interface {
-	GetByID(ctx context.Context, id string) (*entity.Company, error)
+	GetByID(id string) (*entity.Company, error)
 }
 
 // DIANConfigMiddleware inyecta la URL y certificado de DIAN según el environment
@@ -37,7 +36,7 @@ func DIANConfigMiddleware(companyRepo CompanyRepository) fiber.Handler {
 		}
 
 		// Obtener la empresa de la base de datos
-		company, err := companyRepo.GetByID(c.Context(), companyID)
+		company, err := companyRepo.GetByID(companyID)
 		if err != nil {
 			// Si falla, usar defaults y continuar
 			c.Locals("dian_url", "https://vpfe-hab.dian.gov.co/WcfDianCustomerServices.svc")
