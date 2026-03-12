@@ -88,7 +88,9 @@ func (g *MarotoPDFGenerator) GenerateInvoicePDF(
 
 	// Totales
 	m.AddRows(line.NewRow(1, props.Line{Color: colorPrimary, Thickness: 0.3}))
-	m.AddRows(totalsRow(invoice))
+	for _, r := range totalsRows(invoice) {
+		m.AddRows(r)
+	}
 
 	// Footer DIAN
 	m.AddRows(line.NewRow(3))
@@ -187,73 +189,75 @@ func tableHeaderRow() core.Row {
 	)
 }
 
-// tableDetailRows: una fila por línea de detalle.
+// tableDetailRows: crea una fila de texto por producto y una fila separada para el divisor.
 func tableDetailRows(details []appbilling.InvoiceDetailForPDF) []core.Row {
-	result := make([]core.Row, 0, len(details))
+	result := make([]core.Row, 0, len(details)*2)
 	for _, d := range details {
-		result = append(result, row.New(7).Add(
+		result = append(result, row.New(10).Add(
 			col.New(1).Add(text.New(
 				d.Quantity.StringFixed(0),
-				props.Text{Size: 8, Align: align.Center, Top: 1},
+				props.Text{Size: 8, Align: align.Center, Top: 2},
 			)),
 			col.New(5).Add(text.New(
 				d.ProductName,
-				props.Text{Size: 8, Align: align.Left, Top: 1, Left: 1},
+				props.Text{Size: 8, Align: align.Left, Top: 2, Left: 1},
 			)),
 			col.New(2).Add(text.New(
 				"$"+formatMoney(d.UnitPrice.StringFixed(0)),
-				props.Text{Size: 8, Align: align.Right, Top: 1, Right: 1},
+				props.Text{Size: 8, Align: align.Right, Top: 2, Right: 1},
 			)),
 			col.New(1).Add(text.New(
 				d.TaxRate.StringFixed(0)+"%",
-				props.Text{Size: 8, Align: align.Center, Top: 1},
+				props.Text{Size: 8, Align: align.Center, Top: 2},
 			)),
 			col.New(3).Add(text.New(
 				"$"+formatMoney(d.Subtotal.StringFixed(0)),
-				props.Text{Size: 8, Align: align.Right, Top: 1, Right: 1},
+				props.Text{Size: 8, Align: align.Right, Top: 2, Right: 1},
 			)),
 		))
+		result = append(result, line.NewRow(2, props.Line{Color: colorGray, Thickness: 0.2}))
 	}
 	return result
 }
 
-// totalsRow: bloque de totales alineado a la derecha.
-func totalsRow(invoice *entity.Invoice) core.Row {
-	label := func(s string) core.Component {
-		return text.New(s, props.Text{
-			Style: fontstyle.Bold, Size: 9, Align: align.Right, Right: 2,
-		})
+// totalsRows: bloque de totales alineado a la derecha usando una fila por total.
+func totalsRows(invoice *entity.Invoice) []core.Row {
+	labelCol := func(label string, isGrand bool) core.Col {
+		textProps := props.Text{Style: fontstyle.Bold, Size: 9, Align: align.Right, Right: 1}
+		if isGrand {
+			textProps.Size = 10
+			textProps.Color = colorPrimary
+		}
+		return col.New(2).Add(text.New(label, textProps))
 	}
-	value := func(s string) core.Component {
-		return text.New(s, props.Text{Size: 9, Align: align.Right, Right: 1})
-	}
-	grandLabel := func(s string) core.Component {
-		return text.New(s, props.Text{
-			Style: fontstyle.Bold, Size: 10, Align: align.Right,
-			Color: colorPrimary, Right: 2,
-		})
-	}
-	grandValue := func(s string) core.Component {
-		return text.New(s, props.Text{
-			Style: fontstyle.Bold, Size: 10, Align: align.Right,
-			Color: colorPrimary, Right: 1,
-		})
+	valueCol := func(value string, isGrand bool) core.Col {
+		textProps := props.Text{Size: 9, Align: align.Right, Right: 1}
+		if isGrand {
+			textProps.Style = fontstyle.Bold
+			textProps.Size = 10
+			textProps.Color = colorPrimary
+		}
+		return col.New(2).Add(text.New(value, textProps))
 	}
 
-	return row.New(26).Add(
-		col.New(3), // espacio izquierdo
-		col.New(3).Add(
-			label("Subtotal neto:"),
-			label("Impuestos:"),
-			grandLabel("TOTAL A PAGAR:"),
+	return []core.Row{
+		row.New(8).Add(
+			col.New(8),
+			labelCol("Subtotal:", false),
+			valueCol("$"+formatMoney(invoice.NetTotal.StringFixed(0)), false),
 		),
-		col.New(3).Add(
-			value("$"+formatMoney(invoice.NetTotal.StringFixed(0))),
-			value("$"+formatMoney(invoice.TaxTotal.StringFixed(0))),
-			grandValue("$"+formatMoney(invoice.GrandTotal.StringFixed(0))),
+		row.New(8).Add(
+			col.New(8),
+			labelCol("Impuestos:", false),
+			valueCol("$"+formatMoney(invoice.TaxTotal.StringFixed(0)), false),
 		),
-		col.New(3), // espacio derecho
-	)
+		row.New(2).Add(col.New(8), col.New(4).Add(line.New(props.Line{Color: colorPrimary, Thickness: 0.3}))),
+		row.New(10).Add(
+			col.New(8),
+			labelCol("TOTAL:", true),
+			valueCol("$"+formatMoney(invoice.GrandTotal.StringFixed(0)), true),
+		),
+	}
 }
 
 // dianFooterRows: CUFE partido + código QR + leyenda legal.
