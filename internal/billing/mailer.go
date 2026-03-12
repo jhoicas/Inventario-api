@@ -174,7 +174,7 @@ func (m *InvoiceMailer) send(ctx context.Context, invoiceID string) error {
 }
 
 // buildSenderEmail extrae el dominio del email de la empresa y construye noresponde@dominio.
-// Ejemplo: contacto@artemisa.co → noresponde@artemisa.co
+// Ejemplo: contacto@artemisa.co → noresponder@artemisa.co
 func buildSenderEmail(companyEmail string) string {
 	if companyEmail == "" {
 		return ""
