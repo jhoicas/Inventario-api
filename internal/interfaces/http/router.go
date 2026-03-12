@@ -23,6 +23,7 @@ type RouterDeps struct {
 	CustomerUC             *billing.CustomerUseCase
 	CreateInvoice          *billing.CreateInvoiceUseCase
 	ReturnInvoice          *billing.CreateCreditNoteUseCase
+	DebitNote              *billing.CreateDebitNoteUseCase
 	InvoicePDF             *billing.PDFUseCase
 	AuthUC                 *auth.AuthUseCase
 	ModuleService          *usecase.ModuleService
@@ -116,7 +117,7 @@ func Router(app *fiber.App, deps RouterDeps) {
 	)
 
 	// ── Facturación (módulo 'billing' + roles) ─────────────────────────────────
-	invoiceHandler := NewInvoiceHandler(deps.CreateInvoice, deps.ReturnInvoice, deps.InvoicePDF)
+	invoiceHandler := NewInvoiceHandlerWithDebit(deps.CreateInvoice, deps.ReturnInvoice, deps.DebitNote, deps.InvoicePDF)
 	invGroup2 := protected.Group("/invoices", RequireModule(entity.ModuleBilling, deps.ModuleService))
 
 	// POST — emitir factura: admin y vendedor
@@ -128,6 +129,11 @@ func Router(app *fiber.App, deps RouterDeps) {
 	invGroup2.Post("/:id/return",
 		RequireRole(entity.RoleAdmin, entity.RoleVendedor),
 		invoiceHandler.HandleReturn,
+	)
+	// POST — registrar Nota Débito: admin y vendedor
+	invGroup2.Post("/:id/debit-note",
+		RequireRole(entity.RoleAdmin, entity.RoleVendedor),
+		invoiceHandler.HandleDebitNote,
 	)
 	// GET (consultas y descarga) — todos los roles con billing activo
 	invGroup2.Get("/:id/status", invoiceHandler.GetDIANStatus)

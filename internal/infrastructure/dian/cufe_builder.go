@@ -5,9 +5,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/shopspring/decimal"
 	domdian "github.com/jhoicas/Inventario-api/internal/domain/dian"
 	"github.com/jhoicas/Inventario-api/internal/domain/entity"
+	"github.com/shopspring/decimal"
 )
 
 // CufeContext agrupa factura, emisor, cliente y datos de resolución para calcular el CUFE.
@@ -35,15 +35,19 @@ func CalculateCufeFromInvoice(ctx *CufeContext) (string, error) {
 		// 91 = Nota Crédito según tabla DIAN de tipo de documento.
 		docType = "91"
 	}
+	if strings.EqualFold(inv.DocumentType, "DEBIT_NOTE") {
+		// 92 = Nota Débito según tabla DIAN de tipo de documento.
+		docType = "92"
+	}
 
 	params := &domdian.CufeParams{
 		NumFac:    strings.TrimSpace(inv.Prefix) + strings.TrimSpace(inv.Number),
 		DocType:   docType,
 		FecFac:    inv.Date.Format("2006-01-02"), // YYYY-MM-DD
-		ValFac:    inv.NetTotal,                   // Valor total sin impuestos
-		ValImp_01: inv.TaxTotal,                   // IVA (código 01)
-		ValImp_04: decimal.Zero,                   // Impoconsumo (04); poner valor si aplica
-		ValImp_03: decimal.Zero,                   // ICA (03); poner valor si aplica
+		ValFac:    inv.NetTotal,                  // Valor total sin impuestos
+		ValImp_01: inv.TaxTotal,                  // IVA (código 01)
+		ValImp_04: decimal.Zero,                  // Impoconsumo (04); poner valor si aplica
+		ValImp_03: decimal.Zero,                  // ICA (03); poner valor si aplica
 		ValPag:    inv.GrandTotal,
 		NitOfe:    onlyDigitsNIT(ctx.Company.NIT),
 		DocAdq:    onlyDigitsNIT(ctx.Customer.TaxID),

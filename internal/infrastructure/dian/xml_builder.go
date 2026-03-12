@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/shopspring/decimal"
 	"github.com/jhoicas/Inventario-api/pkg/dian"
+	"github.com/shopspring/decimal"
 )
 
 // Namespaces oficiales UBL 2.1 y DIAN (Anexo Técnico 1.9).
@@ -16,6 +16,8 @@ const (
 	NsInvoice = "urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
 	// Namespace para UBL CreditNote
 	NsCreditNote = "urn:oasis:names:specification:ubl:schema:xsd:CreditNote-2"
+	// Namespace para UBL DebitNote
+	NsDebitNote = "urn:oasis:names:specification:ubl:schema:xsd:DebitNote-2"
 	// Common Aggregate Components
 	NsCac = "urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
 	// Common Basic Components
@@ -34,6 +36,8 @@ const (
 	schemaLocationInvoice = "urn:oasis:names:specification:ubl:schema:xsd:Invoice-2 http://docs.oasis-open.org/ubl/os-UBL-2.1/xsd/maindoc/UBL-Invoice-2.1.xsd"
 	// Schema location UBL CreditNote 2.1
 	schemaLocationCreditNote = "urn:oasis:names:specification:ubl:schema:xsd:CreditNote-2 http://docs.oasis-open.org/ubl/os-UBL-2.1/xsd/maindoc/UBL-CreditNote-2.1.xsd"
+	// Schema location UBL DebitNote 2.1
+	schemaLocationDebitNote = "urn:oasis:names:specification:ubl:schema:xsd:DebitNote-2 http://docs.oasis-open.org/ubl/os-UBL-2.1/xsd/maindoc/UBL-DebitNote-2.1.xsd"
 )
 
 // XMLBuilderService construye el XML UBL 2.1 de la factura (sin firma XAdES).
@@ -77,6 +81,22 @@ func (s *XMLBuilderService) Build(ctx *InvoiceBuildContext) ([]byte, error) {
 				{Name: xml.Name{Space: nsXsi, Local: "schemaLocation"}, Value: schemaLocationCreditNote},
 			},
 		}
+	case "DEBIT_NOTE":
+		root = xml.StartElement{
+			Name: xml.Name{Space: NsDebitNote, Local: "DebitNote"},
+			Attr: []xml.Attr{
+				{Name: xml.Name{Local: "Id"}, Value: "debitnote-id"},
+				{Name: xml.Name{Local: "xmlns"}, Value: NsDebitNote},
+				{Name: xml.Name{Local: "xmlns:cac"}, Value: NsCac},
+				{Name: xml.Name{Local: "xmlns:cbc"}, Value: NsCbc},
+				{Name: xml.Name{Local: "xmlns:ds"}, Value: NsDs},
+				{Name: xml.Name{Local: "xmlns:ext"}, Value: NsExt},
+				{Name: xml.Name{Local: "xmlns:sts"}, Value: NsSts},
+				{Name: xml.Name{Local: "xmlns:xades"}, Value: NsXades},
+				{Name: xml.Name{Local: "xmlns:xsi"}, Value: nsXsi},
+				{Name: xml.Name{Space: nsXsi, Local: "schemaLocation"}, Value: schemaLocationDebitNote},
+			},
+		}
 	default:
 		root = xml.StartElement{
 			Name: xml.Name{Space: NsInvoice, Local: "Invoice"},
@@ -118,6 +138,8 @@ func (s *XMLBuilderService) Build(ctx *InvoiceBuildContext) ([]byte, error) {
 	writeCbc(enc, "CustomizationID", "10")
 	if docType == "CREDIT_NOTE" {
 		writeCbc(enc, "ProfileID", "DIAN 2.1: Nota Crédito de Venta")
+	} else if docType == "DEBIT_NOTE" {
+		writeCbc(enc, "ProfileID", "DIAN 2.1: Nota Débito de Venta")
 	} else {
 		writeCbc(enc, "ProfileID", "DIAN 2.1: Factura Electrónica de Venta")
 	}
@@ -138,7 +160,7 @@ func (s *XMLBuilderService) Build(ctx *InvoiceBuildContext) ([]byte, error) {
 	}
 
 	// Elementos específicos de Nota Crédito
-	if docType == "CREDIT_NOTE" {
+	if docType == "CREDIT_NOTE" || docType == "DEBIT_NOTE" {
 		// DiscrepancyResponse obligatorio: referencia, código de concepto y descripción.
 		_ = enc.EncodeToken(xml.StartElement{Name: xml.Name{Space: NsCac, Local: "DiscrepancyResponse"}})
 		if ctx.OriginalInvoiceNumber != "" {
@@ -197,6 +219,10 @@ func (s *XMLBuilderService) Build(ctx *InvoiceBuildContext) ([]byte, error) {
 	for i, line := range ctx.Details {
 		if docType == "CREDIT_NOTE" {
 			if err := s.writeCreditNoteLine(enc, i+1, line); err != nil {
+				return nil, err
+			}
+		} else if docType == "DEBIT_NOTE" {
+			if err := s.writeDebitNoteLine(enc, i+1, line); err != nil {
 				return nil, err
 			}
 		} else {
@@ -310,6 +336,36 @@ func (s *XMLBuilderService) writeCreditNoteLine(enc *xml.Encoder, lineNumber int
 	_ = enc.EncodeToken(xml.EndElement{Name: xml.Name{Space: NsCac, Local: "Price"}})
 
 	_ = enc.EncodeToken(xml.EndElement{Name: xml.Name{Space: NsCac, Local: "CreditNoteLine"}})
+	return nil
+}
+
+// writeDebitNoteLine escribe una línea de Nota Débito (DebitNoteLine).
+func (s *XMLBuilderService) writeDebitNoteLine(enc *xml.Encoder, lineNumber int, line InvoiceLineForXML) error {
+	_ = enc.EncodeToken(xml.StartElement{Name: xml.Name{Space: NsCac, Local: "DebitNoteLine"}})
+
+	writeCbc(enc, "ID", strconv.Itoa(lineNumber))
+
+	_ = enc.EncodeToken(xml.StartElement{
+		Name: xml.Name{Space: NsCbc, Local: "DebitedQuantity"},
+		Attr: []xml.Attr{{Name: xml.Name{Local: "unitCode"}, Value: line.UnitCode}},
+	})
+	_ = enc.EncodeToken(xml.CharData(line.Quantity.String()))
+	_ = enc.EncodeToken(xml.EndElement{Name: xml.Name{Space: NsCbc, Local: "DebitedQuantity"}})
+
+	writeCbcAmount(enc, "LineExtensionAmount", line.Subtotal.Round(2).StringFixed(2), "COP")
+
+	_ = enc.EncodeToken(xml.StartElement{Name: xml.Name{Space: NsCac, Local: "Item"}})
+	writeCbc(enc, "Description", line.ProductName)
+	_ = enc.EncodeToken(xml.StartElement{Name: xml.Name{Space: NsCbc, Local: "Name"}})
+	_ = enc.EncodeToken(xml.CharData(line.ProductCode))
+	_ = enc.EncodeToken(xml.EndElement{Name: xml.Name{Space: NsCbc, Local: "Name"}})
+	_ = enc.EncodeToken(xml.EndElement{Name: xml.Name{Space: NsCac, Local: "Item"}})
+
+	_ = enc.EncodeToken(xml.StartElement{Name: xml.Name{Space: NsCac, Local: "Price"}})
+	writeCbcAmount(enc, "PriceAmount", line.UnitPrice.Round(2).StringFixed(2), "COP")
+	_ = enc.EncodeToken(xml.EndElement{Name: xml.Name{Space: NsCac, Local: "Price"}})
+
+	_ = enc.EncodeToken(xml.EndElement{Name: xml.Name{Space: NsCac, Local: "DebitNoteLine"}})
 	return nil
 }
 

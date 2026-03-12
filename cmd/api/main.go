@@ -110,6 +110,12 @@ func main() {
 		dianOrchestrator, dianCfg,
 	)
 
+	createDebitNoteUC := billing.NewCreateDebitNoteUseCase(
+		txRunner,
+		customerRepo, companyRepo, productRepo, invoiceRepo,
+		dianOrchestrator, dianCfg,
+	)
+
 	analyticsRepo := postgres.NewAnalyticsRepository(pool)
 	levelRepo := postgres.NewInventoryLevelRepository(pool)
 	companyUC := usecase.NewCompanyUseCase(companyRepo)
@@ -194,6 +200,7 @@ func main() {
 		CustomerUC:             customerUC,
 		CreateInvoice:          createInvoiceUC,
 		ReturnInvoice:          createCreditNoteUC,
+		DebitNote:              createDebitNoteUC,
 		InvoicePDF:             invoicePDFUC,
 		AuthUC:                 authUC,
 		ModuleService:          moduleSvc,

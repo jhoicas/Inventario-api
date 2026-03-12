@@ -22,6 +22,11 @@ type CreateCreditNoteUseCase interface {
 	CreateCreditNote(ctx context.Context, companyID, userID, invoiceID string, in dto.ReturnInvoiceRequest) (*dto.InvoiceResponse, error)
 }
 
+// CreateDebitNoteUseCase interface para permitir mocking en tests.
+type CreateDebitNoteUseCase interface {
+	CreateDebitNote(ctx context.Context, companyID, userID, invoiceID string, in dto.CreateDebitNoteRequest) (*dto.DebitNoteResponse, error)
+}
+
 // InvoicePDFUseCase interface para permitir mocking en tests.
 type InvoicePDFUseCase interface {
 	DownloadInvoicePDF(ctx context.Context, companyID, invoiceID string) (pdfBytes []byte, filename string, err error)
@@ -31,6 +36,7 @@ type InvoicePDFUseCase interface {
 type InvoiceHandler struct {
 	uc       CreateInvoiceUseCase
 	returnUC CreateCreditNoteUseCase
+	debitUC  CreateDebitNoteUseCase
 	pdfUC    InvoicePDFUseCase
 }
 
@@ -45,6 +51,18 @@ func NewInvoiceHandler(
 		returnUC: returnUC,
 		pdfUC:    pdfUC,
 	}
+}
+
+// NewInvoiceHandlerWithDebit construye el handler con soporte explícito de nota débito.
+func NewInvoiceHandlerWithDebit(
+	uc CreateInvoiceUseCase,
+	returnUC CreateCreditNoteUseCase,
+	debitUC CreateDebitNoteUseCase,
+	pdfUC InvoicePDFUseCase,
+) *InvoiceHandler {
+	h := NewInvoiceHandler(uc, returnUC, pdfUC)
+	h.debitUC = debitUC
+	return h
 }
 
 // Create godoc
@@ -150,6 +168,65 @@ func (h *InvoiceHandler) HandleReturn(c *fiber.Ctx) error {
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(creditNote)
+}
+
+// HandleDebitNote godoc
+// @Summary      Registrar nota débito
+// @Description  Registra una Nota Débito electrónica asociada a una factura existente y la envía a DIAN
+// @Tags         billing
+// @Security     Bearer
+// @Accept       json
+// @Produce      json
+// @Param        id    path      string                      true  "ID de la factura original"
+// @Param        body  body      dto.CreateDebitNoteRequest  true  "Motivo e ítems de la nota débito"
+// @Success      201   {object}  dto.DebitNoteResponse
+// @Failure      400   {object}  dto.ErrorResponse
+// @Failure      401   {object}  dto.ErrorResponse
+// @Failure      403   {object}  dto.ErrorResponse
+// @Failure      404   {object}  dto.ErrorResponse
+// @Failure      409   {object}  dto.ErrorResponse
+// @Failure      500   {object}  dto.ErrorResponse
+// @Router       /api/invoices/{id}/debit-note [post]
+func (h *InvoiceHandler) HandleDebitNote(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	userID := GetUserID(c)
+	if companyID == "" || userID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	invoiceID := c.Params("id")
+	if invoiceID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "id requerido"})
+	}
+	if h.debitUC == nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: "servicio de nota débito no disponible"})
+	}
+
+	var in dto.CreateDebitNoteRequest
+	if err := c.BodyParser(&in); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
+	}
+
+	debitNote, err := h.debitUC.CreateDebitNote(c.Context(), companyID, userID, invoiceID, in)
+	if err != nil {
+		if err == domain.ErrInvalidInput {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "datos inválidos"})
+		}
+		if err == domain.ErrNotFound {
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "factura o producto no encontrado"})
+		}
+		if err == domain.ErrForbidden {
+			return c.Status(fiber.StatusForbidden).JSON(dto.ErrorResponse{Code: "FORBIDDEN", Message: "acceso denegado al recurso"})
+		}
+		if errors.Is(err, domain.ErrInsufficientStock) {
+			return c.Status(fiber.StatusConflict).JSON(dto.ErrorResponse{
+				Code:    "INSUFFICIENT_STOCK",
+				Message: err.Error(),
+			})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(debitNote)
 }
 
 // GetDIANStatus godoc

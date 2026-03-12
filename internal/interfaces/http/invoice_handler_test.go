@@ -21,9 +21,9 @@ import (
 // ── Fakes para los UseCases ───────────────────────────────────────────────────
 
 type fakeCreateInvoiceUseCase struct {
-	createInvoiceFunc       func(ctx context.Context, companyID, userID string, in dto.CreateInvoiceRequest) (*dto.InvoiceResponse, error)
+	createInvoiceFunc        func(ctx context.Context, companyID, userID string, in dto.CreateInvoiceRequest) (*dto.InvoiceResponse, error)
 	getInvoiceDIANStatusFunc func(ctx context.Context, companyID, id string) (*dto.InvoiceDIANStatusDTO, error)
-	getInvoiceFunc          func(ctx context.Context, companyID, id string) (*dto.InvoiceResponse, error)
+	getInvoiceFunc           func(ctx context.Context, companyID, id string) (*dto.InvoiceResponse, error)
 }
 
 func (f *fakeCreateInvoiceUseCase) CreateInvoice(ctx context.Context, companyID, userID string, in dto.CreateInvoiceRequest) (*dto.InvoiceResponse, error) {
@@ -56,6 +56,17 @@ func (f *fakeCreateCreditNoteUseCase) CreateCreditNote(ctx context.Context, comp
 		return f.createCreditNoteFunc(ctx, companyID, userID, invoiceID, in)
 	}
 	return nil, errors.New("createCreditNote not configured")
+}
+
+type fakeCreateDebitNoteUseCase struct {
+	createDebitNoteFunc func(ctx context.Context, companyID, userID, invoiceID string, in dto.CreateDebitNoteRequest) (*dto.DebitNoteResponse, error)
+}
+
+func (f *fakeCreateDebitNoteUseCase) CreateDebitNote(ctx context.Context, companyID, userID, invoiceID string, in dto.CreateDebitNoteRequest) (*dto.DebitNoteResponse, error) {
+	if f.createDebitNoteFunc != nil {
+		return f.createDebitNoteFunc(ctx, companyID, userID, invoiceID, in)
+	}
+	return nil, errors.New("createDebitNote not configured")
 }
 
 type fakeInvoicePDFUseCase struct {
@@ -111,6 +122,15 @@ func validReturnInvoiceRequest() dto.ReturnInvoiceRequest {
 	}
 }
 
+func validCreateDebitNoteRequest() dto.CreateDebitNoteRequest {
+	return dto.CreateDebitNoteRequest{
+		Reason: "Ajuste por mayor valor",
+		Items: []dto.DebitNoteItemRequest{
+			{ProductID: "prod-001", Quantity: decimal.NewFromInt(1), UnitPrice: decimal.NewFromInt(5000)},
+		},
+	}
+}
+
 func validInvoiceResponse() *dto.InvoiceResponse {
 	return &dto.InvoiceResponse{
 		ID:           "inv-123",
@@ -136,6 +156,14 @@ func validInvoiceDIANStatusDTO() *dto.InvoiceDIANStatusDTO {
 		CUFE:       "abc123",
 		TrackID:    "track-001",
 		Errors:     "",
+	}
+}
+
+func validDebitNoteResponse() *dto.DebitNoteResponse {
+	return &dto.DebitNoteResponse{
+		DebitNoteID: "dn-123",
+		CUFE:        "cude-123",
+		DIANStatus:  "EXITOSO",
 	}
 }
 
@@ -173,9 +201,9 @@ func TestInvoiceHandler_Create(t *testing.T) {
 			},
 		},
 		{
-			name:           "Unauthorized_NoCompanyID",
-			body:           validCreateInvoiceRequest(),
-			mockSetup:      func() (*fakeCreateInvoiceUseCase, *fakeCreateCreditNoteUseCase, *fakeInvoicePDFUseCase) {
+			name: "Unauthorized_NoCompanyID",
+			body: validCreateInvoiceRequest(),
+			mockSetup: func() (*fakeCreateInvoiceUseCase, *fakeCreateCreditNoteUseCase, *fakeInvoicePDFUseCase) {
 				return &fakeCreateInvoiceUseCase{}, &fakeCreateCreditNoteUseCase{}, &fakeInvoicePDFUseCase{}
 			},
 			companyID:      "",
@@ -188,9 +216,9 @@ func TestInvoiceHandler_Create(t *testing.T) {
 			},
 		},
 		{
-			name:           "Unauthorized_NoUserID",
-			body:           validCreateInvoiceRequest(),
-			mockSetup:      func() (*fakeCreateInvoiceUseCase, *fakeCreateCreditNoteUseCase, *fakeInvoicePDFUseCase) {
+			name: "Unauthorized_NoUserID",
+			body: validCreateInvoiceRequest(),
+			mockSetup: func() (*fakeCreateInvoiceUseCase, *fakeCreateCreditNoteUseCase, *fakeInvoicePDFUseCase) {
 				return &fakeCreateInvoiceUseCase{}, &fakeCreateCreditNoteUseCase{}, &fakeInvoicePDFUseCase{}
 			},
 			companyID:      invoiceTestCompanyID,
@@ -203,9 +231,9 @@ func TestInvoiceHandler_Create(t *testing.T) {
 			},
 		},
 		{
-			name:           "InvalidBody",
-			body:           "not valid json",
-			mockSetup:      func() (*fakeCreateInvoiceUseCase, *fakeCreateCreditNoteUseCase, *fakeInvoicePDFUseCase) {
+			name: "InvalidBody",
+			body: "not valid json",
+			mockSetup: func() (*fakeCreateInvoiceUseCase, *fakeCreateCreditNoteUseCase, *fakeInvoicePDFUseCase) {
 				return &fakeCreateInvoiceUseCase{}, &fakeCreateCreditNoteUseCase{}, &fakeInvoicePDFUseCase{}
 			},
 			companyID:      invoiceTestCompanyID,
@@ -379,10 +407,10 @@ func TestInvoiceHandler_HandleReturn(t *testing.T) {
 			},
 		},
 		{
-			name:           "Unauthorized_NoCompanyID",
-			id:             "inv-123",
-			body:           validReturnInvoiceRequest(),
-			mockSetup:      func() (*fakeCreateInvoiceUseCase, *fakeCreateCreditNoteUseCase, *fakeInvoicePDFUseCase) {
+			name: "Unauthorized_NoCompanyID",
+			id:   "inv-123",
+			body: validReturnInvoiceRequest(),
+			mockSetup: func() (*fakeCreateInvoiceUseCase, *fakeCreateCreditNoteUseCase, *fakeInvoicePDFUseCase) {
 				return &fakeCreateInvoiceUseCase{}, &fakeCreateCreditNoteUseCase{}, &fakeInvoicePDFUseCase{}
 			},
 			companyID:      "",
@@ -395,23 +423,23 @@ func TestInvoiceHandler_HandleReturn(t *testing.T) {
 			},
 		},
 		{
-			name:           "BadRequest_MissingID",
-			id:             "",
-			body:           validReturnInvoiceRequest(),
-			mockSetup:      func() (*fakeCreateInvoiceUseCase, *fakeCreateCreditNoteUseCase, *fakeInvoicePDFUseCase) {
+			name: "BadRequest_MissingID",
+			id:   "",
+			body: validReturnInvoiceRequest(),
+			mockSetup: func() (*fakeCreateInvoiceUseCase, *fakeCreateCreditNoteUseCase, *fakeInvoicePDFUseCase) {
 				return &fakeCreateInvoiceUseCase{}, &fakeCreateCreditNoteUseCase{}, &fakeInvoicePDFUseCase{}
 			},
-			companyID:      invoiceTestCompanyID,
-			userID:         invoiceTestUserID,
+			companyID: invoiceTestCompanyID,
+			userID:    invoiceTestUserID,
 			// La ruta no hace match cuando falta :id, Fiber responde 404.
 			expectedStatus: http.StatusNotFound,
 			validateBody:   nil,
 		},
 		{
-			name:           "InvalidBody",
-			id:             "inv-123",
-			body:           "invalid json",
-			mockSetup:      func() (*fakeCreateInvoiceUseCase, *fakeCreateCreditNoteUseCase, *fakeInvoicePDFUseCase) {
+			name: "InvalidBody",
+			id:   "inv-123",
+			body: "invalid json",
+			mockSetup: func() (*fakeCreateInvoiceUseCase, *fakeCreateCreditNoteUseCase, *fakeInvoicePDFUseCase) {
 				return &fakeCreateInvoiceUseCase{}, &fakeCreateCreditNoteUseCase{}, &fakeInvoicePDFUseCase{}
 			},
 			companyID:      invoiceTestCompanyID,
@@ -498,6 +526,147 @@ func TestInvoiceHandler_HandleReturn(t *testing.T) {
 	}
 }
 
+// ── Tests HandleDebitNote ──────────────────────────────────────────────────────
+
+func TestInvoiceHandler_HandleDebitNote(t *testing.T) {
+	tests := []struct {
+		name           string
+		id             string
+		body           interface{}
+		debitUC        *fakeCreateDebitNoteUseCase
+		companyID      string
+		userID         string
+		expectedStatus int
+		validateBody   func(*testing.T, *http.Response)
+	}{
+		{
+			name: "Success",
+			id:   "inv-123",
+			body: validCreateDebitNoteRequest(),
+			debitUC: &fakeCreateDebitNoteUseCase{
+				createDebitNoteFunc: func(_ context.Context, _, _, _ string, _ dto.CreateDebitNoteRequest) (*dto.DebitNoteResponse, error) {
+					return validDebitNoteResponse(), nil
+				},
+			},
+			companyID:      invoiceTestCompanyID,
+			userID:         invoiceTestUserID,
+			expectedStatus: http.StatusCreated,
+			validateBody: func(t *testing.T, resp *http.Response) {
+				var out dto.DebitNoteResponse
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+				assert.Equal(t, "dn-123", out.DebitNoteID)
+				assert.Equal(t, "EXITOSO", out.DIANStatus)
+			},
+		},
+		{
+			name:           "Unauthorized_NoCompanyID",
+			id:             "inv-123",
+			body:           validCreateDebitNoteRequest(),
+			debitUC:        &fakeCreateDebitNoteUseCase{},
+			companyID:      "",
+			userID:         invoiceTestUserID,
+			expectedStatus: http.StatusUnauthorized,
+			validateBody: func(t *testing.T, resp *http.Response) {
+				var errResp dto.ErrorResponse
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
+				assert.Equal(t, "UNAUTHORIZED", errResp.Code)
+			},
+		},
+		{
+			name:           "InvalidBody",
+			id:             "inv-123",
+			body:           "invalid json",
+			debitUC:        &fakeCreateDebitNoteUseCase{},
+			companyID:      invoiceTestCompanyID,
+			userID:         invoiceTestUserID,
+			expectedStatus: http.StatusBadRequest,
+			validateBody: func(t *testing.T, resp *http.Response) {
+				var errResp dto.ErrorResponse
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
+				assert.Equal(t, "INVALID_BODY", errResp.Code)
+			},
+		},
+		{
+			name: "NotFound",
+			id:   "inv-999",
+			body: validCreateDebitNoteRequest(),
+			debitUC: &fakeCreateDebitNoteUseCase{
+				createDebitNoteFunc: func(_ context.Context, _, _, _ string, _ dto.CreateDebitNoteRequest) (*dto.DebitNoteResponse, error) {
+					return nil, domain.ErrNotFound
+				},
+			},
+			companyID:      invoiceTestCompanyID,
+			userID:         invoiceTestUserID,
+			expectedStatus: http.StatusNotFound,
+			validateBody: func(t *testing.T, resp *http.Response) {
+				var errResp dto.ErrorResponse
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
+				assert.Equal(t, "NOT_FOUND", errResp.Code)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := NewInvoiceHandlerWithDebit(
+				&fakeCreateInvoiceUseCase{},
+				&fakeCreateCreditNoteUseCase{},
+				tt.debitUC,
+				&fakeInvoicePDFUseCase{},
+			)
+
+			app := fiber.New(fiber.Config{DisableStartupMessage: true})
+			app.Use(mockInvoiceAuthMiddleware(tt.companyID, tt.userID))
+			app.Post("/invoices/:id/debit-note", handler.HandleDebitNote)
+
+			path := "/invoices/"
+			if tt.id != "" {
+				path += tt.id + "/debit-note"
+			} else {
+				path = "/invoices//debit-note"
+			}
+
+			bodyBytes, _ := json.Marshal(tt.body)
+			req := httptest.NewRequest(http.MethodPost, path, bytes.NewReader(bodyBytes))
+			req.Header.Set("Content-Type", "application/json")
+
+			resp, err := app.Test(req, -1)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+
+			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
+			if tt.validateBody != nil {
+				tt.validateBody(t, resp)
+			}
+		})
+	}
+
+	t.Run("ServiceUnavailable_NilDebitUC", func(t *testing.T) {
+		handler := NewInvoiceHandler(
+			&fakeCreateInvoiceUseCase{},
+			&fakeCreateCreditNoteUseCase{},
+			&fakeInvoicePDFUseCase{},
+		)
+
+		app := fiber.New(fiber.Config{DisableStartupMessage: true})
+		app.Use(mockInvoiceAuthMiddleware(invoiceTestCompanyID, invoiceTestUserID))
+		app.Post("/invoices/:id/debit-note", handler.HandleDebitNote)
+
+		bodyBytes, _ := json.Marshal(validCreateDebitNoteRequest())
+		req := httptest.NewRequest(http.MethodPost, "/invoices/inv-123/debit-note", bytes.NewReader(bodyBytes))
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := app.Test(req, -1)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusInternalServerError, resp.StatusCode)
+		var errResp dto.ErrorResponse
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
+		assert.Equal(t, "INTERNAL", errResp.Code)
+	})
+}
+
 // ── Tests GetByID ───────────────────────────────────────────────────────────────
 
 func TestInvoiceHandler_GetByID(t *testing.T) {
@@ -529,9 +698,9 @@ func TestInvoiceHandler_GetByID(t *testing.T) {
 			},
 		},
 		{
-			name:           "Unauthorized_NoCompanyID",
-			id:             "inv-123",
-			mockSetup:      func() (*fakeCreateInvoiceUseCase, *fakeCreateCreditNoteUseCase, *fakeInvoicePDFUseCase) {
+			name: "Unauthorized_NoCompanyID",
+			id:   "inv-123",
+			mockSetup: func() (*fakeCreateInvoiceUseCase, *fakeCreateCreditNoteUseCase, *fakeInvoicePDFUseCase) {
 				return &fakeCreateInvoiceUseCase{}, &fakeCreateCreditNoteUseCase{}, &fakeInvoicePDFUseCase{}
 			},
 			companyID:      "",
@@ -543,9 +712,9 @@ func TestInvoiceHandler_GetByID(t *testing.T) {
 			},
 		},
 		{
-			name:           "BadRequest_MissingID",
-			id:             "",
-			mockSetup:      func() (*fakeCreateInvoiceUseCase, *fakeCreateCreditNoteUseCase, *fakeInvoicePDFUseCase) {
+			name: "BadRequest_MissingID",
+			id:   "",
+			mockSetup: func() (*fakeCreateInvoiceUseCase, *fakeCreateCreditNoteUseCase, *fakeInvoicePDFUseCase) {
 				return &fakeCreateInvoiceUseCase{}, &fakeCreateCreditNoteUseCase{}, &fakeInvoicePDFUseCase{}
 			},
 			companyID:      invoiceTestCompanyID,
@@ -672,9 +841,9 @@ func TestInvoiceHandler_GetDIANStatus(t *testing.T) {
 			},
 		},
 		{
-			name:           "Unauthorized_NoCompanyID",
-			id:             "inv-123",
-			mockSetup:      func() (*fakeCreateInvoiceUseCase, *fakeCreateCreditNoteUseCase, *fakeInvoicePDFUseCase) {
+			name: "Unauthorized_NoCompanyID",
+			id:   "inv-123",
+			mockSetup: func() (*fakeCreateInvoiceUseCase, *fakeCreateCreditNoteUseCase, *fakeInvoicePDFUseCase) {
 				return &fakeCreateInvoiceUseCase{}, &fakeCreateCreditNoteUseCase{}, &fakeInvoicePDFUseCase{}
 			},
 			companyID:      "",
@@ -686,9 +855,9 @@ func TestInvoiceHandler_GetDIANStatus(t *testing.T) {
 			},
 		},
 		{
-			name:           "BadRequest_MissingID",
-			id:             "",
-			mockSetup:      func() (*fakeCreateInvoiceUseCase, *fakeCreateCreditNoteUseCase, *fakeInvoicePDFUseCase) {
+			name: "BadRequest_MissingID",
+			id:   "",
+			mockSetup: func() (*fakeCreateInvoiceUseCase, *fakeCreateCreditNoteUseCase, *fakeInvoicePDFUseCase) {
 				return &fakeCreateInvoiceUseCase{}, &fakeCreateCreditNoteUseCase{}, &fakeInvoicePDFUseCase{}
 			},
 			companyID:      invoiceTestCompanyID,
@@ -795,9 +964,9 @@ func TestInvoiceHandler_DownloadPDF(t *testing.T) {
 			},
 		},
 		{
-			name:           "Unauthorized_NoCompanyID",
-			id:             "inv-123",
-			mockSetup:      func() (*fakeCreateInvoiceUseCase, *fakeCreateCreditNoteUseCase, *fakeInvoicePDFUseCase) {
+			name: "Unauthorized_NoCompanyID",
+			id:   "inv-123",
+			mockSetup: func() (*fakeCreateInvoiceUseCase, *fakeCreateCreditNoteUseCase, *fakeInvoicePDFUseCase) {
 				return &fakeCreateInvoiceUseCase{}, &fakeCreateCreditNoteUseCase{}, &fakeInvoicePDFUseCase{}
 			},
 			companyID:      "",
@@ -809,9 +978,9 @@ func TestInvoiceHandler_DownloadPDF(t *testing.T) {
 			},
 		},
 		{
-			name:           "BadRequest_MissingID",
-			id:             "",
-			mockSetup:      func() (*fakeCreateInvoiceUseCase, *fakeCreateCreditNoteUseCase, *fakeInvoicePDFUseCase) {
+			name: "BadRequest_MissingID",
+			id:   "",
+			mockSetup: func() (*fakeCreateInvoiceUseCase, *fakeCreateCreditNoteUseCase, *fakeInvoicePDFUseCase) {
 				return &fakeCreateInvoiceUseCase{}, &fakeCreateCreditNoteUseCase{}, &fakeInvoicePDFUseCase{}
 			},
 			companyID:      invoiceTestCompanyID,

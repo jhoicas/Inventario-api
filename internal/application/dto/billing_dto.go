@@ -4,10 +4,10 @@ import "github.com/shopspring/decimal"
 
 // CreateCustomerRequest body para POST /api/customers.
 type CreateCustomerRequest struct {
-	Name   string `json:"name"`
-	TaxID  string `json:"tax_id"`
-	Email  string `json:"email,omitempty"`
-	Phone  string `json:"phone,omitempty"`
+	Name  string `json:"name"`
+	TaxID string `json:"tax_id"`
+	Email string `json:"email,omitempty"`
+	Phone string `json:"phone,omitempty"`
 }
 
 // CustomerResponse cliente en respuestas.
@@ -23,18 +23,18 @@ type CustomerResponse struct {
 // CreateInvoiceRequest body para POST /api/invoices.
 // WarehouseID: bodega de la cual se descuenta el inventario.
 type CreateInvoiceRequest struct {
-	CustomerID   string               `json:"customer_id"`
-	WarehouseID  string               `json:"warehouse_id"`
-	Prefix       string               `json:"prefix"`
-	Number       string               `json:"number,omitempty"` // opcional; si va vacío se puede generar
-	Items        []InvoiceItemRequest `json:"items"`
+	CustomerID  string               `json:"customer_id"`
+	WarehouseID string               `json:"warehouse_id"`
+	Prefix      string               `json:"prefix"`
+	Number      string               `json:"number,omitempty"` // opcional; si va vacío se puede generar
+	Items       []InvoiceItemRequest `json:"items"`
 }
 
 // InvoiceItemRequest línea de factura (producto, cantidad, precio unitario).
 type InvoiceItemRequest struct {
-	ProductID  string          `json:"product_id"`
-	Quantity   decimal.Decimal `json:"quantity"`
-	UnitPrice  decimal.Decimal `json:"unit_price"`
+	ProductID string          `json:"product_id"`
+	Quantity  decimal.Decimal `json:"quantity"`
+	UnitPrice decimal.Decimal `json:"unit_price"`
 }
 
 // ReturnItemRequest línea de devolución (producto y cantidad devuelta).
@@ -49,6 +49,26 @@ type ReturnInvoiceRequest struct {
 	WarehouseID string              `json:"warehouse_id"`
 	Items       []ReturnItemRequest `json:"items"`
 	Reason      string              `json:"reason,omitempty"`
+}
+
+// DebitNoteItemRequest línea de nota débito (producto, cantidad y precio unitario).
+type DebitNoteItemRequest struct {
+	ProductID string          `json:"product_id"`
+	Quantity  decimal.Decimal `json:"quantity"`
+	UnitPrice decimal.Decimal `json:"unit_price"`
+}
+
+// CreateDebitNoteRequest body para POST /api/invoices/{id}/debit-note.
+type CreateDebitNoteRequest struct {
+	Reason string                 `json:"reason,omitempty"`
+	Items  []DebitNoteItemRequest `json:"items"`
+}
+
+// DebitNoteResponse respuesta resumida de creación de nota débito.
+type DebitNoteResponse struct {
+	DebitNoteID string `json:"debit_note_id"`
+	CUFE        string `json:"cufe,omitempty"`
+	DIANStatus  string `json:"dian_status"`
 }
 
 // InvoiceResponse factura con detalle para GET /api/invoices/:id.
@@ -86,7 +106,7 @@ type InvoiceDetailResponse struct {
 type InvoiceDIANStatusDTO struct {
 	ID         string `json:"id"`
 	DIANStatus string `json:"dian_status"` // DRAFT|SIGNED|EXITOSO|RECHAZADO|ERROR_GENERATION
-	CUFE       string `json:"cufe"`         // Código único de factura (SHA-384)
-	TrackID    string `json:"track_id"`     // ZipKey devuelto por el WS DIAN
-	Errors     string `json:"errors"`       // Mensajes de rechazo de la DIAN (vacío si OK)
+	CUFE       string `json:"cufe"`        // Código único de factura (SHA-384)
+	TrackID    string `json:"track_id"`    // ZipKey devuelto por el WS DIAN
+	Errors     string `json:"errors"`      // Mensajes de rechazo de la DIAN (vacío si OK)
 }

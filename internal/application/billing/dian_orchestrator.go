@@ -71,6 +71,11 @@ func (o *DIANOrchestrator) ProcessAsync(invoiceID string) {
 	go o.process(invoiceID)
 }
 
+// ProcessSync ejecuta el procesamiento DIAN de manera síncrona.
+func (o *DIANOrchestrator) ProcessSync(invoiceID string) {
+	o.process(invoiceID)
+}
+
 // process es el núcleo síncrono del orquestador. Siempre termina actualizando
 // dian_status en la DB (EXITOSO, RECHAZADO o ERROR_GENERATION).
 func (o *DIANOrchestrator) process(invoiceID string) {
