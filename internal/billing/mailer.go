@@ -88,13 +88,6 @@ func (m *InvoiceMailer) SendCustomEmailSync(ctx context.Context, companyID, to, 
 	}
 
 	from := m.smtp.From
-	if companyID != "" && m.companyRepo != nil {
-		if company, err := m.companyRepo.GetByID(companyID); err == nil && company != nil {
-			if sender := buildSenderEmail(company.Email); sender != "" {
-				from = sender
-			}
-		}
-	}
 	if from == "" {
 		from = m.smtp.User
 	}
@@ -163,13 +156,10 @@ func (m *InvoiceMailer) send(ctx context.Context, invoiceID string) error {
 		return fmt.Errorf("error generando PDF para correo: %w", err)
 	}
 
-	// ── 5. Construir dirección "From" usando el dominio de la empresa ─────────
-	from := buildSenderEmail(company.Email)
+	// ── 5. Construir dirección "From" desde SMTP_FROM ────────────────────────
+	from := m.smtp.From
 	if from == "" {
-		from = m.smtp.From
-		if from == "" {
-			from = m.smtp.User
-		}
+		from = m.smtp.User
 	}
 
 	// ── 6. Construir mensaje ──────────────────────────────────────────────────
@@ -319,6 +309,12 @@ func (m *InvoiceMailer) sendWithResendAPI(ctx context.Context, from, to, subject
 
 	respBody, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		if resp.StatusCode == http.StatusForbidden && strings.Contains(strings.ToLower(string(respBody)), "not authorized to send emails from") {
+			fallbackFrom := strings.TrimSpace(m.smtp.From)
+			if fallbackFrom != "" && !strings.EqualFold(fallbackFrom, from) {
+				return m.sendWithResendAPI(ctx, fallbackFrom, to, subject, body, pdfName, pdfBytes, xmlName, xmlContent)
+			}
+		}
 		return fmt.Errorf("status %d: %s", resp.StatusCode, strings.TrimSpace(string(respBody)))
 	}
 
@@ -344,23 +340,4 @@ func isSMTPConnectivityError(err error) bool {
 
 func (m *InvoiceMailer) hasResendAPIConfig() bool {
 	return strings.TrimSpace(m.smtp.ResendAPIKey) != "" || strings.TrimSpace(m.smtp.Password) != ""
-}
-
-// buildSenderEmail extrae el dominio del email de la empresa y construye noresponde@dominio.
-// Ejemplo: contacto@artemisa.co → noresponde@artemisa.co
-func buildSenderEmail(companyEmail string) string {
-	if companyEmail == "" {
-		return ""
-	}
-	// Buscar el último @ para extraer la parte del dominio
-	atIndex := strings.LastIndex(companyEmail, "@")
-	if atIndex == -1 || atIndex == len(companyEmail)-1 {
-		// No hay @ o está al final (dominio vacío)
-		return ""
-	}
-	domain := companyEmail[atIndex+1:]
-	if domain == "" {
-		return ""
-	}
-	return "noresponde@" + domain
 }
