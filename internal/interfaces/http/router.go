@@ -24,6 +24,7 @@ type RouterDeps struct {
 	CreateInvoice          *billing.CreateInvoiceUseCase
 	ReturnInvoice          *billing.CreateCreditNoteUseCase
 	DebitNote              *billing.CreateDebitNoteUseCase
+	VoidInvoice            *billing.CreateVoidInvoiceUseCase
 	InvoicePDF             *billing.PDFUseCase
 	AuthUC                 *auth.AuthUseCase
 	ModuleService          *usecase.ModuleService
@@ -117,7 +118,7 @@ func Router(app *fiber.App, deps RouterDeps) {
 	)
 
 	// ── Facturación (módulo 'billing' + roles) ─────────────────────────────────
-	invoiceHandler := NewInvoiceHandlerWithDebit(deps.CreateInvoice, deps.ReturnInvoice, deps.DebitNote, deps.InvoicePDF)
+	invoiceHandler := NewInvoiceHandlerWithBillingOps(deps.CreateInvoice, deps.ReturnInvoice, deps.DebitNote, deps.VoidInvoice, deps.InvoicePDF)
 	invGroup2 := protected.Group("/invoices", RequireModule(entity.ModuleBilling, deps.ModuleService))
 
 	// POST — emitir factura: admin y vendedor
@@ -134,6 +135,11 @@ func Router(app *fiber.App, deps RouterDeps) {
 	invGroup2.Post("/:id/debit-note",
 		RequireRole(entity.RoleAdmin, entity.RoleVendedor),
 		invoiceHandler.HandleDebitNote,
+	)
+	// POST — anular factura (Nota Crédito total): admin y vendedor
+	invGroup2.Post("/:id/void",
+		RequireRole(entity.RoleAdmin, entity.RoleVendedor),
+		invoiceHandler.HandleVoidInvoice,
 	)
 	// GET (consultas y descarga) — todos los roles con billing activo
 	invGroup2.Get("/:id/status", invoiceHandler.GetDIANStatus)

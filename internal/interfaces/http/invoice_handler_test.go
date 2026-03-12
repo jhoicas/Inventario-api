@@ -69,6 +69,17 @@ func (f *fakeCreateDebitNoteUseCase) CreateDebitNote(ctx context.Context, compan
 	return nil, errors.New("createDebitNote not configured")
 }
 
+type fakeVoidInvoiceUseCase struct {
+	voidInvoiceFunc func(ctx context.Context, companyID, userID, invoiceID string, in dto.CreateVoidInvoiceRequest) (*dto.VoidInvoiceResponse, error)
+}
+
+func (f *fakeVoidInvoiceUseCase) VoidInvoice(ctx context.Context, companyID, userID, invoiceID string, in dto.CreateVoidInvoiceRequest) (*dto.VoidInvoiceResponse, error) {
+	if f.voidInvoiceFunc != nil {
+		return f.voidInvoiceFunc(ctx, companyID, userID, invoiceID, in)
+	}
+	return nil, errors.New("voidInvoice not configured")
+}
+
 type fakeInvoicePDFUseCase struct {
 	downloadInvoicePDFFunc func(ctx context.Context, companyID, invoiceID string) ([]byte, string, error)
 }
@@ -164,6 +175,21 @@ func validDebitNoteResponse() *dto.DebitNoteResponse {
 		DebitNoteID: "dn-123",
 		CUFE:        "cude-123",
 		DIANStatus:  "EXITOSO",
+	}
+}
+
+func validVoidInvoiceRequest() dto.CreateVoidInvoiceRequest {
+	return dto.CreateVoidInvoiceRequest{
+		ConceptCode: 2,
+		Reason:      "Anulación de prueba",
+	}
+}
+
+func validVoidInvoiceResponse() *dto.VoidInvoiceResponse {
+	return &dto.VoidInvoiceResponse{
+		CreditNoteID: "cn-void-123",
+		CUFE:         "cufe-void-123",
+		DIANStatus:   "EXITOSO",
 	}
 }
 
@@ -654,6 +680,168 @@ func TestInvoiceHandler_HandleDebitNote(t *testing.T) {
 
 		bodyBytes, _ := json.Marshal(validCreateDebitNoteRequest())
 		req := httptest.NewRequest(http.MethodPost, "/invoices/inv-123/debit-note", bytes.NewReader(bodyBytes))
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := app.Test(req, -1)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusInternalServerError, resp.StatusCode)
+		var errResp dto.ErrorResponse
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
+		assert.Equal(t, "INTERNAL", errResp.Code)
+	})
+}
+
+// ── Tests HandleVoidInvoice ────────────────────────────────────────────────────
+
+func TestInvoiceHandler_HandleVoidInvoice(t *testing.T) {
+	tests := []struct {
+		name           string
+		id             string
+		body           interface{}
+		voidUC         *fakeVoidInvoiceUseCase
+		companyID      string
+		userID         string
+		expectedStatus int
+		validateBody   func(*testing.T, *http.Response)
+	}{
+		{
+			name: "Success",
+			id:   "inv-123",
+			body: validVoidInvoiceRequest(),
+			voidUC: &fakeVoidInvoiceUseCase{
+				voidInvoiceFunc: func(_ context.Context, _, _, _ string, _ dto.CreateVoidInvoiceRequest) (*dto.VoidInvoiceResponse, error) {
+					return validVoidInvoiceResponse(), nil
+				},
+			},
+			companyID:      invoiceTestCompanyID,
+			userID:         invoiceTestUserID,
+			expectedStatus: http.StatusCreated,
+			validateBody: func(t *testing.T, resp *http.Response) {
+				var out dto.VoidInvoiceResponse
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+				assert.Equal(t, "cn-void-123", out.CreditNoteID)
+				assert.Equal(t, "EXITOSO", out.DIANStatus)
+			},
+		},
+		{
+			name:           "Unauthorized_NoCompanyID",
+			id:             "inv-123",
+			body:           validVoidInvoiceRequest(),
+			voidUC:         &fakeVoidInvoiceUseCase{},
+			companyID:      "",
+			userID:         invoiceTestUserID,
+			expectedStatus: http.StatusUnauthorized,
+			validateBody: func(t *testing.T, resp *http.Response) {
+				var errResp dto.ErrorResponse
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
+				assert.Equal(t, "UNAUTHORIZED", errResp.Code)
+			},
+		},
+		{
+			name:           "InvalidBody",
+			id:             "inv-123",
+			body:           "invalid json",
+			voidUC:         &fakeVoidInvoiceUseCase{},
+			companyID:      invoiceTestCompanyID,
+			userID:         invoiceTestUserID,
+			expectedStatus: http.StatusBadRequest,
+			validateBody: func(t *testing.T, resp *http.Response) {
+				var errResp dto.ErrorResponse
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
+				assert.Equal(t, "INVALID_BODY", errResp.Code)
+			},
+		},
+		{
+			name: "NotFound",
+			id:   "inv-999",
+			body: validVoidInvoiceRequest(),
+			voidUC: &fakeVoidInvoiceUseCase{
+				voidInvoiceFunc: func(_ context.Context, _, _, _ string, _ dto.CreateVoidInvoiceRequest) (*dto.VoidInvoiceResponse, error) {
+					return nil, domain.ErrNotFound
+				},
+			},
+			companyID:      invoiceTestCompanyID,
+			userID:         invoiceTestUserID,
+			expectedStatus: http.StatusNotFound,
+			validateBody: func(t *testing.T, resp *http.Response) {
+				var errResp dto.ErrorResponse
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
+				assert.Equal(t, "NOT_FOUND", errResp.Code)
+			},
+		},
+		{
+			name: "Conflict_NotSent",
+			id:   "inv-123",
+			body: validVoidInvoiceRequest(),
+			voidUC: &fakeVoidInvoiceUseCase{
+				voidInvoiceFunc: func(_ context.Context, _, _, _ string, _ dto.CreateVoidInvoiceRequest) (*dto.VoidInvoiceResponse, error) {
+					return nil, domain.ErrConflict
+				},
+			},
+			companyID:      invoiceTestCompanyID,
+			userID:         invoiceTestUserID,
+			expectedStatus: http.StatusConflict,
+			validateBody: func(t *testing.T, resp *http.Response) {
+				var errResp dto.ErrorResponse
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
+				assert.Equal(t, "CONFLICT", errResp.Code)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := NewInvoiceHandlerWithBillingOps(
+				&fakeCreateInvoiceUseCase{},
+				&fakeCreateCreditNoteUseCase{},
+				&fakeCreateDebitNoteUseCase{},
+				tt.voidUC,
+				&fakeInvoicePDFUseCase{},
+			)
+
+			app := fiber.New(fiber.Config{DisableStartupMessage: true})
+			app.Use(mockInvoiceAuthMiddleware(tt.companyID, tt.userID))
+			app.Post("/invoices/:id/void", handler.HandleVoidInvoice)
+
+			path := "/invoices/"
+			if tt.id != "" {
+				path += tt.id + "/void"
+			} else {
+				path = "/invoices//void"
+			}
+
+			bodyBytes, _ := json.Marshal(tt.body)
+			req := httptest.NewRequest(http.MethodPost, path, bytes.NewReader(bodyBytes))
+			req.Header.Set("Content-Type", "application/json")
+
+			resp, err := app.Test(req, -1)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+
+			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
+			if tt.validateBody != nil {
+				tt.validateBody(t, resp)
+			}
+		})
+	}
+
+	t.Run("ServiceUnavailable_NilVoidUC", func(t *testing.T) {
+		handler := NewInvoiceHandlerWithBillingOps(
+			&fakeCreateInvoiceUseCase{},
+			&fakeCreateCreditNoteUseCase{},
+			&fakeCreateDebitNoteUseCase{},
+			nil,
+			&fakeInvoicePDFUseCase{},
+		)
+
+		app := fiber.New(fiber.Config{DisableStartupMessage: true})
+		app.Use(mockInvoiceAuthMiddleware(invoiceTestCompanyID, invoiceTestUserID))
+		app.Post("/invoices/:id/void", handler.HandleVoidInvoice)
+
+		bodyBytes, _ := json.Marshal(validVoidInvoiceRequest())
+		req := httptest.NewRequest(http.MethodPost, "/invoices/inv-123/void", bytes.NewReader(bodyBytes))
 		req.Header.Set("Content-Type", "application/json")
 
 		resp, err := app.Test(req, -1)

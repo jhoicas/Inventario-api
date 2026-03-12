@@ -27,6 +27,11 @@ type CreateDebitNoteUseCase interface {
 	CreateDebitNote(ctx context.Context, companyID, userID, invoiceID string, in dto.CreateDebitNoteRequest) (*dto.DebitNoteResponse, error)
 }
 
+// VoidInvoiceUseCase interface para anulación por nota crédito.
+type VoidInvoiceUseCase interface {
+	VoidInvoice(ctx context.Context, companyID, userID, invoiceID string, in dto.CreateVoidInvoiceRequest) (*dto.VoidInvoiceResponse, error)
+}
+
 // InvoicePDFUseCase interface para permitir mocking en tests.
 type InvoicePDFUseCase interface {
 	DownloadInvoicePDF(ctx context.Context, companyID, invoiceID string) (pdfBytes []byte, filename string, err error)
@@ -37,6 +42,7 @@ type InvoiceHandler struct {
 	uc       CreateInvoiceUseCase
 	returnUC CreateCreditNoteUseCase
 	debitUC  CreateDebitNoteUseCase
+	voidUC   VoidInvoiceUseCase
 	pdfUC    InvoicePDFUseCase
 }
 
@@ -62,6 +68,19 @@ func NewInvoiceHandlerWithDebit(
 ) *InvoiceHandler {
 	h := NewInvoiceHandler(uc, returnUC, pdfUC)
 	h.debitUC = debitUC
+	return h
+}
+
+// NewInvoiceHandlerWithBillingOps construye el handler con nota débito y anulación.
+func NewInvoiceHandlerWithBillingOps(
+	uc CreateInvoiceUseCase,
+	returnUC CreateCreditNoteUseCase,
+	debitUC CreateDebitNoteUseCase,
+	voidUC VoidInvoiceUseCase,
+	pdfUC InvoicePDFUseCase,
+) *InvoiceHandler {
+	h := NewInvoiceHandlerWithDebit(uc, returnUC, debitUC, pdfUC)
+	h.voidUC = voidUC
 	return h
 }
 
@@ -227,6 +246,62 @@ func (h *InvoiceHandler) HandleDebitNote(c *fiber.Ctx) error {
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(debitNote)
+}
+
+// HandleVoidInvoice godoc
+// @Summary      Anular factura por nota crédito total
+// @Description  Crea una Nota Crédito total sobre una factura en estado Sent, la envía a DIAN y marca la factura como VOID
+// @Tags         billing
+// @Security     Bearer
+// @Accept       json
+// @Produce      json
+// @Param        id    path      string                       true  "ID de la factura original"
+// @Param        body  body      dto.CreateVoidInvoiceRequest true  "Código de concepto y motivo"
+// @Success      201   {object}  dto.VoidInvoiceResponse
+// @Failure      400   {object}  dto.ErrorResponse
+// @Failure      401   {object}  dto.ErrorResponse
+// @Failure      403   {object}  dto.ErrorResponse
+// @Failure      404   {object}  dto.ErrorResponse
+// @Failure      409   {object}  dto.ErrorResponse
+// @Failure      500   {object}  dto.ErrorResponse
+// @Router       /api/invoices/{id}/void [post]
+func (h *InvoiceHandler) HandleVoidInvoice(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	userID := GetUserID(c)
+	if companyID == "" || userID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	invoiceID := c.Params("id")
+	if invoiceID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "id requerido"})
+	}
+	if h.voidUC == nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: "servicio de anulación no disponible"})
+	}
+
+	var in dto.CreateVoidInvoiceRequest
+	if err := c.BodyParser(&in); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
+	}
+
+	out, err := h.voidUC.VoidInvoice(c.Context(), companyID, userID, invoiceID, in)
+	if err != nil {
+		if err == domain.ErrInvalidInput {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "datos inválidos"})
+		}
+		if err == domain.ErrNotFound {
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "factura no encontrada"})
+		}
+		if err == domain.ErrForbidden {
+			return c.Status(fiber.StatusForbidden).JSON(dto.ErrorResponse{Code: "FORBIDDEN", Message: "acceso denegado al recurso"})
+		}
+		if err == domain.ErrConflict {
+			return c.Status(fiber.StatusConflict).JSON(dto.ErrorResponse{Code: "CONFLICT", Message: "la factura debe estar en estado Sent"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(out)
 }
 
 // GetDIANStatus godoc

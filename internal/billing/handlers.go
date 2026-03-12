@@ -57,3 +57,7 @@ func (h *CustomerLookupHandler) Lookup(c *fiber.Ctx) error {
 
 	return c.JSON(info)
 }
+
+// Similar to CreateCreditNote handler above
+
+// VoidInvoice handles POST /api/invoices/{id}/void

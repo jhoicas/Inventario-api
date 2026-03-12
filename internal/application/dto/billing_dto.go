@@ -71,6 +71,20 @@ type DebitNoteResponse struct {
 	DIANStatus  string `json:"dian_status"`
 }
 
+// CreateVoidInvoiceRequest body para POST /api/invoices/{id}/void.
+// concept_code: 1=Devolución, 2=Anulación, 3=Descuento, 4=Ajuste precio, 5=Otros.
+type CreateVoidInvoiceRequest struct {
+	ConceptCode int    `json:"concept_code"`
+	Reason      string `json:"reason"`
+}
+
+// VoidInvoiceResponse respuesta resumida de anulación por nota crédito.
+type VoidInvoiceResponse struct {
+	CreditNoteID string `json:"credit_note_id"`
+	CUFE         string `json:"cufe,omitempty"`
+	DIANStatus   string `json:"dian_status"`
+}
+
 // InvoiceResponse factura con detalle para GET /api/invoices/:id.
 type InvoiceResponse struct {
 	ID           string                  `json:"id"`
