@@ -123,6 +123,11 @@ func Router(app *fiber.App, deps RouterDeps) {
 	invoiceHandler := NewInvoiceHandlerWithBillingOps(deps.CreateInvoice, deps.ReturnInvoice, deps.DebitNote, deps.VoidInvoice, deps.InvoicePDF)
 	invGroup2 := protected.Group("/invoices", RequireModule(entity.ModuleBilling, deps.ModuleService))
 
+	// GET — listar facturas con filtros y paginación: admin y vendedor
+	invGroup2.Get("/",
+		RequireRole(entity.RoleAdmin, entity.RoleVendedor),
+		invoiceHandler.GetInvoices,
+	)
 	// POST — emitir factura: admin y vendedor
 	invGroup2.Post("/",
 		RequireRole(entity.RoleAdmin, entity.RoleVendedor),

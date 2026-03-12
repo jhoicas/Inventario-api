@@ -7,11 +7,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/shopspring/decimal"
 	"github.com/jhoicas/Inventario-api/internal/application/dto"
 	"github.com/jhoicas/Inventario-api/internal/domain"
 	"github.com/jhoicas/Inventario-api/internal/domain/entity"
 	"github.com/jhoicas/Inventario-api/internal/domain/repository"
+	"github.com/shopspring/decimal"
 )
 
 // DIANConfig para el caso de uso (clave técnica, entorno de envío y rutas de certificado).
@@ -185,19 +185,19 @@ func (uc *CreateInvoiceUseCase) CreateInvoice(ctx context.Context, companyID, us
 
 		// ── Construir entidades ───────────────────────────────────────────────
 		inv = &entity.Invoice{
-			ID:          invoiceID,
-			CompanyID:   companyID,
-			CustomerID:  in.CustomerID,
-			Prefix:      in.Prefix,
-			Number:      number,
-			Date:        now,
-			NetTotal:    netTotal,
-			TaxTotal:    taxTotal,
-			GrandTotal:  grandTotal,
-			DIAN_Status: entity.DIANStatusDraft,
+			ID:           invoiceID,
+			CompanyID:    companyID,
+			CustomerID:   in.CustomerID,
+			Prefix:       in.Prefix,
+			Number:       number,
+			Date:         now,
+			NetTotal:     netTotal,
+			TaxTotal:     taxTotal,
+			GrandTotal:   grandTotal,
+			DIAN_Status:  entity.DIANStatusDraft,
 			DocumentType: "INVOICE",
-			CreatedAt:   now,
-			UpdatedAt:   now,
+			CreatedAt:    now,
+			UpdatedAt:    now,
 		}
 		for _, item := range in.Items {
 			product := productsByID[item.ProductID]
@@ -289,6 +289,48 @@ func (uc *CreateInvoiceUseCase) GetInvoiceDIANStatus(ctx context.Context, compan
 		CUFE:       inv.CUFE,
 		TrackID:    inv.TrackID,
 		Errors:     inv.DIANErrors,
+	}, nil
+}
+
+// ListInvoices retorna facturas paginadas y filtradas para una empresa.
+func (uc *CreateInvoiceUseCase) ListInvoices(ctx context.Context, companyID string, in dto.InvoiceFilter) (*dto.InvoiceListResponse, error) {
+	if companyID == "" {
+		return nil, domain.ErrInvalidInput
+	}
+
+	limit := in.Limit
+	if limit <= 0 {
+		limit = 20
+	}
+	offset := in.Offset
+	if offset < 0 {
+		offset = 0
+	}
+
+	invoices, total, err := uc.invoiceRepo.List(repository.InvoiceListFilter{
+		CompanyID:  companyID,
+		StartDate:  in.StartDate,
+		EndDate:    in.EndDate,
+		CustomerID: in.CustomerID,
+		DIANStatus: in.DIANStatus,
+		Prefix:     in.Prefix,
+		Limit:      limit,
+		Offset:     offset,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	items := make([]dto.InvoiceResponse, 0, len(invoices))
+	for _, inv := range invoices {
+		items = append(items, *uc.toResponse(inv, "", nil))
+	}
+
+	return &dto.InvoiceListResponse{
+		Items:  items,
+		Total:  total,
+		Limit:  limit,
+		Offset: offset,
 	}, nil
 }
 

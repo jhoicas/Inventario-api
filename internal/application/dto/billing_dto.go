@@ -113,6 +113,25 @@ type InvoiceDetailResponse struct {
 	Subtotal  decimal.Decimal `json:"subtotal"`
 }
 
+// InvoiceFilter parámetros de filtrado y paginación para GET /api/invoices.
+type InvoiceFilter struct {
+	StartDate  string `query:"start_date"` // YYYY-MM-DD
+	EndDate    string `query:"end_date"`   // YYYY-MM-DD
+	CustomerID string `query:"customer_id"`
+	DIANStatus string `query:"dian_status"`
+	Prefix     string `query:"prefix"`
+	Limit      int    `query:"limit"`
+	Offset     int    `query:"offset"`
+}
+
+// InvoiceListResponse respuesta paginada de facturas.
+type InvoiceListResponse struct {
+	Items  []InvoiceResponse `json:"items"`
+	Total  int               `json:"total"`
+	Limit  int               `json:"limit"`
+	Offset int               `json:"offset"`
+}
+
 // InvoiceDIANStatusDTO respuesta ligera para el endpoint de polling
 // GET /api/invoices/:id/status.
 // El frontend consulta este endpoint periódicamente hasta que dian_status sea

@@ -15,6 +15,7 @@ type CreateInvoiceUseCase interface {
 	CreateInvoice(ctx context.Context, companyID, userID string, in dto.CreateInvoiceRequest) (*dto.InvoiceResponse, error)
 	GetInvoiceDIANStatus(ctx context.Context, companyID, id string) (*dto.InvoiceDIANStatusDTO, error)
 	GetInvoice(ctx context.Context, companyID, id string) (*dto.InvoiceResponse, error)
+	ListInvoices(ctx context.Context, companyID string, in dto.InvoiceFilter) (*dto.InvoiceListResponse, error)
 }
 
 // CreateCreditNoteUseCase interface para permitir mocking en tests.
@@ -82,6 +83,46 @@ func NewInvoiceHandlerWithBillingOps(
 	h := NewInvoiceHandlerWithDebit(uc, returnUC, debitUC, pdfUC)
 	h.voidUC = voidUC
 	return h
+}
+
+// GetInvoices godoc
+// @Summary      Listar facturas
+// @Description  Devuelve facturas paginadas filtradas por fecha, cliente, estado DIAN y prefijo
+// @Tags         billing
+// @Security     Bearer
+// @Produce      json
+// @Param        start_date   query     string  false  "Fecha inicio (YYYY-MM-DD)"
+// @Param        end_date     query     string  false  "Fecha fin (YYYY-MM-DD)"
+// @Param        customer_id  query     string  false  "ID del cliente"
+// @Param        dian_status  query     string  false  "Estado DIAN (DRAFT|SIGNED|EXITOSO|RECHAZADO|ERROR_GENERATION)"
+// @Param        prefix       query     string  false  "Prefijo de la factura"
+// @Param        limit        query     int     false  "Límite de resultados"   default(20)
+// @Param        offset       query     int     false  "Desplazamiento"         default(0)
+// @Success      200  {object}  dto.InvoiceListResponse
+// @Failure      401  {object}  dto.ErrorResponse
+// @Failure      500  {object}  dto.ErrorResponse
+// @Router       /api/invoices [get]
+func (h *InvoiceHandler) GetInvoices(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	if companyID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+
+	filter := dto.InvoiceFilter{
+		StartDate:  c.Query("start_date"),
+		EndDate:    c.Query("end_date"),
+		CustomerID: c.Query("customer_id"),
+		DIANStatus: c.Query("dian_status"),
+		Prefix:     c.Query("prefix"),
+		Limit:      c.QueryInt("limit", 20),
+		Offset:     c.QueryInt("offset", 0),
+	}
+
+	out, err := h.uc.ListInvoices(c.Context(), companyID, filter)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.JSON(out)
 }
 
 // Create godoc

@@ -24,6 +24,7 @@ type fakeCreateInvoiceUseCase struct {
 	createInvoiceFunc        func(ctx context.Context, companyID, userID string, in dto.CreateInvoiceRequest) (*dto.InvoiceResponse, error)
 	getInvoiceDIANStatusFunc func(ctx context.Context, companyID, id string) (*dto.InvoiceDIANStatusDTO, error)
 	getInvoiceFunc           func(ctx context.Context, companyID, id string) (*dto.InvoiceResponse, error)
+	listInvoicesFunc         func(ctx context.Context, companyID string, in dto.InvoiceFilter) (*dto.InvoiceListResponse, error)
 }
 
 func (f *fakeCreateInvoiceUseCase) CreateInvoice(ctx context.Context, companyID, userID string, in dto.CreateInvoiceRequest) (*dto.InvoiceResponse, error) {
@@ -45,6 +46,13 @@ func (f *fakeCreateInvoiceUseCase) GetInvoice(ctx context.Context, companyID, id
 		return f.getInvoiceFunc(ctx, companyID, id)
 	}
 	return nil, errors.New("getInvoice not configured")
+}
+
+func (f *fakeCreateInvoiceUseCase) ListInvoices(ctx context.Context, companyID string, in dto.InvoiceFilter) (*dto.InvoiceListResponse, error) {
+	if f.listInvoicesFunc != nil {
+		return f.listInvoicesFunc(ctx, companyID, in)
+	}
+	return nil, errors.New("listInvoices not configured")
 }
 
 type fakeCreateCreditNoteUseCase struct {

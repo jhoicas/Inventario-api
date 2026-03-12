@@ -18,4 +18,20 @@ type InvoiceRepository interface {
 	// (por ejemplo, 'Returned' o 'Partially_Returned'). La implementación puede usar
 	// una columna dedicada o el campo notes según el esquema de BD.
 	UpdateReturnStatus(invoiceID string, status string) error
+
+	// List devuelve facturas filtradas y paginadas para una empresa.
+	// Los campos vacíos/cero de InvoiceListFilter se ignoran.
+	List(filter InvoiceListFilter) ([]*entity.Invoice, int, error)
+}
+
+// InvoiceListFilter parámetros de consulta para el listado de facturas.
+type InvoiceListFilter struct {
+	CompanyID  string
+	StartDate  string // YYYY-MM-DD; vacío = sin límite inferior
+	EndDate    string // YYYY-MM-DD; vacío = sin límite superior
+	CustomerID string
+	DIANStatus string
+	Prefix     string
+	Limit      int
+	Offset     int
 }

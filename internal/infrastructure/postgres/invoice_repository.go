@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -267,4 +268,119 @@ func nullIfEmpty(s string) *string {
 		return nil
 	}
 	return &s
+}
+
+// List devuelve facturas paginadas y filtradas para una empresa.
+func (r *InvoiceRepo) List(filter repository.InvoiceListFilter) ([]*entity.Invoice, int, error) {
+	args := []any{filter.CompanyID}
+	conds := []string{"company_id = $1"}
+	idx := 2
+
+	if filter.StartDate != "" {
+		args = append(args, filter.StartDate)
+		conds = append(conds, fmt.Sprintf("date >= $%d::date", idx))
+		idx++
+	}
+	if filter.EndDate != "" {
+		args = append(args, filter.EndDate)
+		conds = append(conds, fmt.Sprintf("date <= $%d::date", idx))
+		idx++
+	}
+	if filter.CustomerID != "" {
+		args = append(args, filter.CustomerID)
+		conds = append(conds, fmt.Sprintf("customer_id = $%d", idx))
+		idx++
+	}
+	if filter.DIANStatus != "" {
+		args = append(args, filter.DIANStatus)
+		conds = append(conds, fmt.Sprintf("dian_status = $%d", idx))
+		idx++
+	}
+	if filter.Prefix != "" {
+		args = append(args, filter.Prefix)
+		conds = append(conds, fmt.Sprintf("prefix = $%d", idx))
+		idx++
+	}
+
+	where := strings.Join(conds, " AND ")
+
+	// total count
+	var total int
+	countQ := fmt.Sprintf("SELECT COUNT(1) FROM invoices WHERE %s", where)
+	if err := r.q.QueryRow(context.Background(), countQ, args...).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("count invoices: %w", err)
+	}
+
+	limit := filter.Limit
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	offset := filter.Offset
+	if offset < 0 {
+		offset = 0
+	}
+
+	args = append(args, limit, offset)
+	dataQ := fmt.Sprintf(`
+		SELECT id, company_id, customer_id, prefix, number, date,
+		       net_total, tax_total, grand_total, dian_status,
+		       COALESCE(cufe, ''), COALESCE(uuid, ''), COALESCE(xml_signed, ''),
+		       COALESCE(qr_data, ''), COALESCE(track_id_dian, ''), COALESCE(dian_errors, ''),
+		       COALESCE(document_type, ''),
+		       COALESCE(original_invoice_id, ''),
+		       COALESCE(original_invoice_number, ''),
+		       COALESCE(original_invoice_cufe, ''),
+		       original_invoice_issue_on,
+		       COALESCE(discrepancy_code, ''),
+		       COALESCE(discrepancy_reason, ''),
+		       created_at, updated_at
+		FROM invoices
+		WHERE %s
+		ORDER BY date DESC, created_at DESC
+		LIMIT $%d OFFSET $%d`, where, idx, idx+1)
+
+	rows, err := r.q.Query(context.Background(), dataQ, args...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list invoices: %w", err)
+	}
+	defer rows.Close()
+
+	var list []*entity.Invoice
+	for rows.Next() {
+		var inv entity.Invoice
+		var origIssueOn *time.Time
+		var discCode string
+		err := rows.Scan(
+			&inv.ID, &inv.CompanyID, &inv.CustomerID, &inv.Prefix, &inv.Number,
+			&inv.Date, &inv.NetTotal, &inv.TaxTotal, &inv.GrandTotal,
+			&inv.DIAN_Status, &inv.CUFE, &inv.UUID, &inv.XMLSigned,
+			&inv.QRData, &inv.TrackID, &inv.DIANErrors,
+			&inv.DocumentType,
+			&inv.OriginalInvoiceID,
+			&inv.OriginalInvoiceNumber,
+			&inv.OriginalInvoiceCUFE,
+			&origIssueOn,
+			&discCode,
+			&inv.DiscrepancyReason,
+			&inv.CreatedAt, &inv.UpdatedAt,
+		)
+		if err != nil {
+			return nil, 0, fmt.Errorf("scan invoice row: %w", err)
+		}
+		if origIssueOn != nil {
+			inv.OriginalInvoiceIssueOn = *origIssueOn
+		}
+		if discCode != "" {
+			inv.DiscrepancyCode = entity.CreditNoteConcept(discCode)
+		}
+		list = append(list, &inv)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("iterate invoices: %w", err)
+	}
+
+	return list, total, nil
 }
