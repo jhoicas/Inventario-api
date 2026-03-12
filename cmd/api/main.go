@@ -99,11 +99,13 @@ func main() {
 	)
 
 	smtpCfg := dianws.SMTPConfig{
-		Host:     cfg.SMTP.Host,
-		Port:     cfg.SMTP.Port,
-		User:     cfg.SMTP.User,
-		Password: cfg.SMTP.Password,
-		From:     cfg.SMTP.From,
+		Host:         cfg.SMTP.Host,
+		Port:         cfg.SMTP.Port,
+		User:         cfg.SMTP.User,
+		Password:     cfg.SMTP.Password,
+		From:         cfg.SMTP.From,
+		ResendAPIKey: cfg.SMTP.ResendAPIKey,
+		ResendAPIURL: cfg.SMTP.ResendAPIURL,
 	}
 
 	createInvoiceUC := billing.NewCreateInvoiceUseCase(

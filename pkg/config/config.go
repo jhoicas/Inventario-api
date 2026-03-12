@@ -28,11 +28,13 @@ type AIConfig struct {
 
 // SMTPConfig configuración del servidor de correo saliente.
 type SMTPConfig struct {
-	Host     string // SMTP_HOST
-	Port     int    // SMTP_PORT (default 587)
-	User     string // SMTP_USER
-	Password string // SMTP_PASSWORD
-	From     string // SMTP_FROM (dirección From del correo)
+	Host         string // SMTP_HOST
+	Port         int    // SMTP_PORT (default 587)
+	User         string // SMTP_USER
+	Password     string // SMTP_PASSWORD
+	From         string // SMTP_FROM (dirección From del correo)
+	ResendAPIKey string // RESEND_API_KEY
+	ResendAPIURL string // RESEND_API_URL (default https://api.resend.com/emails)
 }
 
 // DIANConfig configuración para factura electrónica DIAN (Colombia).
@@ -75,7 +77,7 @@ func (c DBConfig) ConnectionString() string {
 func (c DBConfig) DSN() string {
 	// Usar url.UserPassword para manejar correctamente caracteres especiales en la contraseña
 	userInfo := url.UserPassword(c.User, c.Password)
-	
+
 	u := &url.URL{
 		Scheme:   "postgres",
 		User:     userInfo,
@@ -83,7 +85,7 @@ func (c DBConfig) DSN() string {
 		Path:     "/" + c.DBName,
 		RawQuery: fmt.Sprintf("sslmode=%s", c.SSLMode),
 	}
-	
+
 	return u.String()
 }
 
@@ -115,7 +117,7 @@ func Load() (*Config, error) {
 	v.SetConfigType("env")
 	v.AddConfigPath(".")
 	_ = v.ReadInConfig() // ignoramos error si no existe
-	
+
 	// También intenta config.env
 	v.SetConfigName("config")
 	v.AddConfigPath(".")
@@ -166,11 +168,13 @@ func Load() (*Config, error) {
 			AnthropicModel:  getString(v, "ANTHROPIC_MODEL", "claude-3-5-haiku-20241022"),
 		},
 		SMTP: SMTPConfig{
-			Host:     getString(v, "SMTP_HOST", ""),
-			Port:     getInt(v, "SMTP_PORT", 587),
-			User:     getString(v, "SMTP_USER", ""),
-			Password: getString(v, "SMTP_PASSWORD", ""),
-			From:     getString(v, "SMTP_FROM", ""),
+			Host:         getString(v, "SMTP_HOST", ""),
+			Port:         getInt(v, "SMTP_PORT", 587),
+			User:         getString(v, "SMTP_USER", ""),
+			Password:     getString(v, "SMTP_PASSWORD", ""),
+			From:         getString(v, "SMTP_FROM", ""),
+			ResendAPIKey: getString(v, "RESEND_API_KEY", ""),
+			ResendAPIURL: getString(v, "RESEND_API_URL", "https://api.resend.com/emails"),
 		},
 	}
 
