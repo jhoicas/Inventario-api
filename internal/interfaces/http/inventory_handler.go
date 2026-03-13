@@ -120,6 +120,7 @@ func (h *InventoryHandler) GetReplenishmentList(c *fiber.Ctx) error {
 // @Param        warehouse_id query  string  false  "ID de la bodega (UUID). Vacío = stock agregado de todas las bodegas."
 // @Success      200  {object}  dto.StockSummaryDTO
 // @Failure      401  {object}  dto.ErrorResponse
+// @Failure      404  {object}  dto.ErrorResponse
 // @Failure      500  {object}  dto.ErrorResponse
 // @Router       /api/inventory/stock [get]
 func (h *InventoryHandler) GetStock(c *fiber.Ctx) error {
@@ -137,6 +138,9 @@ func (h *InventoryHandler) GetStock(c *fiber.Ctx) error {
 
 	summary, err := h.getStock.Execute(c.Context(), companyID, productID, warehouseID)
 	if err != nil {
+		if err == domain.ErrNotFound {
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "producto o bodega no encontrado"})
+		}
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}
 

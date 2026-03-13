@@ -7,7 +7,9 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/shopspring/decimal"
@@ -96,12 +98,12 @@ func validRegisterMovementRequest() dto.RegisterMovementRequest {
 func validReplenishmentList() []dto.ReplenishmentSuggestionDTO {
 	return []dto.ReplenishmentSuggestionDTO{
 		{
-			ProductID:     "prod-001",
-			SKU:           "SKU-001",
-			ProductName:   "Producto 1",
-			CurrentStock:  decimal.NewFromInt(5),
-			ReorderPoint:  decimal.NewFromInt(10),
-			IdealStock:    decimal.NewFromInt(15),
+			ProductID:         "prod-001",
+			SKU:               "SKU-001",
+			ProductName:       "Producto 1",
+			CurrentStock:      decimal.NewFromInt(5),
+			ReorderPoint:      decimal.NewFromInt(10),
+			IdealStock:        decimal.NewFromInt(15),
 			SuggestedOrderQty: decimal.NewFromInt(10),
 		},
 	}
@@ -143,9 +145,11 @@ func TestInventoryHandler_RegisterMovement(t *testing.T) {
 			},
 		},
 		{
-			name:           "Unauthorized_NoCompanyOrUser",
-			body:           validRegisterMovementRequest(),
-			mockSetup:      func() (*fakeRegisterMovementUseCase, *fakeReplenishmentUseCase) { return &fakeRegisterMovementUseCase{}, &fakeReplenishmentUseCase{} },
+			name: "Unauthorized_NoCompanyOrUser",
+			body: validRegisterMovementRequest(),
+			mockSetup: func() (*fakeRegisterMovementUseCase, *fakeReplenishmentUseCase) {
+				return &fakeRegisterMovementUseCase{}, &fakeReplenishmentUseCase{}
+			},
 			companyID:      "",
 			userID:         "",
 			expectedStatus: http.StatusUnauthorized,
@@ -156,9 +160,11 @@ func TestInventoryHandler_RegisterMovement(t *testing.T) {
 			},
 		},
 		{
-			name:           "InvalidBody",
-			body:           "not valid json",
-			mockSetup:      func() (*fakeRegisterMovementUseCase, *fakeReplenishmentUseCase) { return &fakeRegisterMovementUseCase{}, &fakeReplenishmentUseCase{} },
+			name: "InvalidBody",
+			body: "not valid json",
+			mockSetup: func() (*fakeRegisterMovementUseCase, *fakeReplenishmentUseCase) {
+				return &fakeRegisterMovementUseCase{}, &fakeReplenishmentUseCase{}
+			},
 			companyID:      inventoryTestCompanyID,
 			userID:         inventoryTestUserID,
 			expectedStatus: http.StatusBadRequest,
@@ -358,9 +364,11 @@ func TestInventoryHandler_GetReplenishmentList(t *testing.T) {
 			},
 		},
 		{
-			name:           "Unauthorized_NoCompanyID",
-			warehouseID:    "",
-			mockSetup:      func() (*fakeRegisterMovementUseCase, *fakeReplenishmentUseCase) { return &fakeRegisterMovementUseCase{}, &fakeReplenishmentUseCase{} },
+			name:        "Unauthorized_NoCompanyID",
+			warehouseID: "",
+			mockSetup: func() (*fakeRegisterMovementUseCase, *fakeReplenishmentUseCase) {
+				return &fakeRegisterMovementUseCase{}, &fakeReplenishmentUseCase{}
+			},
 			companyID:      "",
 			expectedStatus: http.StatusUnauthorized,
 			validateBody: func(t *testing.T, resp *http.Response) {
@@ -417,3 +425,144 @@ func TestInventoryHandler_GetReplenishmentList(t *testing.T) {
 	}
 }
 
+// ── Tests GetStock ───────────────────────────────────────────────────────────
+
+func TestInventoryHandler_GetStock(t *testing.T) {
+	lastUpdated := time.Date(2026, 3, 12, 10, 30, 0, 0, time.UTC)
+
+	tests := []struct {
+		name           string
+		companyID      string
+		productID      string
+		warehouseID    string
+		getStockUC     *fakeGetStockUseCase
+		expectedStatus int
+		validateBody   func(*testing.T, *http.Response)
+	}{
+		{
+			name:        "Success_WithWarehouse",
+			companyID:   inventoryTestCompanyID,
+			productID:   "prod-001",
+			warehouseID: "wh-001",
+			getStockUC: &fakeGetStockUseCase{
+				executeFunc: func(_ context.Context, companyID, productID, warehouseID string) (*dto.StockSummaryDTO, error) {
+					assert.Equal(t, inventoryTestCompanyID, companyID)
+					assert.Equal(t, "prod-001", productID)
+					assert.Equal(t, "wh-001", warehouseID)
+					return &dto.StockSummaryDTO{
+						ProductID:      productID,
+						WarehouseID:    warehouseID,
+						CurrentStock:   decimal.NewFromInt(25),
+						ReservedStock:  decimal.NewFromInt(5),
+						AvailableStock: decimal.NewFromInt(20),
+						AvgCost:        decimal.NewFromInt(12500),
+						LastUpdated:    lastUpdated,
+					}, nil
+				},
+			},
+			expectedStatus: http.StatusOK,
+			validateBody: func(t *testing.T, resp *http.Response) {
+				var out dto.StockSummaryDTO
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+				assert.Equal(t, "prod-001", out.ProductID)
+				assert.Equal(t, "wh-001", out.WarehouseID)
+				assert.True(t, out.CurrentStock.Equal(decimal.NewFromInt(25)))
+				assert.True(t, out.ReservedStock.Equal(decimal.NewFromInt(5)))
+				assert.True(t, out.AvailableStock.Equal(decimal.NewFromInt(20)))
+				assert.True(t, out.AvgCost.Equal(decimal.NewFromInt(12500)))
+			},
+		},
+		{
+			name:           "Unauthorized_NoCompanyID",
+			companyID:      "",
+			productID:      "prod-001",
+			warehouseID:    "",
+			getStockUC:     &fakeGetStockUseCase{},
+			expectedStatus: http.StatusUnauthorized,
+			validateBody: func(t *testing.T, resp *http.Response) {
+				var errResp dto.ErrorResponse
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
+				assert.Equal(t, "UNAUTHORIZED", errResp.Code)
+			},
+		},
+		{
+			name:           "Validation_MissingProductID",
+			companyID:      inventoryTestCompanyID,
+			productID:      "",
+			warehouseID:    "",
+			getStockUC:     &fakeGetStockUseCase{},
+			expectedStatus: http.StatusBadRequest,
+			validateBody: func(t *testing.T, resp *http.Response) {
+				var errResp dto.ErrorResponse
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
+				assert.Equal(t, "VALIDATION", errResp.Code)
+			},
+		},
+		{
+			name:        "NotFound",
+			companyID:   inventoryTestCompanyID,
+			productID:   "prod-404",
+			warehouseID: "wh-001",
+			getStockUC: &fakeGetStockUseCase{
+				executeFunc: func(_ context.Context, _, _, _ string) (*dto.StockSummaryDTO, error) {
+					return nil, domain.ErrNotFound
+				},
+			},
+			expectedStatus: http.StatusNotFound,
+			validateBody: func(t *testing.T, resp *http.Response) {
+				var errResp dto.ErrorResponse
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
+				assert.Equal(t, "NOT_FOUND", errResp.Code)
+			},
+		},
+		{
+			name:        "InternalError",
+			companyID:   inventoryTestCompanyID,
+			productID:   "prod-001",
+			warehouseID: "",
+			getStockUC: &fakeGetStockUseCase{
+				executeFunc: func(_ context.Context, _, _, _ string) (*dto.StockSummaryDTO, error) {
+					return nil, errors.New("db error")
+				},
+			},
+			expectedStatus: http.StatusInternalServerError,
+			validateBody: func(t *testing.T, resp *http.Response) {
+				var errResp dto.ErrorResponse
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
+				assert.Equal(t, "INTERNAL", errResp.Code)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := NewInventoryHandler(&fakeRegisterMovementUseCase{}, &fakeReplenishmentUseCase{}, tt.getStockUC)
+
+			app := fiber.New(fiber.Config{DisableStartupMessage: true})
+			app.Use(mockInventoryCompanyOnly(tt.companyID))
+			app.Get("/inventory/stock", handler.GetStock)
+
+			path := "/inventory/stock"
+			params := make([]string, 0, 2)
+			if tt.productID != "" {
+				params = append(params, "product_id="+tt.productID)
+			}
+			if tt.warehouseID != "" {
+				params = append(params, "warehouse_id="+tt.warehouseID)
+			}
+			if len(params) > 0 {
+				path += "?" + strings.Join(params, "&")
+			}
+
+			req := httptest.NewRequest(http.MethodGet, path, nil)
+			resp, err := app.Test(req, -1)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+
+			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
+			if tt.validateBody != nil {
+				tt.validateBody(t, resp)
+			}
+		})
+	}
+}
