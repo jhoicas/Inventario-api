@@ -77,6 +77,20 @@ func (f *fakeListMovementsUseCase) Execute(ctx context.Context, companyID string
 	return nil, errors.New("Execute not configured")
 }
 
+type fakeReorderConfigUseCase struct {
+	executeFunc func(ctx context.Context, companyID string, in dto.ReorderConfigRequest) error
+}
+
+func (f *fakeReorderConfigUseCase) Execute(ctx context.Context, companyID string, in dto.ReorderConfigRequest) error {
+	if f == nil {
+		return errors.New("Execute not configured")
+	}
+	if f.executeFunc != nil {
+		return f.executeFunc(ctx, companyID, in)
+	}
+	return errors.New("Execute not configured")
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 const inventoryTestCompanyID = "company-inv-123"
@@ -708,6 +722,184 @@ func TestInventoryHandler_ListMovements(t *testing.T) {
 			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
 			if tt.validateBody != nil {
 				tt.validateBody(t, resp)
+			}
+		})
+	}
+}
+
+func TestInventoryHandler_UpdateReorderConfig(t *testing.T) {
+	tests := []struct {
+		name           string
+		companyID      string
+		productID      string
+		body           string
+		reorderUC      *fakeReorderConfigUseCase
+		expectedStatus int
+		assertBody     func(t *testing.T, resp *http.Response)
+	}{
+		{
+			name:      "Success_UpdatesConfig_UsesPathProductID",
+			companyID: inventoryTestCompanyID,
+			productID: "prod-path-123",
+			body: `{
+				"warehouse_id":"wh-1",
+				"product_id":"prod-body-should-be-overwritten",
+				"reorder_point":"10",
+				"min_stock":"2",
+				"max_stock":"30",
+				"lead_time_days":5
+			}`,
+			reorderUC: &fakeReorderConfigUseCase{executeFunc: func(ctx context.Context, companyID string, in dto.ReorderConfigRequest) error {
+				require.Equal(t, inventoryTestCompanyID, companyID)
+				require.Equal(t, "prod-path-123", in.ProductID)
+				require.Equal(t, "wh-1", in.WarehouseID)
+				return nil
+			}},
+			expectedStatus: http.StatusOK,
+			assertBody: func(t *testing.T, resp *http.Response) {
+				var out map[string]string
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+				assert.Equal(t, "configuración de reposición actualizada", out["message"])
+			},
+		},
+		{
+			name:           "Unauthorized_NoCompanyID",
+			companyID:      "",
+			productID:      "prod-1",
+			body:           `{}`,
+			reorderUC:      &fakeReorderConfigUseCase{},
+			expectedStatus: http.StatusUnauthorized,
+			assertBody: func(t *testing.T, resp *http.Response) {
+				var out dto.ErrorResponse
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+				assert.Equal(t, "UNAUTHORIZED", out.Code)
+			},
+		},
+		{
+			name:           "ServiceUnavailable_NoUseCase",
+			companyID:      inventoryTestCompanyID,
+			productID:      "prod-1",
+			body:           `{}`,
+			reorderUC:      nil,
+			expectedStatus: http.StatusServiceUnavailable,
+			assertBody: func(t *testing.T, resp *http.Response) {
+				var out dto.ErrorResponse
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+				assert.Equal(t, "SERVICE_UNAVAILABLE", out.Code)
+			},
+		},
+		{
+			name:           "Validation_InvalidBody",
+			companyID:      inventoryTestCompanyID,
+			productID:      "prod-1",
+			body:           `{"warehouse_id":`,
+			reorderUC:      &fakeReorderConfigUseCase{},
+			expectedStatus: http.StatusBadRequest,
+			assertBody: func(t *testing.T, resp *http.Response) {
+				var out dto.ErrorResponse
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+				assert.Equal(t, "INVALID_BODY", out.Code)
+			},
+		},
+		{
+			name:      "Validation_InvalidInput",
+			companyID: inventoryTestCompanyID,
+			productID: "prod-1",
+			body: `{
+				"warehouse_id":"wh-1",
+				"reorder_point":"-1",
+				"min_stock":"2",
+				"max_stock":"30",
+				"lead_time_days":5
+			}`,
+			reorderUC: &fakeReorderConfigUseCase{executeFunc: func(ctx context.Context, companyID string, in dto.ReorderConfigRequest) error {
+				return domain.ErrInvalidInput
+			}},
+			expectedStatus: http.StatusBadRequest,
+			assertBody: func(t *testing.T, resp *http.Response) {
+				var out dto.ErrorResponse
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+				assert.Equal(t, "VALIDATION", out.Code)
+			},
+		},
+		{
+			name:      "NotFound_Product",
+			companyID: inventoryTestCompanyID,
+			productID: "prod-404",
+			body: `{
+				"warehouse_id":"wh-1",
+				"reorder_point":"10",
+				"min_stock":"2",
+				"max_stock":"30",
+				"lead_time_days":5
+			}`,
+			reorderUC: &fakeReorderConfigUseCase{executeFunc: func(ctx context.Context, companyID string, in dto.ReorderConfigRequest) error {
+				return domain.ErrNotFound
+			}},
+			expectedStatus: http.StatusNotFound,
+			assertBody: func(t *testing.T, resp *http.Response) {
+				var out dto.ErrorResponse
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+				assert.Equal(t, "NOT_FOUND", out.Code)
+			},
+		},
+		{
+			name:      "Forbidden_ProductFromOtherCompany",
+			companyID: inventoryTestCompanyID,
+			productID: "prod-1",
+			body: `{
+				"warehouse_id":"wh-1",
+				"reorder_point":"10",
+				"min_stock":"2",
+				"max_stock":"30",
+				"lead_time_days":5
+			}`,
+			reorderUC: &fakeReorderConfigUseCase{executeFunc: func(ctx context.Context, companyID string, in dto.ReorderConfigRequest) error {
+				return domain.ErrForbidden
+			}},
+			expectedStatus: http.StatusForbidden,
+			assertBody: func(t *testing.T, resp *http.Response) {
+				var out dto.ErrorResponse
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+				assert.Equal(t, "FORBIDDEN", out.Code)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var handler *InventoryHandler
+			if tt.reorderUC == nil {
+				handler = NewInventoryHandler(
+					&fakeRegisterMovementUseCase{},
+					&fakeReplenishmentUseCase{},
+					&fakeGetStockUseCase{},
+					nil,
+				)
+			} else {
+				handler = NewInventoryHandler(
+					&fakeRegisterMovementUseCase{},
+					&fakeReplenishmentUseCase{},
+					&fakeGetStockUseCase{},
+					nil,
+					tt.reorderUC,
+				)
+			}
+
+			app := fiber.New(fiber.Config{DisableStartupMessage: true})
+			app.Use(mockInventoryCompanyOnly(tt.companyID))
+			app.Put("/products/:id/reorder-config", handler.UpdateReorderConfig)
+
+			req := httptest.NewRequest(http.MethodPut, "/products/"+tt.productID+"/reorder-config", strings.NewReader(tt.body))
+			req.Header.Set("Content-Type", "application/json")
+
+			resp, err := app.Test(req, -1)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+
+			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
+			if tt.assertBody != nil {
+				tt.assertBody(t, resp)
 			}
 		})
 	}

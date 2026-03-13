@@ -142,9 +142,11 @@ func main() {
 	levelRepo := postgres.NewInventoryLevelRepository(pool)
 	stockRepo := postgres.NewStockRepository(pool)
 	movementRepo := postgres.NewInventoryMovementRepository(pool)
+	reorderConfigRepo := postgres.NewReorderConfigRepository(pool)
 	companyUC := usecase.NewCompanyUseCase(companyRepo, resolutionRepo)
 	warehouseUC := usecase.NewWarehouseUseCase(warehouseRepo)
 	productUC := usecase.NewProductUseCase(productRepo)
+	updateReorderConfigUC := inventory.NewUpdateReorderConfigUseCase(productRepo, reorderConfigRepo)
 	moduleSvc := usecase.NewModuleService(companyRepo)
 	analyticsUC := usecase.NewAnalyticsUseCase(analyticsRepo)
 	rawMaterialAnalyticsUC := usecase.NewRawMaterialAnalyticsUseCase(analyticsRepo)
@@ -230,6 +232,7 @@ func main() {
 		Replenishment:          replenishmentUC,
 		GetStock:               getStockUC,
 		ListMovements:          listMovementsUC,
+		ReorderConfig:          updateReorderConfigUC,
 		CustomerUC:             customerUC,
 		CreateInvoice:          createInvoiceUC,
 		ReturnInvoice:          createCreditNoteUC,

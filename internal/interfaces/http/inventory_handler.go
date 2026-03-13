@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"errors"
+	"reflect"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -58,12 +59,28 @@ type InventoryHandler struct {
 
 func NewInventoryHandler(uc RegisterMovementUseCase, replenishment ReplenishmentUseCase, getStock GetStockUseCase, listMovements ListMovementsUseCase, options ...any) *InventoryHandler {
 	h := &InventoryHandler{uc: uc, replenishment: replenishment, getStock: getStock, listMovements: listMovements}
+	isNilOption := func(v any) bool {
+		if v == nil {
+			return true
+		}
+		rv := reflect.ValueOf(v)
+		switch rv.Kind() {
+		case reflect.Ptr, reflect.Map, reflect.Slice, reflect.Interface, reflect.Func, reflect.Chan:
+			return rv.IsNil()
+		default:
+			return false
+		}
+	}
 	for _, opt := range options {
 		switch v := opt.(type) {
 		case StocktakeUseCase:
-			h.stocktake = v
+			if !isNilOption(v) {
+				h.stocktake = v
+			}
 		case ReorderConfigUseCase:
-			h.reorderConfig = v
+			if !isNilOption(v) {
+				h.reorderConfig = v
+			}
 		}
 	}
 	return h

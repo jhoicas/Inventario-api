@@ -23,6 +23,8 @@ type RouterDeps struct {
 	Replenishment          *inventory.ReplenishmentUseCase
 	GetStock               *inventory.GetStockUseCase
 	ListMovements          ListMovementsUseCase
+	ReorderConfig          *inventory.UpdateReorderConfigUseCase
+	Stocktake              *inventory.StocktakeUseCase
 	CustomerUC             *billing.CustomerUseCase
 	CreateInvoice          *billing.CreateInvoiceUseCase
 	ReturnInvoice          *billing.CreateCreditNoteUseCase
@@ -110,7 +112,12 @@ func Router(app *fiber.App, deps RouterDeps) {
 	usersGroup.Put("/:id", userHandler.Update)
 
 	// ── Inventario (módulo 'inventory' + roles) ────────────────────────────────
-	inventoryHandler := NewInventoryHandler(deps.RegisterMovement, deps.Replenishment, deps.GetStock, deps.ListMovements)
+	inventoryHandler := NewInventoryHandler(deps.RegisterMovement, deps.Replenishment, deps.GetStock, deps.ListMovements, deps.ReorderConfig, deps.Stocktake)
+	prod.Put("/:id/reorder-config",
+		RequireModule(entity.ModuleInventory, deps.ModuleService),
+		RequireRole(entity.RoleAdmin, entity.RoleBodeguero),
+		inventoryHandler.UpdateReorderConfig,
+	)
 	invGroup := protected.Group("/inventory", RequireModule(entity.ModuleInventory, deps.ModuleService))
 	// GET /inventory/movements — admin y bodeguero
 	invGroup.Get("/movements",
@@ -132,6 +139,19 @@ func Router(app *fiber.App, deps RouterDeps) {
 	invGroup.Get("/stock",
 		RequireRole(entity.RoleAdmin, entity.RoleBodeguero),
 		inventoryHandler.GetStock,
+	)
+	// Stocktake (conteo físico) — admin y bodeguero
+	invGroup.Post("/stocktake",
+		RequireRole(entity.RoleAdmin, entity.RoleBodeguero),
+		inventoryHandler.CreateStocktakeSnapshot,
+	)
+	invGroup.Put("/stocktake/:id",
+		RequireRole(entity.RoleAdmin, entity.RoleBodeguero),
+		inventoryHandler.UpdateStocktakeCounts,
+	)
+	invGroup.Post("/stocktake/:id/close",
+		RequireRole(entity.RoleAdmin, entity.RoleBodeguero),
+		inventoryHandler.CloseStocktake,
 	)
 
 	// ── Facturación (módulo 'billing' + roles) ─────────────────────────────────
