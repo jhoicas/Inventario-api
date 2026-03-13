@@ -51,13 +51,13 @@ var _ TxRunner = (*fakeTxRunner)(nil)
 // ── Fake ProductRepository ────────────────────────────────────────────────────
 
 type fakeProductRepo struct {
-	getByIDFunc     func(id string) (*entity.Product, error)
-	updateCostFunc  func(productID string, cost decimal.Decimal) error
-	createFunc      func(product *entity.Product) error
+	getByIDFunc            func(id string) (*entity.Product, error)
+	updateCostFunc         func(productID string, cost decimal.Decimal) error
+	createFunc             func(product *entity.Product) error
 	getByCompanyAndSKUFunc func(companyID, sku string) (*entity.Product, error)
-	updateFunc      func(product *entity.Product) error
-	listByCompanyFunc func(companyID string, limit, offset int) ([]*entity.Product, error)
-	deleteFunc      func(id string) error
+	updateFunc             func(product *entity.Product) error
+	listByCompanyFunc      func(companyID string, limit, offset int) ([]*entity.Product, error)
+	deleteFunc             func(id string) error
 }
 
 func (f *fakeProductRepo) Create(product *entity.Product) error {
@@ -108,11 +108,11 @@ var _ repository.ProductRepository = (*fakeProductRepo)(nil)
 // ── Fake WarehouseRepository ──────────────────────────────────────────────────
 
 type fakeWarehouseRepo struct {
-	getByIDFunc  func(id string) (*entity.Warehouse, error)
-	createFunc   func(warehouse *entity.Warehouse) error
-	updateFunc   func(warehouse *entity.Warehouse) error
+	getByIDFunc       func(id string) (*entity.Warehouse, error)
+	createFunc        func(warehouse *entity.Warehouse) error
+	updateFunc        func(warehouse *entity.Warehouse) error
 	listByCompanyFunc func(companyID string, limit, offset int) ([]*entity.Warehouse, error)
-	deleteFunc   func(id string) error
+	deleteFunc        func(id string) error
 }
 
 func (f *fakeWarehouseRepo) Create(warehouse *entity.Warehouse) error {
@@ -151,10 +151,11 @@ var _ repository.WarehouseRepository = (*fakeWarehouseRepo)(nil)
 // ── Fake InventoryMovementRepository ───────────────────────────────────────────
 
 type fakeMovementRepo struct {
-	createFunc         func(movement *entity.InventoryMovement) error
-	getByIDFunc        func(id string) (*entity.InventoryMovement, error)
+	createFunc          func(movement *entity.InventoryMovement) error
+	getByIDFunc         func(id string) (*entity.InventoryMovement, error)
+	listFunc            func(companyID string, f repository.MovementFilters) ([]*entity.InventoryMovement, int64, error)
 	listByWarehouseFunc func(warehouseID string, from, to *time.Time, limit, offset int) ([]*entity.InventoryMovement, error)
-	listByProductFunc  func(productID string, from, to *time.Time, limit, offset int) ([]*entity.InventoryMovement, error)
+	listByProductFunc   func(productID string, from, to *time.Time, limit, offset int) ([]*entity.InventoryMovement, error)
 }
 
 func (f *fakeMovementRepo) Create(movement *entity.InventoryMovement) error {
@@ -168,6 +169,12 @@ func (f *fakeMovementRepo) GetByID(id string) (*entity.InventoryMovement, error)
 		return f.getByIDFunc(id)
 	}
 	return nil, nil
+}
+func (f *fakeMovementRepo) List(companyID string, flt repository.MovementFilters) ([]*entity.InventoryMovement, int64, error) {
+	if f.listFunc != nil {
+		return f.listFunc(companyID, flt)
+	}
+	return nil, 0, nil
 }
 func (f *fakeMovementRepo) ListByWarehouse(warehouseID string, from, to *time.Time, limit, offset int) ([]*entity.InventoryMovement, error) {
 	if f.listByWarehouseFunc != nil {
@@ -187,14 +194,28 @@ var _ repository.InventoryMovementRepository = (*fakeMovementRepo)(nil)
 // ── Fake StockRepository ───────────────────────────────────────────────────────
 
 type fakeStockRepo struct {
-	getFunc         func(productID, warehouseID string) (*entity.Stock, error)
+	getFunc          func(productID, warehouseID string) (*entity.Stock, error)
+	getByProductFunc func(productID string) ([]*entity.Stock, error)
+	getSummaryFunc   func(productID, warehouseID string) (*repository.StockSummary, error)
 	getForUpdateFunc func(productID, warehouseID string) (*entity.Stock, error)
-	upsertFunc      func(stock *entity.Stock) error
+	upsertFunc       func(stock *entity.Stock) error
 }
 
 func (f *fakeStockRepo) Get(productID, warehouseID string) (*entity.Stock, error) {
 	if f.getFunc != nil {
 		return f.getFunc(productID, warehouseID)
+	}
+	return nil, nil
+}
+func (f *fakeStockRepo) GetByProduct(productID string) ([]*entity.Stock, error) {
+	if f.getByProductFunc != nil {
+		return f.getByProductFunc(productID)
+	}
+	return nil, nil
+}
+func (f *fakeStockRepo) GetSummary(productID, warehouseID string) (*repository.StockSummary, error) {
+	if f.getSummaryFunc != nil {
+		return f.getSummaryFunc(productID, warehouseID)
 	}
 	return nil, nil
 }
@@ -274,10 +295,10 @@ func TestRegisterMovementUseCase_RegisterMovement(t *testing.T) {
 	ctx := context.Background()
 
 	tests := []struct {
-		name      string
-		input     MovementInputDTO
-		setup     func() (TxRunner, *fakeProductRepo, *fakeWarehouseRepo)
-		wantErr   error
+		name       string
+		input      MovementInputDTO
+		setup      func() (TxRunner, *fakeProductRepo, *fakeWarehouseRepo)
+		wantErr    error
 		wantAnyErr bool
 	}{
 		{
@@ -422,7 +443,7 @@ func TestRegisterMovementUseCase_RegisterMovement(t *testing.T) {
 			wantErr: domain.ErrInsufficientStock,
 		},
 		{
-			name: "NotFound_Product",
+			name:  "NotFound_Product",
 			input: validRegisterMovementDTO(),
 			setup: func() (TxRunner, *fakeProductRepo, *fakeWarehouseRepo) {
 				productRepo := &fakeProductRepo{
@@ -435,17 +456,19 @@ func TestRegisterMovementUseCase_RegisterMovement(t *testing.T) {
 						return validWarehouse(testCompanyID), nil
 					},
 				}
-				txRunner := &fakeTxRunner{ runFunc: func(_ context.Context, fn func(
+				txRunner := &fakeTxRunner{runFunc: func(_ context.Context, fn func(
 					repository.InventoryMovementRepository,
 					repository.StockRepository,
 					repository.ProductRepository,
-				) error) error { return fn(nil, nil, productRepo) } }
+				) error) error {
+					return fn(nil, nil, productRepo)
+				}}
 				return txRunner, productRepo, warehouseRepo
 			},
 			wantErr: domain.ErrNotFound,
 		},
 		{
-			name: "NotFound_Warehouse",
+			name:  "NotFound_Warehouse",
 			input: validRegisterMovementDTO(),
 			setup: func() (TxRunner, *fakeProductRepo, *fakeWarehouseRepo) {
 				productRepo := &fakeProductRepo{
@@ -464,7 +487,7 @@ func TestRegisterMovementUseCase_RegisterMovement(t *testing.T) {
 			wantErr: domain.ErrNotFound,
 		},
 		{
-			name: "Forbidden_ProductFromOtherCompany",
+			name:  "Forbidden_ProductFromOtherCompany",
 			input: validRegisterMovementDTO(),
 			setup: func() (TxRunner, *fakeProductRepo, *fakeWarehouseRepo) {
 				productRepo := &fakeProductRepo{
@@ -517,7 +540,7 @@ func TestRegisterMovementUseCase_RegisterMovement(t *testing.T) {
 			wantErr: domain.ErrInvalidInput,
 		},
 		{
-			name: "RepoError_StockGetForUpdateFails",
+			name:  "RepoError_StockGetForUpdateFails",
 			input: validRegisterMovementDTO(),
 			setup: func() (TxRunner, *fakeProductRepo, *fakeWarehouseRepo) {
 				productRepo := &fakeProductRepo{
@@ -549,7 +572,7 @@ func TestRegisterMovementUseCase_RegisterMovement(t *testing.T) {
 			wantAnyErr: true,
 		},
 		{
-			name: "RepoError_MovementCreateFails",
+			name:  "RepoError_MovementCreateFails",
 			input: validRegisterMovementDTO(),
 			setup: func() (TxRunner, *fakeProductRepo, *fakeWarehouseRepo) {
 				productRepo := &fakeProductRepo{
@@ -627,7 +650,7 @@ func TestRegisterMovementUseCase_RegisterMovementFromRequest(t *testing.T) {
 				return validWarehouse(testCompanyID), nil
 			},
 		}
-		movRepo := &fakeMovementRepo{ createFunc: func(_ *entity.InventoryMovement) error { return nil } }
+		movRepo := &fakeMovementRepo{createFunc: func(_ *entity.InventoryMovement) error { return nil }}
 		stockRepo := &fakeStockRepo{
 			getForUpdateFunc: func(_, _ string) (*entity.Stock, error) { return validStock(decimal.Zero), nil },
 			upsertFunc:       func(_ *entity.Stock) error { return nil },

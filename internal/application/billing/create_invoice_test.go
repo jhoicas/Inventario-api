@@ -100,12 +100,12 @@ var _ InventoryUseCase = (*fakeInventoryUC)(nil)
 // ── Fake CustomerRepository ────────────────────────────────────────────────────
 
 type fakeCustomerRepo struct {
-	getByIDFunc             func(id string) (*entity.Customer, error)
-	createFunc              func(customer *entity.Customer) error
+	getByIDFunc              func(id string) (*entity.Customer, error)
+	createFunc               func(customer *entity.Customer) error
 	getByCompanyAndTaxIDFunc func(companyID, taxID string) (*entity.Customer, error)
-	listByCompanyFunc       func(companyID string, limit, offset int) ([]*entity.Customer, error)
-	updateFunc              func(customer *entity.Customer) error
-	deleteFunc              func(id string) error
+	listByCompanyFunc        func(companyID string, limit, offset int) ([]*entity.Customer, error)
+	updateFunc               func(customer *entity.Customer) error
+	deleteFunc               func(id string) error
 }
 
 func (f *fakeCustomerRepo) Create(customer *entity.Customer) error {
@@ -155,9 +155,9 @@ type fakeCompanyRepo struct {
 	hasActiveModuleFunc func(ctx context.Context, companyID, moduleName string) (bool, error)
 	createFunc          func(company *entity.Company) error
 	getByNITFunc        func(nit string) (*entity.Company, error)
-	updateFunc         func(company *entity.Company) error
+	updateFunc          func(company *entity.Company) error
 	listFunc            func(limit, offset int) ([]*entity.Company, error)
-	deleteFunc         func(id string) error
+	deleteFunc          func(id string) error
 }
 
 func (f *fakeCompanyRepo) Create(company *entity.Company) error {
@@ -265,11 +265,11 @@ var _ repository.ProductRepository = (*fakeProductRepo)(nil)
 // ── Fake WarehouseRepository ──────────────────────────────────────────────────
 
 type fakeWarehouseRepo struct {
-	getByIDFunc         func(id string) (*entity.Warehouse, error)
-	createFunc          func(warehouse *entity.Warehouse) error
-	updateFunc          func(warehouse *entity.Warehouse) error
-	listByCompanyFunc   func(companyID string, limit, offset int) ([]*entity.Warehouse, error)
-	deleteFunc          func(id string) error
+	getByIDFunc       func(id string) (*entity.Warehouse, error)
+	createFunc        func(warehouse *entity.Warehouse) error
+	updateFunc        func(warehouse *entity.Warehouse) error
+	listByCompanyFunc func(companyID string, limit, offset int) ([]*entity.Warehouse, error)
+	deleteFunc        func(id string) error
 }
 
 func (f *fakeWarehouseRepo) Create(warehouse *entity.Warehouse) error {
@@ -308,13 +308,14 @@ var _ repository.WarehouseRepository = (*fakeWarehouseRepo)(nil)
 // ── Fake InvoiceRepository ────────────────────────────────────────────────────
 
 type fakeInvoiceRepo struct {
-	createFunc           func(invoice *entity.Invoice) error
-	createDetailFunc     func(detail *entity.InvoiceDetail) error
-	updateFunc           func(invoice *entity.Invoice) error
-	getByIDFunc          func(id string) (*entity.Invoice, error)
+	createFunc                func(invoice *entity.Invoice) error
+	createDetailFunc          func(detail *entity.InvoiceDetail) error
+	updateFunc                func(invoice *entity.Invoice) error
+	getByIDFunc               func(id string) (*entity.Invoice, error)
 	getDetailsByInvoiceIDFunc func(invoiceID string) ([]*entity.InvoiceDetail, error)
-	getDIANStatusFunc    func(id string) (*entity.Invoice, error)
-	updateReturnStatusFunc func(invoiceID string, status string) error
+	getDIANStatusFunc         func(id string) (*entity.Invoice, error)
+	updateReturnStatusFunc    func(invoiceID string, status string) error
+	listFunc                  func(filter repository.InvoiceListFilter) ([]*entity.Invoice, int, error)
 }
 
 func (f *fakeInvoiceRepo) Create(invoice *entity.Invoice) error {
@@ -358,6 +359,12 @@ func (f *fakeInvoiceRepo) UpdateReturnStatus(invoiceID string, status string) er
 		return f.updateReturnStatusFunc(invoiceID, status)
 	}
 	return nil
+}
+func (f *fakeInvoiceRepo) List(filter repository.InvoiceListFilter) ([]*entity.Invoice, int, error) {
+	if f.listFunc != nil {
+		return f.listFunc(filter)
+	}
+	return nil, 0, nil
 }
 
 var _ repository.InvoiceRepository = (*fakeInvoiceRepo)(nil)
@@ -410,9 +417,9 @@ func validWarehouse(companyID string) *entity.Warehouse {
 // NetTotal = 70000, TaxTotal = 6300, GrandTotal = 76300.
 func validCreateInvoiceRequest() dto.CreateInvoiceRequest {
 	return dto.CreateInvoiceRequest{
-		CustomerID:  testCustomerID,
-		Prefix:      "FV",
-		Number:      "",
+		CustomerID: testCustomerID,
+		Prefix:     "FV",
+		Number:     "",
 		Items: []dto.InvoiceItemRequest{
 			{ProductID: testProductID1, Quantity: decimal.NewFromInt(2), UnitPrice: decimal.NewFromInt(10000)},
 			{ProductID: testProductID2, Quantity: decimal.NewFromInt(1), UnitPrice: decimal.NewFromInt(50000)},
@@ -598,7 +605,7 @@ func TestCreateInvoiceUseCase_CreateInvoice(t *testing.T) {
 					},
 				}
 				companyRepo := &fakeCompanyRepo{
-					getByIDFunc: func(id string) (*entity.Company, error) { return validCompany(id), nil },
+					getByIDFunc:         func(id string) (*entity.Company, error) { return validCompany(id), nil },
 					hasActiveModuleFunc: func(_ context.Context, _, _ string) (bool, error) { return false, nil },
 				}
 				productRepo := &fakeProductRepo{
@@ -675,7 +682,9 @@ func TestCreateInvoiceUseCase_CreateInvoice(t *testing.T) {
 					getByIDFunc:         func(id string) (*entity.Company, error) { return validCompany(id), nil },
 					hasActiveModuleFunc: func(_ context.Context, _, _ string) (bool, error) { return false, nil },
 				}
-				productRepo := &fakeProductRepo{getByIDFunc: func(id string) (*entity.Product, error) { return validProduct(testCompanyID, id, decimal.NewFromInt(10000), decimal.NewFromInt(19)), nil }}
+				productRepo := &fakeProductRepo{getByIDFunc: func(id string) (*entity.Product, error) {
+					return validProduct(testCompanyID, id, decimal.NewFromInt(10000), decimal.NewFromInt(19)), nil
+				}}
 				return &fakeBillingTxRunner{}, &fakeInventoryUC{}, customerRepo, companyRepo, productRepo, &fakeWarehouseRepo{}, &fakeInvoiceRepo{}
 			},
 			wantErr: domain.ErrInvalidInput,
@@ -697,7 +706,9 @@ func TestCreateInvoiceUseCase_CreateInvoice(t *testing.T) {
 					getByIDFunc:         func(id string) (*entity.Company, error) { return validCompany(id), nil },
 					hasActiveModuleFunc: func(_ context.Context, _, _ string) (bool, error) { return false, nil },
 				}
-				productRepo := &fakeProductRepo{getByIDFunc: func(id string) (*entity.Product, error) { return validProduct(testCompanyID, id, decimal.NewFromInt(10000), decimal.NewFromInt(19)), nil }}
+				productRepo := &fakeProductRepo{getByIDFunc: func(id string) (*entity.Product, error) {
+					return validProduct(testCompanyID, id, decimal.NewFromInt(10000), decimal.NewFromInt(19)), nil
+				}}
 				return &fakeBillingTxRunner{}, &fakeInventoryUC{}, customerRepo, companyRepo, productRepo, &fakeWarehouseRepo{}, &fakeInvoiceRepo{}
 			},
 			wantErr: domain.ErrInvalidInput,
@@ -712,7 +723,7 @@ func TestCreateInvoiceUseCase_CreateInvoice(t *testing.T) {
 					getByIDFunc: func(_ string) (*entity.Customer, error) { return validCustomer(testCompanyID), nil },
 				}
 				companyRepo := &fakeCompanyRepo{
-					getByIDFunc: func(id string) (*entity.Company, error) { return validCompany(id), nil },
+					getByIDFunc:         func(id string) (*entity.Company, error) { return validCompany(id), nil },
 					hasActiveModuleFunc: func(_ context.Context, _, _ string) (bool, error) { return true, nil },
 				}
 				productRepo := &fakeProductRepo{}
@@ -736,7 +747,7 @@ func TestCreateInvoiceUseCase_CreateInvoice(t *testing.T) {
 					getByIDFunc: func(_ string) (*entity.Customer, error) { return validCustomer(testCompanyID), nil },
 				}
 				companyRepo := &fakeCompanyRepo{
-					getByIDFunc: func(id string) (*entity.Company, error) { return validCompany(id), nil },
+					getByIDFunc:         func(id string) (*entity.Company, error) { return validCompany(id), nil },
 					hasActiveModuleFunc: func(_ context.Context, _, _ string) (bool, error) { return true, nil },
 				}
 				productRepo := &fakeProductRepo{

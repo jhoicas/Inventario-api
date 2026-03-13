@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jhoicas/Inventario-api/internal/application/dto"
@@ -23,16 +24,22 @@ type GetStockUseCase interface {
 	Execute(ctx context.Context, companyID, productID, warehouseID string) (*dto.StockSummaryDTO, error)
 }
 
+// ListMovementsUseCase interfaz local para listar movimientos con filtros.
+type ListMovementsUseCase interface {
+	Execute(ctx context.Context, companyID string, in dto.MovementFiltersDTO) (*dto.PaginatedMovementsDTO, error)
+}
+
 // InventoryHandler maneja las peticiones HTTP de movimientos e inventario (protegido).
 type InventoryHandler struct {
 	uc            RegisterMovementUseCase
 	replenishment ReplenishmentUseCase
 	getStock      GetStockUseCase
+	listMovements ListMovementsUseCase
 }
 
 // NewInventoryHandler construye el handler.
-func NewInventoryHandler(uc RegisterMovementUseCase, replenishment ReplenishmentUseCase, getStock GetStockUseCase) *InventoryHandler {
-	return &InventoryHandler{uc: uc, replenishment: replenishment, getStock: getStock}
+func NewInventoryHandler(uc RegisterMovementUseCase, replenishment ReplenishmentUseCase, getStock GetStockUseCase, listMovements ListMovementsUseCase) *InventoryHandler {
+	return &InventoryHandler{uc: uc, replenishment: replenishment, getStock: getStock, listMovements: listMovements}
 }
 
 // RegisterMovement godoc
@@ -145,4 +152,67 @@ func (h *InventoryHandler) GetStock(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(summary)
+}
+
+// ListMovements godoc
+// @Summary      Listar movimientos de inventario
+// @Description  Devuelve movimientos paginados con filtros por producto, bodega, tipo y rango de fechas.
+// @Tags         inventory
+// @Security     Bearer
+// @Produce      json
+// @Param        product_id    query  string  false  "ID de producto"
+// @Param        warehouse_id  query  string  false  "ID de bodega"
+// @Param        type          query  string  false  "Tipo de movimiento (IN|OUT|ADJUSTMENT|TRANSFER|RETURN)"
+// @Param        start_date    query  string  false  "Fecha inicio (YYYY-MM-DD)"
+// @Param        end_date      query  string  false  "Fecha fin (YYYY-MM-DD)"
+// @Param        limit         query  int     false  "Límite" default(20)
+// @Param        offset        query  int     false  "Offset" default(0)
+// @Success      200  {object}  dto.PaginatedMovementsDTO
+// @Failure      401  {object}  dto.ErrorResponse
+// @Failure      400  {object}  dto.ErrorResponse
+// @Failure      503  {object}  dto.ErrorResponse
+// @Failure      500  {object}  dto.ErrorResponse
+// @Router       /api/inventory/movements [get]
+func (h *InventoryHandler) ListMovements(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	if companyID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if h.listMovements == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "listado de movimientos no configurado"})
+	}
+
+	parseDate := func(s string) (time.Time, error) {
+		if s == "" {
+			return time.Time{}, nil
+		}
+		return time.Parse("2006-01-02", s)
+	}
+
+	startDate, err := parseDate(c.Query("start_date"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "start_date inválida (use YYYY-MM-DD)"})
+	}
+	endDate, err := parseDate(c.Query("end_date"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "end_date inválida (use YYYY-MM-DD)"})
+	}
+
+	out, err := h.listMovements.Execute(c.Context(), companyID, dto.MovementFiltersDTO{
+		ProductID:   c.Query("product_id"),
+		WarehouseID: c.Query("warehouse_id"),
+		Type:        c.Query("type"),
+		StartDate:   startDate,
+		EndDate:     endDate,
+		Limit:       c.QueryInt("limit", 20),
+		Offset:      c.QueryInt("offset", 0),
+	})
+	if err != nil {
+		if err == domain.ErrInvalidInput {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "filtros inválidos"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+
+	return c.JSON(out)
 }

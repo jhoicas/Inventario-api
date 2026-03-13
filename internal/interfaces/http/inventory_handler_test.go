@@ -55,6 +55,20 @@ func (f *fakeGetStockUseCase) Execute(ctx context.Context, companyID, productID,
 	return nil, errors.New("Execute not configured")
 }
 
+type fakeListMovementsUseCase struct {
+	executeFunc func(ctx context.Context, companyID string, in dto.MovementFiltersDTO) (*dto.PaginatedMovementsDTO, error)
+}
+
+func (f *fakeListMovementsUseCase) Execute(ctx context.Context, companyID string, in dto.MovementFiltersDTO) (*dto.PaginatedMovementsDTO, error) {
+	if f == nil {
+		return nil, errors.New("Execute not configured")
+	}
+	if f.executeFunc != nil {
+		return f.executeFunc(ctx, companyID, in)
+	}
+	return nil, errors.New("Execute not configured")
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 const inventoryTestCompanyID = "company-inv-123"
@@ -279,7 +293,7 @@ func TestInventoryHandler_RegisterMovement(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			regUC, replUC := tt.mockSetup()
-			handler := NewInventoryHandler(regUC, replUC, &fakeGetStockUseCase{})
+			handler := NewInventoryHandler(regUC, replUC, &fakeGetStockUseCase{}, nil)
 
 			app := fiber.New(fiber.Config{DisableStartupMessage: true})
 			app.Use(mockInventoryAuthMiddleware(tt.companyID, tt.userID))
@@ -401,7 +415,7 @@ func TestInventoryHandler_GetReplenishmentList(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			regUC, replUC := tt.mockSetup()
-			handler := NewInventoryHandler(regUC, replUC, &fakeGetStockUseCase{})
+			handler := NewInventoryHandler(regUC, replUC, &fakeGetStockUseCase{}, nil)
 
 			app := fiber.New(fiber.Config{DisableStartupMessage: true})
 			app.Use(mockInventoryCompanyOnly(tt.companyID))
@@ -536,7 +550,7 @@ func TestInventoryHandler_GetStock(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			handler := NewInventoryHandler(&fakeRegisterMovementUseCase{}, &fakeReplenishmentUseCase{}, tt.getStockUC)
+			handler := NewInventoryHandler(&fakeRegisterMovementUseCase{}, &fakeReplenishmentUseCase{}, tt.getStockUC, nil)
 
 			app := fiber.New(fiber.Config{DisableStartupMessage: true})
 			app.Use(mockInventoryCompanyOnly(tt.companyID))
@@ -555,6 +569,130 @@ func TestInventoryHandler_GetStock(t *testing.T) {
 			}
 
 			req := httptest.NewRequest(http.MethodGet, path, nil)
+			resp, err := app.Test(req, -1)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+
+			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
+			if tt.validateBody != nil {
+				tt.validateBody(t, resp)
+			}
+		})
+	}
+}
+
+// ── Tests ListMovements ──────────────────────────────────────────────────────
+
+func TestInventoryHandler_ListMovements(t *testing.T) {
+	tests := []struct {
+		name           string
+		companyID      string
+		query          string
+		listUC         ListMovementsUseCase
+		expectedStatus int
+		validateBody   func(*testing.T, *http.Response)
+	}{
+		{
+			name:      "Success_WithFilters",
+			companyID: inventoryTestCompanyID,
+			query:     "?product_id=prod-001&warehouse_id=wh-001&type=IN&start_date=2026-03-01&end_date=2026-03-12&limit=10&offset=0",
+			listUC: &fakeListMovementsUseCase{
+				executeFunc: func(_ context.Context, companyID string, in dto.MovementFiltersDTO) (*dto.PaginatedMovementsDTO, error) {
+					assert.Equal(t, inventoryTestCompanyID, companyID)
+					assert.Equal(t, "prod-001", in.ProductID)
+					assert.Equal(t, "wh-001", in.WarehouseID)
+					assert.Equal(t, "IN", in.Type)
+					assert.Equal(t, 10, in.Limit)
+					assert.Equal(t, 0, in.Offset)
+					return &dto.PaginatedMovementsDTO{
+						Items: []dto.MovementDTO{
+							{
+								ID:          "mov-001",
+								ProductID:   "prod-001",
+								WarehouseID: "wh-001",
+								Type:        "IN",
+								Quantity:    decimal.NewFromInt(10),
+								Balance:     decimal.NewFromInt(10),
+							},
+						},
+						Total: 1,
+					}, nil
+				},
+			},
+			expectedStatus: http.StatusOK,
+			validateBody: func(t *testing.T, resp *http.Response) {
+				var out dto.PaginatedMovementsDTO
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+				assert.Equal(t, int64(1), out.Total)
+				require.Len(t, out.Items, 1)
+				assert.Equal(t, "mov-001", out.Items[0].ID)
+				assert.True(t, out.Items[0].Balance.Equal(decimal.NewFromInt(10)))
+			},
+		},
+		{
+			name:           "Unauthorized_NoCompanyID",
+			companyID:      "",
+			query:          "",
+			listUC:         &fakeListMovementsUseCase{},
+			expectedStatus: http.StatusUnauthorized,
+			validateBody: func(t *testing.T, resp *http.Response) {
+				var errResp dto.ErrorResponse
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
+				assert.Equal(t, "UNAUTHORIZED", errResp.Code)
+			},
+		},
+		{
+			name:           "Validation_InvalidStartDate",
+			companyID:      inventoryTestCompanyID,
+			query:          "?start_date=12-03-2026",
+			listUC:         &fakeListMovementsUseCase{},
+			expectedStatus: http.StatusBadRequest,
+			validateBody: func(t *testing.T, resp *http.Response) {
+				var errResp dto.ErrorResponse
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
+				assert.Equal(t, "VALIDATION", errResp.Code)
+			},
+		},
+		{
+			name:           "Validation_InvalidEndDate",
+			companyID:      inventoryTestCompanyID,
+			query:          "?end_date=2026/03/12",
+			listUC:         &fakeListMovementsUseCase{},
+			expectedStatus: http.StatusBadRequest,
+			validateBody: func(t *testing.T, resp *http.Response) {
+				var errResp dto.ErrorResponse
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
+				assert.Equal(t, "VALIDATION", errResp.Code)
+			},
+		},
+		{
+			name:           "ServiceUnavailable_NoListUseCase",
+			companyID:      inventoryTestCompanyID,
+			query:          "",
+			listUC:         nil,
+			expectedStatus: http.StatusServiceUnavailable,
+			validateBody: func(t *testing.T, resp *http.Response) {
+				var errResp dto.ErrorResponse
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
+				assert.Equal(t, "SERVICE_UNAVAILABLE", errResp.Code)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := NewInventoryHandler(
+				&fakeRegisterMovementUseCase{},
+				&fakeReplenishmentUseCase{},
+				&fakeGetStockUseCase{},
+				tt.listUC,
+			)
+
+			app := fiber.New(fiber.Config{DisableStartupMessage: true})
+			app.Use(mockInventoryCompanyOnly(tt.companyID))
+			app.Get("/inventory/movements", handler.ListMovements)
+
+			req := httptest.NewRequest(http.MethodGet, "/inventory/movements"+tt.query, nil)
 			resp, err := app.Test(req, -1)
 			require.NoError(t, err)
 			defer resp.Body.Close()
