@@ -18,6 +18,7 @@ type RouterDeps struct {
 	CompanyRepo            repository.CompanyRepository // Para inyectar configuración DIAN
 	WarehouseUC            *usecase.WarehouseUseCase
 	ProductUC              *usecase.ProductUseCase
+	SupplierUC             *usecase.SupplierUseCase
 	UserRepo               repository.UserRepository
 	RegisterMovement       *inventory.RegisterMovementUseCase
 	Replenishment          *inventory.ReplenishmentUseCase
@@ -89,6 +90,13 @@ func Router(app *fiber.App, deps RouterDeps) {
 	// Escritura de productos: admin y bodeguero
 	prod.Post("/", RequireRole(entity.RoleAdmin, entity.RoleBodeguero), productHandler.Create)
 	prod.Put("/:id", RequireRole(entity.RoleAdmin, entity.RoleBodeguero), productHandler.Update)
+
+	supplierHandler := NewSupplierHandler(deps.SupplierUC)
+	sup := protected.Group("/suppliers")
+	sup.Get("/", supplierHandler.List)
+	sup.Get("/:id", supplierHandler.GetByID)
+	sup.Post("/", RequireRole(entity.RoleAdmin, entity.RoleBodeguero), supplierHandler.Create)
+	sup.Put("/:id", RequireRole(entity.RoleAdmin, entity.RoleBodeguero), supplierHandler.Update)
 
 	customerHandler := NewCustomerHandler(deps.CustomerUC)
 	cust := protected.Group("/customers")

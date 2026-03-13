@@ -67,6 +67,7 @@ func main() {
 	userRepo := postgres.NewUserRepository(pool)
 	warehouseRepo := postgres.NewWarehouseRepository(pool)
 	productRepo := postgres.NewProductRepository(pool)
+	supplierRepo := postgres.NewSupplierRepository(pool)
 	customerRepo := postgres.NewCustomerRepository(pool)
 	invoiceRepo := postgres.NewInvoiceRepository(pool)
 	txRunner := postgres.NewTxRunner(pool)
@@ -146,6 +147,7 @@ func main() {
 	companyUC := usecase.NewCompanyUseCase(companyRepo, resolutionRepo)
 	warehouseUC := usecase.NewWarehouseUseCase(warehouseRepo)
 	productUC := usecase.NewProductUseCase(productRepo)
+	supplierUC := usecase.NewSupplierUseCase(supplierRepo)
 	updateReorderConfigUC := inventory.NewUpdateReorderConfigUseCase(productRepo, reorderConfigRepo)
 	moduleSvc := usecase.NewModuleService(companyRepo)
 	analyticsUC := usecase.NewAnalyticsUseCase(analyticsRepo)
@@ -227,6 +229,7 @@ func main() {
 		CompanyRepo:            companyRepo,
 		WarehouseUC:            warehouseUC,
 		ProductUC:              productUC,
+		SupplierUC:             supplierUC,
 		UserRepo:               userRepo,
 		RegisterMovement:       registerMovementUC,
 		Replenishment:          replenishmentUC,
