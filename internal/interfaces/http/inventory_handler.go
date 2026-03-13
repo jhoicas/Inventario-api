@@ -7,6 +7,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jhoicas/Inventario-api/internal/application/dto"
+	appinventory "github.com/jhoicas/Inventario-api/internal/application/inventory"
 	"github.com/jhoicas/Inventario-api/internal/domain"
 )
 
@@ -31,17 +32,29 @@ type ListMovementsUseCase interface {
 	Execute(ctx context.Context, companyID string, in dto.MovementFiltersDTO) (*dto.PaginatedMovementsDTO, error)
 }
 
+// StocktakeUseCase interfaz local para conteos físicos (stocktake).
+type StocktakeUseCase interface {
+	CreateSnapshot(ctx context.Context, companyID, warehouseID string) (string, error)
+	UpdateCounts(ctx context.Context, stocktakeID string, items []appinventory.StocktakeItemInput) error
+	Close(ctx context.Context, stocktakeID string) error
+}
+
 // InventoryHandler maneja las peticiones HTTP de movimientos e inventario (protegido).
 type InventoryHandler struct {
 	uc            RegisterMovementUseCase
 	replenishment ReplenishmentUseCase
 	getStock      GetStockUseCase
 	listMovements ListMovementsUseCase
+	stocktake     StocktakeUseCase
 }
 
 // NewInventoryHandler construye el handler.
-func NewInventoryHandler(uc RegisterMovementUseCase, replenishment ReplenishmentUseCase, getStock GetStockUseCase, listMovements ListMovementsUseCase) *InventoryHandler {
-	return &InventoryHandler{uc: uc, replenishment: replenishment, getStock: getStock, listMovements: listMovements}
+func NewInventoryHandler(uc RegisterMovementUseCase, replenishment ReplenishmentUseCase, getStock GetStockUseCase, listMovements ListMovementsUseCase, stocktake ...StocktakeUseCase) *InventoryHandler {
+	var stocktakeUC StocktakeUseCase
+	if len(stocktake) > 0 {
+		stocktakeUC = stocktake[0]
+	}
+	return &InventoryHandler{uc: uc, replenishment: replenishment, getStock: getStock, listMovements: listMovements, stocktake: stocktakeUC}
 }
 
 // RegisterMovement godoc
@@ -127,6 +140,144 @@ func (h *InventoryHandler) RegisterAdjustment(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{"movement_id": movementID})
+}
+
+type createStocktakeRequest struct {
+	WarehouseID string `json:"warehouse_id"`
+}
+
+type updateStocktakeCountsRequest struct {
+	Items []appinventory.StocktakeItemInput `json:"items"`
+}
+
+// CreateStocktakeSnapshot godoc
+// @Summary      Crear snapshot de conteo físico
+// @Description  Copia el stock actual de la bodega y abre un stocktake en estado OPEN.
+// @Tags         inventory
+// @Security     Bearer
+// @Accept       json
+// @Produce      json
+// @Param        body  body  createStocktakeRequest  true  "warehouse_id"
+// @Success      201   {object}  map[string]string  "{ \"stocktake_id\": \"uuid\" }"
+// @Failure      400   {object}  dto.ErrorResponse
+// @Failure      404   {object}  dto.ErrorResponse
+// @Failure      503   {object}  dto.ErrorResponse
+// @Failure      500   {object}  dto.ErrorResponse
+// @Router       /api/inventory/stocktake [post]
+func (h *InventoryHandler) CreateStocktakeSnapshot(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	if companyID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if h.stocktake == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "stocktake no configurado"})
+	}
+
+	var in createStocktakeRequest
+	if err := c.BodyParser(&in); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
+	}
+
+	stocktakeID, err := h.stocktake.CreateSnapshot(c.Context(), companyID, in.WarehouseID)
+	if err != nil {
+		if errors.Is(err, domain.ErrInvalidInput) {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "datos inválidos"})
+		}
+		if errors.Is(err, domain.ErrNotFound) {
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "bodega no encontrada"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{"stocktake_id": stocktakeID})
+}
+
+// UpdateStocktakeCounts godoc
+// @Summary      Actualizar conteo físico
+// @Description  Actualiza cantidades contadas del stocktake y recalcula diferencias.
+// @Tags         inventory
+// @Security     Bearer
+// @Accept       json
+// @Produce      json
+// @Param        id    path  string                       true  "stocktake_id"
+// @Param        body  body  updateStocktakeCountsRequest true  "items"
+// @Success      200   {object}  map[string]string
+// @Failure      400   {object}  dto.ErrorResponse
+// @Failure      404   {object}  dto.ErrorResponse
+// @Failure      409   {object}  dto.ErrorResponse
+// @Failure      503   {object}  dto.ErrorResponse
+// @Failure      500   {object}  dto.ErrorResponse
+// @Router       /api/inventory/stocktake/{id} [put]
+func (h *InventoryHandler) UpdateStocktakeCounts(c *fiber.Ctx) error {
+	if GetCompanyID(c) == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if h.stocktake == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "stocktake no configurado"})
+	}
+
+	stocktakeID := c.Params("id")
+	var in updateStocktakeCountsRequest
+	if err := c.BodyParser(&in); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
+	}
+
+	if err := h.stocktake.UpdateCounts(c.Context(), stocktakeID, in.Items); err != nil {
+		if errors.Is(err, domain.ErrInvalidInput) {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "datos inválidos"})
+		}
+		if errors.Is(err, domain.ErrNotFound) {
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "stocktake o item no encontrado"})
+		}
+		if errors.Is(err, domain.ErrConflict) {
+			return c.Status(fiber.StatusConflict).JSON(dto.ErrorResponse{Code: "CONFLICT", Message: "stocktake cerrado"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+
+	return c.JSON(fiber.Map{"message": "conteo actualizado"})
+}
+
+// CloseStocktake godoc
+// @Summary      Cerrar conteo físico
+// @Description  Cierra el stocktake y genera movimientos ADJUSTMENT por cada diferencia != 0.
+// @Tags         inventory
+// @Security     Bearer
+// @Produce      json
+// @Param        id  path  string  true  "stocktake_id"
+// @Success      200  {object}  map[string]string
+// @Failure      400  {object}  dto.ErrorResponse
+// @Failure      404  {object}  dto.ErrorResponse
+// @Failure      409  {object}  dto.ErrorResponse
+// @Failure      503  {object}  dto.ErrorResponse
+// @Failure      500  {object}  dto.ErrorResponse
+// @Router       /api/inventory/stocktake/{id}/close [post]
+func (h *InventoryHandler) CloseStocktake(c *fiber.Ctx) error {
+	if GetCompanyID(c) == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if h.stocktake == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "stocktake no configurado"})
+	}
+
+	stocktakeID := c.Params("id")
+	if err := h.stocktake.Close(c.Context(), stocktakeID); err != nil {
+		if errors.Is(err, domain.ErrInvalidInput) {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "datos inválidos"})
+		}
+		if errors.Is(err, domain.ErrNotFound) {
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "stocktake no encontrado"})
+		}
+		if errors.Is(err, domain.ErrConflict) {
+			return c.Status(fiber.StatusConflict).JSON(dto.ErrorResponse{Code: "CONFLICT", Message: "stocktake ya cerrado"})
+		}
+		if errors.Is(err, domain.ErrInsufficientStock) {
+			return c.Status(fiber.StatusConflict).JSON(dto.ErrorResponse{Code: "INSUFFICIENT_STOCK", Message: "stock insuficiente"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+
+	return c.JSON(fiber.Map{"message": "stocktake cerrado"})
 }
 
 // GetReplenishmentList godoc
