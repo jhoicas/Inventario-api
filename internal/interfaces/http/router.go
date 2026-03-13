@@ -21,6 +21,7 @@ type RouterDeps struct {
 	UserRepo               repository.UserRepository
 	RegisterMovement       *inventory.RegisterMovementUseCase
 	Replenishment          *inventory.ReplenishmentUseCase
+	GetStock               *inventory.GetStockUseCase
 	CustomerUC             *billing.CustomerUseCase
 	CreateInvoice          *billing.CreateInvoiceUseCase
 	ReturnInvoice          *billing.CreateCreditNoteUseCase
@@ -108,7 +109,7 @@ func Router(app *fiber.App, deps RouterDeps) {
 	usersGroup.Put("/:id", userHandler.Update)
 
 	// ── Inventario (módulo 'inventory' + roles) ────────────────────────────────
-	inventoryHandler := NewInventoryHandler(deps.RegisterMovement, deps.Replenishment)
+	inventoryHandler := NewInventoryHandler(deps.RegisterMovement, deps.Replenishment, deps.GetStock)
 	invGroup := protected.Group("/inventory", RequireModule(entity.ModuleInventory, deps.ModuleService))
 
 	// POST /inventory/movements — admin y bodeguero
@@ -120,6 +121,11 @@ func Router(app *fiber.App, deps RouterDeps) {
 	invGroup.Get("/replenishment-list",
 		RequireRole(entity.RoleAdmin, entity.RoleBodeguero),
 		inventoryHandler.GetReplenishmentList,
+	)
+	// GET /inventory/stock — admin y bodeguero
+	invGroup.Get("/stock",
+		RequireRole(entity.RoleAdmin, entity.RoleBodeguero),
+		inventoryHandler.GetStock,
 	)
 
 	// ── Facturación (módulo 'billing' + roles) ─────────────────────────────────

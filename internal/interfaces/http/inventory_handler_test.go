@@ -42,6 +42,17 @@ func (f *fakeReplenishmentUseCase) GenerateReplenishmentList(ctx context.Context
 	return nil, errors.New("GenerateReplenishmentList not configured")
 }
 
+type fakeGetStockUseCase struct {
+	executeFunc func(ctx context.Context, companyID, productID, warehouseID string) (*dto.StockSummaryDTO, error)
+}
+
+func (f *fakeGetStockUseCase) Execute(ctx context.Context, companyID, productID, warehouseID string) (*dto.StockSummaryDTO, error) {
+	if f.executeFunc != nil {
+		return f.executeFunc(ctx, companyID, productID, warehouseID)
+	}
+	return nil, errors.New("Execute not configured")
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 const inventoryTestCompanyID = "company-inv-123"
@@ -262,7 +273,7 @@ func TestInventoryHandler_RegisterMovement(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			regUC, replUC := tt.mockSetup()
-			handler := NewInventoryHandler(regUC, replUC)
+			handler := NewInventoryHandler(regUC, replUC, &fakeGetStockUseCase{})
 
 			app := fiber.New(fiber.Config{DisableStartupMessage: true})
 			app.Use(mockInventoryAuthMiddleware(tt.companyID, tt.userID))
@@ -382,7 +393,7 @@ func TestInventoryHandler_GetReplenishmentList(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			regUC, replUC := tt.mockSetup()
-			handler := NewInventoryHandler(regUC, replUC)
+			handler := NewInventoryHandler(regUC, replUC, &fakeGetStockUseCase{})
 
 			app := fiber.New(fiber.Config{DisableStartupMessage: true})
 			app.Use(mockInventoryCompanyOnly(tt.companyID))

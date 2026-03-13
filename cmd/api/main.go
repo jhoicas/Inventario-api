@@ -140,6 +140,7 @@ func main() {
 
 	analyticsRepo := postgres.NewAnalyticsRepository(pool)
 	levelRepo := postgres.NewInventoryLevelRepository(pool)
+	stockRepo := postgres.NewStockRepository(pool)
 	companyUC := usecase.NewCompanyUseCase(companyRepo, resolutionRepo)
 	warehouseUC := usecase.NewWarehouseUseCase(warehouseRepo)
 	productUC := usecase.NewProductUseCase(productRepo)
@@ -147,6 +148,7 @@ func main() {
 	analyticsUC := usecase.NewAnalyticsUseCase(analyticsRepo)
 	rawMaterialAnalyticsUC := usecase.NewRawMaterialAnalyticsUseCase(analyticsRepo)
 	replenishmentUC := inventory.NewReplenishmentUseCase(levelRepo, analyticsRepo)
+	getStockUC := inventory.NewGetStockUseCase(stockRepo)
 	dashboardUC := appanalytics.NewDashboardUseCase(analyticsRepo)
 
 	anthropicSvc := infraai.NewAnthropicService(cfg.AI.AnthropicAPIKey, cfg.AI.AnthropicModel)
@@ -224,6 +226,7 @@ func main() {
 		UserRepo:               userRepo,
 		RegisterMovement:       registerMovementUC,
 		Replenishment:          replenishmentUC,
+		GetStock:               getStockUC,
 		CustomerUC:             customerUC,
 		CreateInvoice:          createInvoiceUC,
 		ReturnInvoice:          createCreditNoteUC,

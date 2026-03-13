@@ -1,6 +1,10 @@
 package dto
 
-import "github.com/shopspring/decimal"
+import (
+	"time"
+
+	"github.com/shopspring/decimal"
+)
 
 // RegisterMovementRequest body para POST /api/inventory/movements.
 type RegisterMovementRequest struct {
@@ -29,4 +33,15 @@ type ReplenishmentSuggestionDTO struct {
 	UnitsSoldLast90Days   decimal.Decimal `json:"units_sold_last_90d"`   // volumen de ventas reciente
 	InventoryDays         decimal.Decimal `json:"inventory_days"`        // días de inventario = CurrentStock / (UnitsSoldLast90Days/90)
 	Priority              int             `json:"priority"`              // 1 = más urgente
+}
+
+// StockSummaryDTO resumen de stock para un producto (una bodega o agregado de todas).
+type StockSummaryDTO struct {
+	ProductID       string          `json:"product_id"`
+	WarehouseID     string          `json:"warehouse_id,omitempty"` // vacío si es agregado de todas las bodegas
+	CurrentStock    decimal.Decimal `json:"current_stock"`
+	ReservedStock   decimal.Decimal `json:"reserved_stock"`
+	AvailableStock  decimal.Decimal `json:"available_stock"`
+	AvgCost         decimal.Decimal `json:"avg_cost"`
+	LastUpdated     time.Time       `json:"last_updated"`
 }

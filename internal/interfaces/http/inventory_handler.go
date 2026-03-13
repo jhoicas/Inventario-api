@@ -18,15 +18,21 @@ type ReplenishmentUseCase interface {
 	GenerateReplenishmentList(ctx context.Context, companyID, warehouseID string) ([]dto.ReplenishmentSuggestionDTO, error)
 }
 
+// GetStockUseCase interfaz local para obtener resumen de stock.
+type GetStockUseCase interface {
+	Execute(ctx context.Context, companyID, productID, warehouseID string) (*dto.StockSummaryDTO, error)
+}
+
 // InventoryHandler maneja las peticiones HTTP de movimientos e inventario (protegido).
 type InventoryHandler struct {
 	uc            RegisterMovementUseCase
 	replenishment ReplenishmentUseCase
+	getStock      GetStockUseCase
 }
 
 // NewInventoryHandler construye el handler.
-func NewInventoryHandler(uc RegisterMovementUseCase, replenishment ReplenishmentUseCase) *InventoryHandler {
-	return &InventoryHandler{uc: uc, replenishment: replenishment}
+func NewInventoryHandler(uc RegisterMovementUseCase, replenishment ReplenishmentUseCase, getStock GetStockUseCase) *InventoryHandler {
+	return &InventoryHandler{uc: uc, replenishment: replenishment, getStock: getStock}
 }
 
 // RegisterMovement godoc
@@ -99,7 +105,40 @@ func (h *InventoryHandler) GetReplenishmentList(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"total":           len(list),
-		"replenishments":  list,
+		"total":          len(list),
+		"replenishments": list,
 	})
+}
+
+// GetStock godoc
+// @Summary      Resumen de stock
+// @Description  Devuelve el resumen de stock de un producto en una bodega o agregado de todas las bodegas.
+// @Tags         inventory
+// @Security     Bearer
+// @Produce      json
+// @Param        product_id   query  string  true   "ID del producto (UUID)"
+// @Param        warehouse_id query  string  false  "ID de la bodega (UUID). Vacío = stock agregado de todas las bodegas."
+// @Success      200  {object}  dto.StockSummaryDTO
+// @Failure      401  {object}  dto.ErrorResponse
+// @Failure      500  {object}  dto.ErrorResponse
+// @Router       /api/inventory/stock [get]
+func (h *InventoryHandler) GetStock(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	if companyID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+
+	productID := c.Query("product_id")
+	if productID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "product_id es requerido"})
+	}
+
+	warehouseID := c.Query("warehouse_id")
+
+	summary, err := h.getStock.Execute(c.Context(), companyID, productID, warehouseID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+
+	return c.JSON(summary)
 }
