@@ -39,6 +39,11 @@ type StocktakeUseCase interface {
 	Close(ctx context.Context, stocktakeID string) error
 }
 
+// ReorderConfigUseCase interfaz local para configurar puntos de reposición por producto y bodega.
+type ReorderConfigUseCase interface {
+	Execute(ctx context.Context, companyID string, in dto.ReorderConfigRequest) error
+}
+
 // InventoryHandler maneja las peticiones HTTP de movimientos e inventario (protegido).
 type InventoryHandler struct {
 	uc            RegisterMovementUseCase
@@ -46,15 +51,22 @@ type InventoryHandler struct {
 	getStock      GetStockUseCase
 	listMovements ListMovementsUseCase
 	stocktake     StocktakeUseCase
+	reorderConfig ReorderConfigUseCase
 }
 
 // NewInventoryHandler construye el handler.
-func NewInventoryHandler(uc RegisterMovementUseCase, replenishment ReplenishmentUseCase, getStock GetStockUseCase, listMovements ListMovementsUseCase, stocktake ...StocktakeUseCase) *InventoryHandler {
-	var stocktakeUC StocktakeUseCase
-	if len(stocktake) > 0 {
-		stocktakeUC = stocktake[0]
+
+func NewInventoryHandler(uc RegisterMovementUseCase, replenishment ReplenishmentUseCase, getStock GetStockUseCase, listMovements ListMovementsUseCase, options ...any) *InventoryHandler {
+	h := &InventoryHandler{uc: uc, replenishment: replenishment, getStock: getStock, listMovements: listMovements}
+	for _, opt := range options {
+		switch v := opt.(type) {
+		case StocktakeUseCase:
+			h.stocktake = v
+		case ReorderConfigUseCase:
+			h.reorderConfig = v
+		}
 	}
-	return &InventoryHandler{uc: uc, replenishment: replenishment, getStock: getStock, listMovements: listMovements, stocktake: stocktakeUC}
+	return h
 }
 
 // RegisterMovement godoc
@@ -278,6 +290,59 @@ func (h *InventoryHandler) CloseStocktake(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{"message": "stocktake cerrado"})
+}
+
+// UpdateReorderConfig godoc
+// @Summary      Configurar reposición por producto
+// @Description  Upsert de configuración en product_reorder_config por producto y bodega.
+// @Tags         inventory
+// @Security     Bearer
+// @Accept       json
+// @Produce      json
+// @Param        id    path  string  true  "ID del producto"
+// @Param        body  body  dto.ReorderConfigRequest  true  "warehouse_id, reorder_point, min_stock, max_stock, lead_time_days"
+// @Success      200   {object}  map[string]string
+// @Failure      400   {object}  dto.ErrorResponse
+// @Failure      403   {object}  dto.ErrorResponse
+// @Failure      404   {object}  dto.ErrorResponse
+// @Failure      503   {object}  dto.ErrorResponse
+// @Failure      500   {object}  dto.ErrorResponse
+// @Router       /api/products/{id}/reorder-config [put]
+func (h *InventoryHandler) UpdateReorderConfig(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	if companyID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if h.reorderConfig == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "reorder_config no configurado"})
+	}
+
+	productID := c.Params("id")
+	if productID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "id es requerido"})
+	}
+
+	var in dto.ReorderConfigRequest
+	if err := c.BodyParser(&in); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
+	}
+	in.ProductID = productID
+
+	err := h.reorderConfig.Execute(c.Context(), companyID, in)
+	if err != nil {
+		if errors.Is(err, domain.ErrInvalidInput) {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "datos inválidos"})
+		}
+		if errors.Is(err, domain.ErrNotFound) {
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "producto no encontrado"})
+		}
+		if errors.Is(err, domain.ErrForbidden) {
+			return c.Status(fiber.StatusForbidden).JSON(dto.ErrorResponse{Code: "FORBIDDEN", Message: "acceso denegado al recurso"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+
+	return c.JSON(fiber.Map{"message": "configuración de reposición actualizada"})
 }
 
 // GetReplenishmentList godoc

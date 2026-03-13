@@ -23,6 +23,16 @@ type RegisterMovementRequest struct {
 	AdjustmentReason string `json:"adjustment_reason,omitempty"`
 }
 
+// ReorderConfigRequest body para configurar niveles de reposición por producto y bodega.
+type ReorderConfigRequest struct {
+	WarehouseID  string          `json:"warehouse_id"`
+	ProductID    string          `json:"product_id,omitempty"`
+	ReorderPoint decimal.Decimal `json:"reorder_point"`
+	MinStock     decimal.Decimal `json:"min_stock"`
+	MaxStock     decimal.Decimal `json:"max_stock"`
+	LeadTimeDays int             `json:"lead_time_days"`
+}
+
 // ReplenishmentSuggestionDTO representa una sugerencia de reposición para un SKU
 // que se encuentra por debajo de su punto de reorden.
 type ReplenishmentSuggestionDTO struct {
