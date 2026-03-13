@@ -45,6 +45,13 @@ type ReorderConfigUseCase interface {
 	Execute(ctx context.Context, companyID string, in dto.ReorderConfigRequest) error
 }
 
+// PurchaseOrderUseCase interfaz local para órdenes de compra.
+type PurchaseOrderUseCase interface {
+	Create(ctx context.Context, companyID string, in appinventory.CreatePurchaseOrderInput) (string, error)
+	UpdateStatus(ctx context.Context, companyID, purchaseOrderID, status string) error
+	Receive(ctx context.Context, companyID, userID, purchaseOrderID, warehouseID string) error
+}
+
 // InventoryHandler maneja las peticiones HTTP de movimientos e inventario (protegido).
 type InventoryHandler struct {
 	uc            RegisterMovementUseCase
@@ -53,6 +60,7 @@ type InventoryHandler struct {
 	listMovements ListMovementsUseCase
 	stocktake     StocktakeUseCase
 	reorderConfig ReorderConfigUseCase
+	purchaseOrder PurchaseOrderUseCase
 }
 
 // NewInventoryHandler construye el handler.
@@ -81,9 +89,123 @@ func NewInventoryHandler(uc RegisterMovementUseCase, replenishment Replenishment
 			if !isNilOption(v) {
 				h.reorderConfig = v
 			}
+		case PurchaseOrderUseCase:
+			if !isNilOption(v) {
+				h.purchaseOrder = v
+			}
 		}
 	}
 	return h
+}
+
+type receivePurchaseOrderRequest struct {
+	WarehouseID string `json:"warehouse_id"`
+}
+
+// CreatePurchaseOrder godoc
+// @Summary      Crear orden de compra
+// @Description  Crea una orden de compra en estado BORRADOR.
+// @Tags         inventory
+// @Security     Bearer
+// @Accept       json
+// @Produce      json
+// @Param        body  body  appinventory.CreatePurchaseOrderInput  true  "supplier_id, number, date, items"
+// @Success      201   {object}  map[string]string
+// @Failure      400   {object}  dto.ErrorResponse
+// @Failure      403   {object}  dto.ErrorResponse
+// @Failure      404   {object}  dto.ErrorResponse
+// @Failure      503   {object}  dto.ErrorResponse
+// @Failure      500   {object}  dto.ErrorResponse
+// @Router       /api/purchase-orders [post]
+func (h *InventoryHandler) CreatePurchaseOrder(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	if companyID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if h.purchaseOrder == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "purchase_order no configurado"})
+	}
+
+	var in appinventory.CreatePurchaseOrderInput
+	if err := c.BodyParser(&in); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
+	}
+
+	id, err := h.purchaseOrder.Create(c.Context(), companyID, in)
+	if err != nil {
+		if errors.Is(err, domain.ErrInvalidInput) {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "datos inválidos"})
+		}
+		if errors.Is(err, domain.ErrNotFound) {
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "recurso no encontrado"})
+		}
+		if errors.Is(err, domain.ErrForbidden) {
+			return c.Status(fiber.StatusForbidden).JSON(dto.ErrorResponse{Code: "FORBIDDEN", Message: "acceso denegado al recurso"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{"purchase_order_id": id})
+}
+
+// ReceivePurchaseOrder godoc
+// @Summary      Recibir orden de compra
+// @Description  Registra movimientos IN por cada ítem de la orden de compra en una sola transacción.
+// @Tags         inventory
+// @Security     Bearer
+// @Accept       json
+// @Produce      json
+// @Param        id    path  string                       true  "purchase_order_id"
+// @Param        body  body  receivePurchaseOrderRequest  true  "warehouse_id"
+// @Success      200   {object}  map[string]string
+// @Failure      400   {object}  dto.ErrorResponse
+// @Failure      403   {object}  dto.ErrorResponse
+// @Failure      404   {object}  dto.ErrorResponse
+// @Failure      409   {object}  dto.ErrorResponse
+// @Failure      503   {object}  dto.ErrorResponse
+// @Failure      500   {object}  dto.ErrorResponse
+// @Router       /api/purchase-orders/{id}/receive [put]
+func (h *InventoryHandler) ReceivePurchaseOrder(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	userID := GetUserID(c)
+	if companyID == "" || userID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if h.purchaseOrder == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "purchase_order no configurado"})
+	}
+
+	purchaseOrderID := c.Params("id")
+	if purchaseOrderID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "id es requerido"})
+	}
+
+	var in receivePurchaseOrderRequest
+	if err := c.BodyParser(&in); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
+	}
+
+	err := h.purchaseOrder.Receive(c.Context(), companyID, userID, purchaseOrderID, in.WarehouseID)
+	if err != nil {
+		if errors.Is(err, domain.ErrInvalidInput) {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "datos inválidos"})
+		}
+		if errors.Is(err, domain.ErrNotFound) {
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "recurso no encontrado"})
+		}
+		if errors.Is(err, domain.ErrForbidden) {
+			return c.Status(fiber.StatusForbidden).JSON(dto.ErrorResponse{Code: "FORBIDDEN", Message: "acceso denegado al recurso"})
+		}
+		if errors.Is(err, domain.ErrConflict) {
+			return c.Status(fiber.StatusConflict).JSON(dto.ErrorResponse{Code: "CONFLICT", Message: "la orden ya fue recibida o no puede recibirse"})
+		}
+		if errors.Is(err, domain.ErrInsufficientStock) {
+			return c.Status(fiber.StatusConflict).JSON(dto.ErrorResponse{Code: "INSUFFICIENT_STOCK", Message: "stock insuficiente"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+
+	return c.JSON(fiber.Map{"message": "orden de compra recibida"})
 }
 
 // RegisterMovement godoc

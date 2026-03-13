@@ -144,10 +144,12 @@ func main() {
 	stockRepo := postgres.NewStockRepository(pool)
 	movementRepo := postgres.NewInventoryMovementRepository(pool)
 	reorderConfigRepo := postgres.NewReorderConfigRepository(pool)
+	purchaseOrderRepo := postgres.NewPurchaseOrderRepository(pool)
 	companyUC := usecase.NewCompanyUseCase(companyRepo, resolutionRepo)
 	warehouseUC := usecase.NewWarehouseUseCase(warehouseRepo)
 	productUC := usecase.NewProductUseCase(productRepo)
 	supplierUC := usecase.NewSupplierUseCase(supplierRepo)
+	purchaseOrderUC := inventory.NewPurchaseOrderUseCase(purchaseOrderRepo, supplierRepo, warehouseRepo, txRunner, registerMovementUC)
 	updateReorderConfigUC := inventory.NewUpdateReorderConfigUseCase(productRepo, reorderConfigRepo)
 	moduleSvc := usecase.NewModuleService(companyRepo)
 	analyticsUC := usecase.NewAnalyticsUseCase(analyticsRepo)
@@ -236,6 +238,7 @@ func main() {
 		GetStock:               getStockUC,
 		ListMovements:          listMovementsUC,
 		ReorderConfig:          updateReorderConfigUC,
+		PurchaseOrder:          purchaseOrderUC,
 		CustomerUC:             customerUC,
 		CreateInvoice:          createInvoiceUC,
 		ReturnInvoice:          createCreditNoteUC,

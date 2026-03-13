@@ -31,3 +31,10 @@ type StocktakeRepository interface {
 	UpdateCounts(ctx context.Context, stocktakeID string, items []entity.StocktakeItem) error
 	MarkClosed(ctx context.Context, stocktakeID string, closedAt time.Time) error
 }
+
+// PurchaseOrderRepository define persistencia para órdenes de compra.
+type PurchaseOrderRepository interface {
+	Create(ctx context.Context, po *entity.PurchaseOrder) error
+	GetByID(ctx context.Context, id string) (*entity.PurchaseOrder, error)
+	UpdateStatus(ctx context.Context, id, status string, updatedAt time.Time) error
+}

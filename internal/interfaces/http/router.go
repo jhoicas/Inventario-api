@@ -26,6 +26,7 @@ type RouterDeps struct {
 	ListMovements          ListMovementsUseCase
 	ReorderConfig          *inventory.UpdateReorderConfigUseCase
 	Stocktake              *inventory.StocktakeUseCase
+	PurchaseOrder          *inventory.PurchaseOrderUseCase
 	CustomerUC             *billing.CustomerUseCase
 	CreateInvoice          *billing.CreateInvoiceUseCase
 	ReturnInvoice          *billing.CreateCreditNoteUseCase
@@ -120,7 +121,17 @@ func Router(app *fiber.App, deps RouterDeps) {
 	usersGroup.Put("/:id", userHandler.Update)
 
 	// ── Inventario (módulo 'inventory' + roles) ────────────────────────────────
-	inventoryHandler := NewInventoryHandler(deps.RegisterMovement, deps.Replenishment, deps.GetStock, deps.ListMovements, deps.ReorderConfig, deps.Stocktake)
+	inventoryHandler := NewInventoryHandler(deps.RegisterMovement, deps.Replenishment, deps.GetStock, deps.ListMovements, deps.ReorderConfig, deps.Stocktake, deps.PurchaseOrder)
+	po := protected.Group("/purchase-orders", RequireModule(entity.ModuleInventory, deps.ModuleService))
+	po.Post("/",
+		RequireRole(entity.RoleAdmin, entity.RoleBodeguero),
+		inventoryHandler.CreatePurchaseOrder,
+	)
+	po.Put("/:id/receive",
+		RequireRole(entity.RoleAdmin, entity.RoleBodeguero),
+		inventoryHandler.ReceivePurchaseOrder,
+	)
+
 	prod.Put("/:id/reorder-config",
 		RequireModule(entity.ModuleInventory, deps.ModuleService),
 		RequireRole(entity.RoleAdmin, entity.RoleBodeguero),
