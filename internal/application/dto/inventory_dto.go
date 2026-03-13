@@ -6,6 +6,9 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+// AdjustmentReasons lista de razones válidas para movimientos de tipo ADJUSTMENT.
+var AdjustmentReasons = []string{"MERMA", "ROBO", "VENCIMIENTO", "CONTEO_FISICO", "DETERIORO", "OTRO"}
+
 // RegisterMovementRequest body para POST /api/inventory/movements.
 type RegisterMovementRequest struct {
 	ProductID       string           `json:"product_id"`
@@ -15,6 +18,9 @@ type RegisterMovementRequest struct {
 	Type            string           `json:"type"`
 	Quantity        decimal.Decimal  `json:"quantity"`
 	UnitCost        *decimal.Decimal `json:"unit_cost,omitempty"`
+	// AdjustmentReason es obligatorio cuando Type == "ADJUSTMENT".
+	// Valores válidos: MERMA | ROBO | VENCIMIENTO | CONTEO_FISICO | DETERIORO | OTRO
+	AdjustmentReason string `json:"adjustment_reason,omitempty"`
 }
 
 // ReplenishmentSuggestionDTO representa una sugerencia de reposición para un SKU
@@ -68,6 +74,7 @@ type MovementDTO struct {
 	Balance       decimal.Decimal `json:"balance"`
 	UnitCost      decimal.Decimal `json:"unit_cost"`
 	TotalCost     decimal.Decimal `json:"total_cost"`
+	Notes         string          `json:"notes,omitempty"`
 	Date          time.Time       `json:"date"`
 	CreatedAt     time.Time       `json:"created_at"`
 	CreatedBy     string          `json:"created_by,omitempty"`

@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -12,6 +13,7 @@ import (
 // RegisterMovementUseCase interfaz local para registrar movimientos de inventario.
 type RegisterMovementUseCase interface {
 	RegisterMovementFromRequest(ctx context.Context, companyID, userID string, in dto.RegisterMovementRequest) error
+	RegisterAdjustmentFromRequest(ctx context.Context, companyID, userID string, in dto.RegisterMovementRequest) (string, error)
 }
 
 // ReplenishmentUseCase interfaz local para generar listas de reposición.
@@ -82,6 +84,49 @@ func (h *InventoryHandler) RegisterMovement(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{"message": "movimiento registrado"})
+}
+
+// RegisterAdjustment godoc
+// @Summary      Registrar ajuste de inventario
+// @Description  Registra un movimiento de tipo ADJUSTMENT con razón obligatoria (MERMA|ROBO|VENCIMIENTO|CONTEO_FISICO|DETERIORO|OTRO).
+// @Tags         inventory
+// @Security     Bearer
+// @Accept       json
+// @Produce      json
+// @Param        body  body  dto.RegisterMovementRequest  true  "product_id, warehouse_id, quantity (±), adjustment_reason"
+// @Success      201   {object}  map[string]string  "{ \"movement_id\": \"uuid\" }"
+// @Failure      400   {object}  dto.ErrorResponse
+// @Failure      403   {object}  dto.ErrorResponse
+// @Failure      404   {object}  dto.ErrorResponse
+// @Failure      409   {object}  dto.ErrorResponse
+// @Router       /api/inventory/adjustments [post]
+func (h *InventoryHandler) RegisterAdjustment(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	userID := GetUserID(c)
+	if companyID == "" || userID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	var in dto.RegisterMovementRequest
+	if err := c.BodyParser(&in); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
+	}
+	movementID, err := h.uc.RegisterAdjustmentFromRequest(c.Context(), companyID, userID, in)
+	if err != nil {
+		if errors.Is(err, domain.ErrInvalidInput) {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: err.Error()})
+		}
+		if errors.Is(err, domain.ErrNotFound) {
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "producto o bodega no encontrado"})
+		}
+		if errors.Is(err, domain.ErrForbidden) {
+			return c.Status(fiber.StatusForbidden).JSON(dto.ErrorResponse{Code: "FORBIDDEN", Message: "acceso denegado al recurso"})
+		}
+		if errors.Is(err, domain.ErrInsufficientStock) {
+			return c.Status(fiber.StatusConflict).JSON(dto.ErrorResponse{Code: "INSUFFICIENT_STOCK", Message: "stock insuficiente"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{"movement_id": movementID})
 }
 
 // GetReplenishmentList godoc

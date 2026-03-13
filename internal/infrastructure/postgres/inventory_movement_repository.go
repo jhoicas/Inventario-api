@@ -31,16 +31,20 @@ func (r *InventoryMovementRepo) Create(movement *entity.InventoryMovement) error
 		movement.ID = uuid.New().String()
 	}
 	query := `
-		INSERT INTO inventory_movements (id, transaction_id, product_id, warehouse_id, type, quantity, unit_cost, total_cost, date, created_at, created_by)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`
+		INSERT INTO inventory_movements (id, transaction_id, product_id, warehouse_id, type, quantity, unit_cost, total_cost, notes, date, created_at, created_by)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`
 	createdBy := (*string)(nil)
 	if movement.CreatedBy != "" {
 		createdBy = &movement.CreatedBy
 	}
+	notes := (*string)(nil)
+	if movement.Notes != "" {
+		notes = &movement.Notes
+	}
 	_, err := r.q.Exec(context.Background(), query,
 		movement.ID, movement.TransactionID, movement.ProductID, movement.WarehouseID,
 		movement.Type, movement.Quantity, movement.UnitCost, movement.TotalCost,
-		movement.Date, movement.CreatedAt, createdBy,
+		notes, movement.Date, movement.CreatedAt, createdBy,
 	)
 	if err != nil {
 		return fmt.Errorf("create inventory movement: %w", err)
@@ -51,19 +55,23 @@ func (r *InventoryMovementRepo) Create(movement *entity.InventoryMovement) error
 // GetByID obtiene un movimiento por ID.
 func (r *InventoryMovementRepo) GetByID(id string) (*entity.InventoryMovement, error) {
 	query := `
-		SELECT id, transaction_id, product_id, warehouse_id, type, quantity, unit_cost, total_cost, date, created_at, created_by
+		SELECT id, transaction_id, product_id, warehouse_id, type, quantity, unit_cost, total_cost, notes, date, created_at, created_by
 		FROM inventory_movements WHERE id = $1`
 	var m entity.InventoryMovement
 	var createdBy *string
+	var notes *string
 	err := r.q.QueryRow(context.Background(), query, id).Scan(
 		&m.ID, &m.TransactionID, &m.ProductID, &m.WarehouseID, &m.Type,
-		&m.Quantity, &m.UnitCost, &m.TotalCost, &m.Date, &m.CreatedAt, &createdBy,
+		&m.Quantity, &m.UnitCost, &m.TotalCost, &notes, &m.Date, &m.CreatedAt, &createdBy,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("get movement: %w", err)
+	}
+	if notes != nil {
+		m.Notes = *notes
 	}
 	if createdBy != nil {
 		m.CreatedBy = *createdBy
@@ -128,7 +136,7 @@ func (r *InventoryMovementRepo) List(companyID string, f repository.MovementFilt
 
 	dataQuery := fmt.Sprintf(`
 		SELECT im.id, im.transaction_id, im.product_id, im.warehouse_id,
-		       im.type, im.quantity, im.unit_cost, im.total_cost, im.date, im.created_at, im.created_by
+		       im.type, im.quantity, im.unit_cost, im.total_cost, im.notes, im.date, im.created_at, im.created_by
 		FROM inventory_movements im
 		WHERE %s
 		ORDER BY im.date ASC, im.created_at ASC
@@ -145,12 +153,16 @@ func (r *InventoryMovementRepo) List(companyID string, f repository.MovementFilt
 	for rows.Next() {
 		var m entity.InventoryMovement
 		var createdBy *string
+		var notes *string
 		if err := rows.Scan(
 			&m.ID, &m.TransactionID, &m.ProductID, &m.WarehouseID,
 			&m.Type, &m.Quantity, &m.UnitCost, &m.TotalCost,
-			&m.Date, &m.CreatedAt, &createdBy,
+			&notes, &m.Date, &m.CreatedAt, &createdBy,
 		); err != nil {
 			return nil, 0, fmt.Errorf("scan movement list: %w", err)
+		}
+		if notes != nil {
+			m.Notes = *notes
 		}
 		if createdBy != nil {
 			m.CreatedBy = *createdBy

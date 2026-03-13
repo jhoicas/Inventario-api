@@ -5,11 +5,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/shopspring/decimal"
 	"github.com/jhoicas/Inventario-api/internal/domain"
 	"github.com/jhoicas/Inventario-api/internal/domain/entity"
 	"github.com/jhoicas/Inventario-api/internal/domain/inventory"
 	"github.com/jhoicas/Inventario-api/internal/domain/repository"
+	"github.com/shopspring/decimal"
 )
 
 // RegisterMovementUseCase registra movimientos de inventario de forma transaccional
@@ -46,6 +46,14 @@ type MovementInputDTO struct {
 	Type            string
 	Quantity        decimal.Decimal
 	UnitCost        *decimal.Decimal
+	// MovementID permite al caller pre-fijar el UUID del movimiento y recuperarlo después.
+	// Si está vacío, el repositorio lo genera automáticamente.
+	MovementID string
+	// AdjustmentReason se persiste en notes para movimientos ADJUSTMENT.
+	// Valores válidos: MERMA | ROBO | VENCIMIENTO | CONTEO_FISICO | DETERIORO | OTRO
+	AdjustmentReason string
+	// Notes propaga razón/observaciones al crear el registro en inventory_movements.
+	Notes string
 }
 
 // RegisterMovement inicia una transacción, bloquea la fila en inventory_stock (SELECT FOR UPDATE),
@@ -152,6 +160,7 @@ func (uc *RegisterMovementUseCase) doIN(
 	}
 	// Guarda registro en inventory_movements
 	mov := &entity.InventoryMovement{
+		ID:            input.MovementID,
 		TransactionID: txID,
 		ProductID:     input.ProductID,
 		WarehouseID:   input.WarehouseID,
@@ -159,6 +168,7 @@ func (uc *RegisterMovementUseCase) doIN(
 		Quantity:      input.Quantity,
 		UnitCost:      unitCost,
 		TotalCost:     input.Quantity.Mul(unitCost),
+		Notes:         input.Notes,
 		Date:          now,
 		CreatedAt:     now,
 		CreatedBy:     input.UserID,
@@ -271,6 +281,7 @@ func (uc *RegisterMovementUseCase) doOUT(
 	}
 	unitCost := product.Cost
 	mov := &entity.InventoryMovement{
+		ID:            input.MovementID,
 		TransactionID: txID,
 		ProductID:     input.ProductID,
 		WarehouseID:   input.WarehouseID,
@@ -278,6 +289,7 @@ func (uc *RegisterMovementUseCase) doOUT(
 		Quantity:      input.Quantity.Neg(),
 		UnitCost:      unitCost,
 		TotalCost:     input.Quantity.Neg().Mul(unitCost),
+		Notes:         input.Notes,
 		Date:          now,
 		CreatedAt:     now,
 		CreatedBy:     input.UserID,
@@ -286,6 +298,7 @@ func (uc *RegisterMovementUseCase) doOUT(
 }
 
 // doADJUSTMENT: positivo como IN, negativo como OUT.
+// Propaga AdjustmentReason como Notes para que se persista en inventory_movements.notes.
 func (uc *RegisterMovementUseCase) doADJUSTMENT(
 	movRepo repository.InventoryMovementRepository,
 	stockRepo repository.StockRepository,
@@ -294,6 +307,8 @@ func (uc *RegisterMovementUseCase) doADJUSTMENT(
 	input MovementInputDTO,
 	now time.Time, txID string,
 ) error {
+	// Guardar razón de ajuste en Notes para que se persista en inventory_movements.notes
+	input.Notes = input.AdjustmentReason
 	if input.Quantity.GreaterThan(decimal.Zero) {
 		unitCost := decimal.Zero
 		if input.UnitCost != nil {

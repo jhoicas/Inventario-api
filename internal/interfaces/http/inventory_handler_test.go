@@ -23,7 +23,8 @@ import (
 // ── Fakes para los casos de uso de inventario ──────────────────────────────────
 
 type fakeRegisterMovementUseCase struct {
-	registerFunc func(ctx context.Context, companyID, userID string, in dto.RegisterMovementRequest) error
+	registerFunc   func(ctx context.Context, companyID, userID string, in dto.RegisterMovementRequest) error
+	adjustmentFunc func(ctx context.Context, companyID, userID string, in dto.RegisterMovementRequest) (string, error)
 }
 
 func (f *fakeRegisterMovementUseCase) RegisterMovementFromRequest(ctx context.Context, companyID, userID string, in dto.RegisterMovementRequest) error {
@@ -31,6 +32,13 @@ func (f *fakeRegisterMovementUseCase) RegisterMovementFromRequest(ctx context.Co
 		return f.registerFunc(ctx, companyID, userID, in)
 	}
 	return errors.New("RegisterMovementFromRequest not configured")
+}
+
+func (f *fakeRegisterMovementUseCase) RegisterAdjustmentFromRequest(ctx context.Context, companyID, userID string, in dto.RegisterMovementRequest) (string, error) {
+	if f.adjustmentFunc != nil {
+		return f.adjustmentFunc(ctx, companyID, userID, in)
+	}
+	return "", errors.New("RegisterAdjustmentFromRequest not configured")
 }
 
 type fakeReplenishmentUseCase struct {

@@ -82,6 +82,7 @@ func (uc *GetMovementsUseCase) Execute(ctx context.Context, companyID string, f 
 			Balance:       balance,
 			UnitCost:      m.UnitCost,
 			TotalCost:     m.TotalCost,
+			Notes:         m.Notes,
 			Date:          m.Date,
 			CreatedAt:     m.CreatedAt,
 			CreatedBy:     m.CreatedBy,

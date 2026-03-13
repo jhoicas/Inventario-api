@@ -28,6 +28,7 @@ type InventoryMovement struct {
 	Quantity      decimal.Decimal // positivo entrada/ajuste+, negativo salida
 	UnitCost      decimal.Decimal
 	TotalCost     decimal.Decimal
+	Notes         string // razón de ajuste u observaciones libres
 	Date          time.Time
 	CreatedAt     time.Time
 	CreatedBy     string
