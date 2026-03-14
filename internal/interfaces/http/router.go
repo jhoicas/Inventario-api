@@ -260,6 +260,10 @@ func Router(app *fiber.App, deps RouterDeps) {
 		crmGroup.Put("/tickets/:id", h.UpdateTicket)
 		crmGroup.Post("/ai/campaign-copy", h.GenerateCampaignCopy)
 		crmGroup.Post("/ai/summarize-timeline", h.SummarizeTimeline)
+		// Opportunities (embudo de ventas)
+		crmGroup.Post("/opportunities", h.CreateOpportunity)
+		crmGroup.Put("/opportunities/:id/stage", h.UpdateOpportunityStage)
+		crmGroup.Get("/opportunities/funnel", h.GetOpportunityFunnel)
 	}
 
 	// ── IA (reservado para futuros usos; sugerencia de clasificación de productos deshabilitada — parametrización manual)

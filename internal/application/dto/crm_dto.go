@@ -16,10 +16,10 @@ type CreateTaskRequest struct {
 
 // UpdateTaskRequest body para actualizar una tarea.
 type UpdateTaskRequest struct {
-	Title       *string `json:"title"`
-	Description *string `json:"description"`
+	Title       *string    `json:"title"`
+	Description *string    `json:"description"`
 	DueAt       *time.Time `json:"due_at"`
-	Status      *string `json:"status"` // pending, done, cancelled
+	Status      *string    `json:"status"` // pending, done, cancelled
 }
 
 // CreateInteractionRequest body para registrar una interacción.
@@ -65,12 +65,12 @@ type UpdateBenefitRequest struct {
 
 // Profile360Response vista 360 del cliente (datos base + perfil CRM).
 type Profile360Response struct {
-	Customer   CustomerResponse `json:"customer"`
-	ProfileID  string          `json:"profile_id"`
-	CategoryID string          `json:"category_id"`
-	CategoryName string        `json:"category_name,omitempty"`
-	LTV        decimal.Decimal `json:"ltv"`
-	Benefits   []BenefitResponse `json:"benefits,omitempty"`
+	Customer     CustomerResponse  `json:"customer"`
+	ProfileID    string            `json:"profile_id"`
+	CategoryID   string            `json:"category_id"`
+	CategoryName string            `json:"category_name,omitempty"`
+	LTV          decimal.Decimal   `json:"ltv"`
+	Benefits     []BenefitResponse `json:"benefits,omitempty"`
 }
 
 // TaskResponse tarea en respuestas.
@@ -153,4 +153,40 @@ type TaskAlert struct {
 	ProductID   string `json:"product_id"`
 	ProductName string `json:"product_name"`
 	Reason      string `json:"reason"`
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Opportunities
+// ──────────────────────────────────────────────────────────────────────────────
+
+// CreateOpportunityRequest body para crear una oportunidad.
+type CreateOpportunityRequest struct {
+	CustomerID        string          `json:"customer_id"`
+	Title             string          `json:"title" validate:"required"`
+	Amount            decimal.Decimal `json:"amount"`
+	Probability       int             `json:"probability"` // 0–100
+	Stage             string          `json:"stage"`       // defaults to "prospecto"
+	ExpectedCloseDate *time.Time      `json:"expected_close_date"`
+}
+
+// OpportunityResponse oportunidad en respuestas.
+type OpportunityResponse struct {
+	ID                string          `json:"id"`
+	CompanyID         string          `json:"company_id"`
+	CustomerID        string          `json:"customer_id"`
+	Title             string          `json:"title"`
+	Amount            decimal.Decimal `json:"amount"`
+	Probability       int             `json:"probability"`
+	Stage             string          `json:"stage"`
+	ExpectedCloseDate *time.Time      `json:"expected_close_date,omitempty"`
+	CreatedBy         string          `json:"created_by"`
+	CreatedAt         time.Time       `json:"created_at"`
+	UpdatedAt         time.Time       `json:"updated_at"`
+}
+
+// FunnelStageDTO resumen de una etapa del embudo de ventas.
+type FunnelStageDTO struct {
+	Stage       string          `json:"stage"`
+	Count       int             `json:"count"`
+	TotalAmount decimal.Decimal `json:"total_amount"`
 }

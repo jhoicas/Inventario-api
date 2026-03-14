@@ -4,8 +4,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
 	"github.com/jhoicas/Inventario-api/internal/application/crm"
 	"github.com/jhoicas/Inventario-api/internal/application/dto"
 	"github.com/jhoicas/Inventario-api/internal/domain"
@@ -14,10 +14,11 @@ import (
 
 // CRMHandler maneja las peticiones HTTP del módulo CRM (protegido + RequireModule crm).
 type CRMHandler struct {
-	LoyaltyUC *crm.LoyaltyUseCase
-	TaskUC    *crm.TaskUseCase
-	PQRUC     *crm.PQRUseCase
-	AICRMUC   *crm.AICRMUseCase
+	LoyaltyUC       *crm.LoyaltyUseCase
+	TaskUC          *crm.TaskUseCase
+	PQRUC           *crm.PQRUseCase
+	AICRMUC         *crm.AICRMUseCase
+	OpportunityUC   *crm.OpportunityUseCase
 	InteractionRepo interface {
 		Create(interaction *entity.CRMInteraction) error
 		ListByCustomer(customerID string, limit, offset int) ([]*entity.CRMInteraction, error)
@@ -34,12 +35,14 @@ func NewCRMHandler(
 		Create(interaction *entity.CRMInteraction) error
 		ListByCustomer(customerID string, limit, offset int) ([]*entity.CRMInteraction, error)
 	},
+	opportunityUC *crm.OpportunityUseCase,
 ) *CRMHandler {
 	return &CRMHandler{
 		LoyaltyUC:       loyaltyUC,
 		TaskUC:          taskUC,
 		PQRUC:           pqrUC,
 		AICRMUC:         aiCRMUC,
+		OpportunityUC:   opportunityUC,
 		InteractionRepo: interactionRepo,
 	}
 }
@@ -567,6 +570,109 @@ func (h *CRMHandler) ListTickets(c *fiber.Ctx) error {
 	}
 
 	out, err := h.PQRUC.ListByCompany(c.Context(), companyID, search, status, sort, limit, offset)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.JSON(out)
+}
+
+// CreateOpportunity crea una oportunidad CRM.
+// @Summary      Crear oportunidad
+// @Description  Crea una oportunidad de negocio en el embudo de ventas
+// @Tags         crm
+// @Security     Bearer
+// @Accept       json
+// @Produce      json
+// @Param        body  body      dto.CreateOpportunityRequest  true  "Opportunity"
+// @Success      201   {object}  dto.OpportunityResponse
+// @Failure      400   {object}  dto.ErrorResponse
+// @Failure      503   {object}  dto.ErrorResponse
+// @Router       /api/crm/opportunities [post]
+func (h *CRMHandler) CreateOpportunity(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	userID := GetUserID(c)
+	if companyID == "" || userID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if h.OpportunityUC == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "opportunity no configurado"})
+	}
+	var in dto.CreateOpportunityRequest
+	if err := c.BodyParser(&in); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
+	}
+	out, err := h.OpportunityUC.Create(c.Context(), companyID, userID, in)
+	if err != nil {
+		if err == domain.ErrInvalidInput {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "title requerido"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.Status(fiber.StatusCreated).JSON(out)
+}
+
+// UpdateOpportunityStage actualiza la etapa de una oportunidad.
+// @Summary      Actualizar etapa de oportunidad
+// @Description  Cambia la etapa del embudo de ventas de una oportunidad
+// @Tags         crm
+// @Security     Bearer
+// @Accept       json
+// @Produce      json
+// @Param        id    path      string  true  "Opportunity ID"
+// @Param        body  body      object  true  "{\"stage\": \"prospecto|calificado|propuesta|negociacion|ganado|perdido\"}"
+// @Success      200   {object}  map[string]string
+// @Failure      400   {object}  dto.ErrorResponse
+// @Failure      403   {object}  dto.ErrorResponse
+// @Failure      404   {object}  dto.ErrorResponse
+// @Router       /api/crm/opportunities/{id}/stage [put]
+func (h *CRMHandler) UpdateOpportunityStage(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	id := c.Params("id")
+	if companyID == "" || id == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if h.OpportunityUC == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "opportunity no configurado"})
+	}
+	var body struct {
+		Stage string `json:"stage"`
+	}
+	if err := c.BodyParser(&body); err != nil || body.Stage == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "stage requerido"})
+	}
+	err := h.OpportunityUC.UpdateStage(c.Context(), companyID, id, body.Stage)
+	if err != nil {
+		switch err {
+		case domain.ErrInvalidInput:
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "stage inválido"})
+		case domain.ErrNotFound:
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "oportunidad no encontrada"})
+		case domain.ErrForbidden:
+			return c.Status(fiber.StatusForbidden).JSON(dto.ErrorResponse{Code: "FORBIDDEN", Message: "acceso denegado"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.JSON(fiber.Map{"status": "ok"})
+}
+
+// GetOpportunityFunnel retorna el embudo de ventas por etapa.
+// @Summary      Embudo de ventas
+// @Description  Retorna el conteo y monto total de oportunidades agrupadas por etapa
+// @Tags         crm
+// @Security     Bearer
+// @Produce      json
+// @Success      200   {array}   dto.FunnelStageDTO
+// @Failure      503   {object}  dto.ErrorResponse
+// @Router       /api/crm/opportunities/funnel [get]
+func (h *CRMHandler) GetOpportunityFunnel(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	if companyID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if h.OpportunityUC == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "opportunity no configurado"})
+	}
+	out, err := h.OpportunityUC.GetFunnel(c.Context(), companyID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}

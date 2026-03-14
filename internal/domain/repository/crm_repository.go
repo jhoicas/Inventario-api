@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"github.com/jhoicas/Inventario-api/internal/domain/entity"
 )
@@ -57,4 +58,12 @@ type CRMTicketRepository interface {
 	// status: filtra por status exacto.
 	// sort: orden por created_at ("asc" | "desc"). Cualquier otro valor usa "desc".
 	ListByCompany(companyID string, search string, status string, sort string, limit, offset int) ([]*entity.CRMTicket, error)
+}
+
+// CRMOpportunityRepository puerto de persistencia para oportunidades CRM.
+type CRMOpportunityRepository interface {
+	Create(ctx context.Context, opp *entity.Opportunity) error
+	GetByID(ctx context.Context, id string) (*entity.Opportunity, error)
+	UpdateStage(ctx context.Context, id string, stage entity.OpportunityStage, updatedAt time.Time) error
+	ListByCompany(ctx context.Context, companyID string) ([]*entity.Opportunity, error)
 }
