@@ -863,6 +863,83 @@ func (h *CRMHandler) GetCampaignMetrics(c *fiber.Ctx) error {
 	return c.JSON(out)
 }
 
+// EscalateTicket escala un ticket PQR y registra la razón.
+// @Summary      Escalar ticket PQR
+// @Description  Marca el ticket como ESCALATED, persiste la razón y genera una entrada de auditoría
+// @Tags         crm
+// @Security     Bearer
+// @Accept       json
+// @Produce      json
+// @Param        id    path      string  true  "Ticket ID"
+// @Param        body  body      object  true  "{\"reason\": \"...\"}"
+// @Success      200   {object}  map[string]string
+// @Failure      400   {object}  dto.ErrorResponse
+// @Failure      403   {object}  dto.ErrorResponse
+// @Failure      404   {object}  dto.ErrorResponse
+// @Router       /api/crm/tickets/{id}/escalate [put]
+func (h *CRMHandler) EscalateTicket(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	ticketID := c.Params("id")
+	if companyID == "" || ticketID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	var body struct {
+		Reason string `json:"reason"`
+	}
+	if err := c.BodyParser(&body); err != nil || body.Reason == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "reason requerido"})
+	}
+	if err := h.PQRUC.EscalateTicket(c.Context(), companyID, ticketID, body.Reason); err != nil {
+		switch err {
+		case domain.ErrInvalidInput:
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "parámetros inválidos"})
+		case domain.ErrNotFound:
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "ticket no encontrado"})
+		case domain.ErrForbidden:
+			return c.Status(fiber.StatusForbidden).JSON(dto.ErrorResponse{Code: "FORBIDDEN", Message: "acceso denegado"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.JSON(fiber.Map{"status": "escalated"})
+}
+
+// ListOverdueTickets lista los tickets en estado OVERDUE de la empresa.
+// @Summary      Tickets vencidos (OVERDUE)
+// @Description  Devuelve los tickets cuyo SLA ha expirado y fueron marcados como OVERDUE
+// @Tags         crm
+// @Security     Bearer
+// @Produce      json
+// @Success      200  {array}   dto.TicketResponse
+// @Failure      401  {object}  dto.ErrorResponse
+// @Router       /api/crm/tickets/overdue [get]
+func (h *CRMHandler) ListOverdueTickets(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	if companyID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	list, err := h.PQRUC.ListOverdue(c.Context(), companyID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	items := make([]dto.TicketResponse, 0, len(list))
+	for _, t := range list {
+		items = append(items, dto.TicketResponse{
+			ID:               t.ID,
+			CompanyID:        t.CompanyID,
+			CustomerID:       t.CustomerID,
+			Subject:          t.Subject,
+			Description:      t.Description,
+			Status:           t.Status,
+			Sentiment:        t.Sentiment,
+			EscalationReason: t.EscalationReason,
+			CreatedBy:        t.CreatedBy,
+			CreatedAt:        t.CreatedAt,
+			UpdatedAt:        t.UpdatedAt,
+		})
+	}
+	return c.JSON(items)
+}
+
 // SummarizeTimeline resume el timeline de interacciones de un cliente con IA.
 // @Summary      Resumir timeline de interacciones con IA
 // @Description  Resume el historial de interacciones de un cliente usando IA
