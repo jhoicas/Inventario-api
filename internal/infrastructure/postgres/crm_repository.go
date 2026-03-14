@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -402,9 +403,10 @@ func (r *CRMTicketRepo) Create(t *entity.CRMTicket) error {
 		t.ID = uuid.New().String()
 	}
 	_, err := r.q.Exec(context.Background(), `
-		INSERT INTO crm_tickets (id, company_id, customer_id, subject, description, status, sentiment, created_by, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-		t.ID, t.CompanyID, t.CustomerID, t.Subject, t.Description, t.Status, nullIfEmpty(t.Sentiment), nullIfEmpty(t.CreatedBy), t.CreatedAt, t.UpdatedAt,
+		INSERT INTO crm_tickets (id, company_id, customer_id, subject, description, status, sentiment, escalation_reason, created_by, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+		t.ID, t.CompanyID, t.CustomerID, t.Subject, t.Description, t.Status,
+		nullIfEmpty(t.Sentiment), nullIfEmpty(t.EscalationReason), nullIfEmpty(t.CreatedBy), t.CreatedAt, t.UpdatedAt,
 	)
 	return err
 }
@@ -413,9 +415,10 @@ func (r *CRMTicketRepo) GetByID(id string) (*entity.CRMTicket, error) {
 	var t entity.CRMTicket
 	var sentiment *string
 	var createdBy *string
+	var escalationReason *string
 	err := r.q.QueryRow(context.Background(), `
-		SELECT id, company_id, customer_id, subject, description, status, sentiment, created_by, created_at, updated_at FROM crm_tickets WHERE id = $1`, id,
-	).Scan(&t.ID, &t.CompanyID, &t.CustomerID, &t.Subject, &t.Description, &t.Status, &sentiment, &createdBy, &t.CreatedAt, &t.UpdatedAt)
+		SELECT id, company_id, customer_id, subject, description, status, sentiment, escalation_reason, created_by, created_at, updated_at FROM crm_tickets WHERE id = $1`, id,
+	).Scan(&t.ID, &t.CompanyID, &t.CustomerID, &t.Subject, &t.Description, &t.Status, &sentiment, &escalationReason, &createdBy, &t.CreatedAt, &t.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
@@ -425,6 +428,9 @@ func (r *CRMTicketRepo) GetByID(id string) (*entity.CRMTicket, error) {
 	if sentiment != nil {
 		t.Sentiment = *sentiment
 	}
+	if escalationReason != nil {
+		t.EscalationReason = *escalationReason
+	}
 	if createdBy != nil {
 		t.CreatedBy = *createdBy
 	}
@@ -433,15 +439,15 @@ func (r *CRMTicketRepo) GetByID(id string) (*entity.CRMTicket, error) {
 
 func (r *CRMTicketRepo) Update(t *entity.CRMTicket) error {
 	_, err := r.q.Exec(context.Background(), `
-		UPDATE crm_tickets SET subject = $2, description = $3, status = $4, sentiment = $5, updated_at = $6 WHERE id = $1`,
-		t.ID, t.Subject, t.Description, t.Status, nullIfEmpty(t.Sentiment), t.UpdatedAt,
+		UPDATE crm_tickets SET subject = $2, description = $3, status = $4, sentiment = $5, escalation_reason = $6, updated_at = $7 WHERE id = $1`,
+		t.ID, t.Subject, t.Description, t.Status, nullIfEmpty(t.Sentiment), nullIfEmpty(t.EscalationReason), t.UpdatedAt,
 	)
 	return err
 }
 
 func (r *CRMTicketRepo) ListByCompany(companyID string, search string, status string, sort string, limit, offset int) ([]*entity.CRMTicket, error) {
 	query := `
-		SELECT id, company_id, customer_id, subject, description, status, sentiment, created_by, created_at, updated_at
+		SELECT id, company_id, customer_id, subject, description, status, sentiment, escalation_reason, created_by, created_at, updated_at
 		FROM crm_tickets
 		WHERE company_id = $1`
 	args := []any{companyID}
@@ -480,7 +486,8 @@ func (r *CRMTicketRepo) ListByCompany(companyID string, search string, status st
 		var t entity.CRMTicket
 		var sentiment *string
 		var createdBy *string
-		if err := rows.Scan(&t.ID, &t.CompanyID, &t.CustomerID, &t.Subject, &t.Description, &t.Status, &sentiment, &createdBy, &t.CreatedAt, &t.UpdatedAt); err != nil {
+		var escalationReason *string
+		if err := rows.Scan(&t.ID, &t.CompanyID, &t.CustomerID, &t.Subject, &t.Description, &t.Status, &sentiment, &escalationReason, &createdBy, &t.CreatedAt, &t.UpdatedAt); err != nil {
 			return nil, err
 		}
 		if sentiment != nil {
@@ -489,7 +496,121 @@ func (r *CRMTicketRepo) ListByCompany(companyID string, search string, status st
 		if createdBy != nil {
 			t.CreatedBy = *createdBy
 		}
+		if escalationReason != nil {
+			t.EscalationReason = *escalationReason
+		}
 		list = append(list, &t)
+	}
+	return list, rows.Err()
+}
+
+// UpdateStatus actualiza únicamente el estado y el timestamp de un ticket.
+func (r *CRMTicketRepo) UpdateStatus(id, status string, updatedAt time.Time) error {
+	_, err := r.q.Exec(context.Background(),
+		`UPDATE crm_tickets SET status = $2, updated_at = $3 WHERE id = $1`,
+		id, status, updatedAt,
+	)
+	return err
+}
+
+// ListOverdue devuelve todos los tickets con estado OVERDUE de una empresa.
+func (r *CRMTicketRepo) ListOverdue(companyID string) ([]*entity.CRMTicket, error) {
+	rows, err := r.q.Query(context.Background(), `
+		SELECT id, company_id, customer_id, subject, description, status, sentiment, escalation_reason, created_by, created_at, updated_at
+		FROM crm_tickets
+		WHERE company_id = $1 AND status = 'OVERDUE'
+		ORDER BY created_at DESC`, companyID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []*entity.CRMTicket
+	for rows.Next() {
+		var t entity.CRMTicket
+		var sentiment, escalationReason, createdBy *string
+		if err := rows.Scan(&t.ID, &t.CompanyID, &t.CustomerID, &t.Subject, &t.Description, &t.Status, &sentiment, &escalationReason, &createdBy, &t.CreatedAt, &t.UpdatedAt); err != nil {
+			return nil, err
+		}
+		if sentiment != nil {
+			t.Sentiment = *sentiment
+		}
+		if escalationReason != nil {
+			t.EscalationReason = *escalationReason
+		}
+		if createdBy != nil {
+			t.CreatedBy = *createdBy
+		}
+		list = append(list, &t)
+	}
+	return list, rows.Err()
+}
+
+// MarkOverdueTickets marca como OVERDUE todos los tickets cuyo SLA ha expirado.
+func (r *CRMTicketRepo) MarkOverdueTickets(ctx context.Context) (int64, error) {
+	tag, err := r.q.Exec(ctx, `
+		UPDATE crm_tickets t
+		SET status = 'OVERDUE', updated_at = now()
+		FROM sla_config s
+		WHERE t.company_id = s.company_id
+		  AND t.status NOT IN ('closed', 'resolved', 'ESCALATED', 'OVERDUE')
+		  AND now() > t.created_at + (s.max_hours * interval '1 hour')`)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
+}
+
+// ---------------------------------------------------------------------------
+// SLAConfigRepo
+// ---------------------------------------------------------------------------
+
+// SLAConfigRepo implementación de SLAConfigRepository.
+type SLAConfigRepo struct{ q Querier }
+
+func NewSLAConfigRepository(q Querier) *SLAConfigRepo { return &SLAConfigRepo{q: q} }
+
+func (r *SLAConfigRepo) Upsert(ctx context.Context, cfg *entity.SLAConfig) error {
+	_, err := r.q.Exec(ctx, `
+		INSERT INTO sla_config (company_id, ticket_type, max_hours, updated_at)
+		VALUES ($1, $2, $3, now())
+		ON CONFLICT (company_id, ticket_type)
+		DO UPDATE SET max_hours = EXCLUDED.max_hours, updated_at = now()`,
+		cfg.CompanyID, cfg.TicketType, cfg.MaxHours,
+	)
+	return err
+}
+
+func (r *SLAConfigRepo) GetByCompanyAndType(ctx context.Context, companyID, ticketType string) (*entity.SLAConfig, error) {
+	var cfg entity.SLAConfig
+	err := r.q.QueryRow(ctx,
+		`SELECT company_id, ticket_type, max_hours FROM sla_config WHERE company_id = $1 AND ticket_type = $2`,
+		companyID, ticketType,
+	).Scan(&cfg.CompanyID, &cfg.TicketType, &cfg.MaxHours)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &cfg, nil
+}
+
+func (r *SLAConfigRepo) ListByCompany(ctx context.Context, companyID string) ([]*entity.SLAConfig, error) {
+	rows, err := r.q.Query(ctx,
+		`SELECT company_id, ticket_type, max_hours FROM sla_config WHERE company_id = $1 ORDER BY ticket_type`,
+		companyID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []*entity.SLAConfig
+	for rows.Next() {
+		var cfg entity.SLAConfig
+		if err := rows.Scan(&cfg.CompanyID, &cfg.TicketType, &cfg.MaxHours); err != nil {
+			return nil, err
+		}
+		list = append(list, &cfg)
 	}
 	return list, rows.Err()
 }

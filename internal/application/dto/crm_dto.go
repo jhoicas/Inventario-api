@@ -108,16 +108,17 @@ type InteractionResponse struct {
 
 // TicketResponse ticket PQR en respuestas.
 type TicketResponse struct {
-	ID          string    `json:"id"`
-	CompanyID   string    `json:"company_id"`
-	CustomerID  string    `json:"customer_id"`
-	Subject     string    `json:"subject"`
-	Description string    `json:"description"`
-	Status      string    `json:"status"`
-	Sentiment   string    `json:"sentiment"`
-	CreatedBy   string    `json:"created_by"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID               string    `json:"id"`
+	CompanyID        string    `json:"company_id"`
+	CustomerID       string    `json:"customer_id"`
+	Subject          string    `json:"subject"`
+	Description      string    `json:"description"`
+	Status           string    `json:"status"`
+	Sentiment        string    `json:"sentiment"`
+	EscalationReason string    `json:"escalation_reason,omitempty"`
+	CreatedBy        string    `json:"created_by"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
 }
 
 // TicketResponseList lista paginada de tickets.

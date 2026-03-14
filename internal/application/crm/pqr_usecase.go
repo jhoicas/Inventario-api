@@ -152,17 +152,66 @@ func (uc *PQRUseCase) ListByCompany(ctx context.Context, companyID string, searc
 	return &dto.TicketResponseList{Items: items, Limit: limit, Offset: offset}, nil
 }
 
+// EscalateTicket marca un ticket como ESCALATED y registra la razón.
+func (uc *PQRUseCase) EscalateTicket(ctx context.Context, companyID, ticketID, reason string) error {
+	if ticketID == "" || reason == "" {
+		return domain.ErrInvalidInput
+	}
+	ticket, err := uc.ticketRepo.GetByID(ticketID)
+	if err != nil {
+		return err
+	}
+	if ticket == nil {
+		return domain.ErrNotFound
+	}
+	if ticket.CompanyID != companyID {
+		return domain.ErrForbidden
+	}
+	now := time.Now()
+	ticket.Status = entity.TicketStatusEscalated
+	ticket.EscalationReason = reason
+	ticket.UpdatedAt = now
+	if err := uc.ticketRepo.Update(ticket); err != nil {
+		return err
+	}
+	if uc.interactionRepo != nil {
+		m := &entity.CRMInteraction{
+			ID:         fmt.Sprintf("%s-esc", ticket.ID), // uuid collision-safe
+			CompanyID:  companyID,
+			CustomerID: ticket.CustomerID,
+			Type:       entity.InteractionTypeOther,
+			Subject:    fmt.Sprintf("Ticket PQR escalado (%s)", ticket.ID),
+			Body:       fmt.Sprintf("Razón de escalamiento: %s", reason),
+			CreatedBy:  "",
+			CreatedAt:  now,
+		}
+		if idErr := uc.interactionRepo.Create(m); idErr != nil {
+			return idErr
+		}
+	}
+	return nil
+}
+
+// ListOverdue lista los tickets en estado OVERDUE de una empresa.
+func (uc *PQRUseCase) ListOverdue(ctx context.Context, companyID string) ([]*entity.CRMTicket, error) {
+	if companyID == "" {
+		return nil, domain.ErrInvalidInput
+	}
+	return uc.ticketRepo.ListOverdue(companyID)
+}
+
 func toTicketResponse(t *entity.CRMTicket) *dto.TicketResponse {
 	return &dto.TicketResponse{
-		ID:          t.ID,
-		CompanyID:   t.CompanyID,
-		CustomerID:  t.CustomerID,
-		Subject:     t.Subject,
-		Description: t.Description,
-		Status:      t.Status,
-		Sentiment:   t.Sentiment,
-		CreatedBy:   t.CreatedBy,
-		CreatedAt:   t.CreatedAt,
-		UpdatedAt:   t.UpdatedAt,
+		ID:               t.ID,
+		CompanyID:        t.CompanyID,
+		CustomerID:       t.CustomerID,
+		Subject:          t.Subject,
+		Description:      t.Description,
+		Status:           t.Status,
+		Sentiment:        t.Sentiment,
+		EscalationReason: t.EscalationReason,
+		CreatedBy:        t.CreatedBy,
+		CreatedAt:        t.CreatedAt,
+		UpdatedAt:        t.UpdatedAt,
 	}
 }

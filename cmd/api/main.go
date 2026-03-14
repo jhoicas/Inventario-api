@@ -169,6 +169,10 @@ func main() {
 	crmInteractionRepo := postgres.NewCRMInteractionRepository(pool)
 	crmTaskRepo := postgres.NewCRMTaskRepository(pool)
 	crmTicketRepo := postgres.NewCRMTicketRepository(pool)
+	slaConfigRepo := postgres.NewSLAConfigRepository(pool)
+	_ = slaConfigRepo // disponible para futuros endpoints
+	slaWorker := crm.NewSLAWorker(crmTicketRepo, 24*time.Hour)
+	go slaWorker.Start(workerCtx)
 	loyaltyUC := crm.NewLoyaltyUseCase(crmProfileRepo, customerRepo, crmCategoryRepo, crmBenefitRepo)
 	taskUC := crm.NewTaskUseCase(crmTaskRepo)
 	aiCRMUC := crm.NewAICRMUseCase(anthropicSvc)

@@ -58,6 +58,23 @@ type CRMTicketRepository interface {
 	// status: filtra por status exacto.
 	// sort: orden por created_at ("asc" | "desc"). Cualquier otro valor usa "desc".
 	ListByCompany(companyID string, search string, status string, sort string, limit, offset int) ([]*entity.CRMTicket, error)
+	// UpdateStatus actualiza solo el status y updated_at de un ticket.
+	UpdateStatus(id, status string, updatedAt time.Time) error
+	// ListOverdue retorna los tickets en estado OVERDUE de una empresa.
+	ListOverdue(companyID string) ([]*entity.CRMTicket, error)
+	// MarkOverdueTickets marca como OVERDUE todos los tickets activos cuyo
+	// created_at + sla_config.max_hours ha expirado. Devuelve el total marcado.
+	MarkOverdueTickets(ctx context.Context) (int64, error)
+}
+
+// SLAConfigRepository puerto para configuración de SLA por empresa y tipo de ticket.
+type SLAConfigRepository interface {
+	// Upsert inserta o actualiza la configuración SLA.
+	Upsert(ctx context.Context, cfg *entity.SLAConfig) error
+	// GetByCompanyAndType obtiene la configuración SLA para una empresa y tipo.
+	GetByCompanyAndType(ctx context.Context, companyID, ticketType string) (*entity.SLAConfig, error)
+	// ListByCompany lista todas las configuraciones SLA de una empresa.
+	ListByCompany(ctx context.Context, companyID string) ([]*entity.SLAConfig, error)
 }
 
 // CRMOpportunityRepository puerto de persistencia para oportunidades CRM.
