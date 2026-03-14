@@ -21,6 +21,7 @@ var _ repository.CRMProfileRepository = (*CRMProfileRepo)(nil)
 var _ repository.CRMInteractionRepository = (*CRMInteractionRepo)(nil)
 var _ repository.CRMTaskRepository = (*CRMTaskRepo)(nil)
 var _ repository.CRMTicketRepository = (*CRMTicketRepo)(nil)
+var _ repository.CRMCampaignRepository = (*CRMCampaignRepo)(nil)
 
 // CRMCategoryRepo implementación de CRMCategoryRepository.
 type CRMCategoryRepo struct{ q Querier }
@@ -672,4 +673,75 @@ func (r *SLAConfigRepo) ListByCompany(ctx context.Context, companyID string) ([]
 		list = append(list, &cfg)
 	}
 	return list, rows.Err()
+}
+
+// ---------------------------------------------------------------------------
+// CRMCampaignRepo
+// ---------------------------------------------------------------------------
+
+// CRMCampaignRepo implementación de CRMCampaignRepository.
+type CRMCampaignRepo struct{ q Querier }
+
+func NewCRMCampaignRepository(q Querier) *CRMCampaignRepo { return &CRMCampaignRepo{q: q} }
+
+func (r *CRMCampaignRepo) Create(ctx context.Context, c *entity.Campaign) error {
+	if c.ID == "" {
+		c.ID = uuid.New().String()
+	}
+	_, err := r.q.Exec(ctx, `
+		INSERT INTO crm_campaigns (id, company_id, name, description, status, scheduled_at, created_by, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+		c.ID, c.CompanyID, c.Name, nullIfEmpty(c.Description), string(c.Status), c.ScheduledAt, nullIfEmpty(c.CreatedBy), c.CreatedAt, c.UpdatedAt,
+	)
+	if err != nil {
+		return err
+	}
+	_, err = r.q.Exec(ctx, `
+		INSERT INTO crm_campaign_metrics (campaign_id, sent, opened, clicked, converted, revenue, updated_at)
+		VALUES ($1, 0, 0, 0, 0, 0, now())
+		ON CONFLICT (campaign_id) DO NOTHING`, c.ID,
+	)
+	return err
+}
+
+func (r *CRMCampaignRepo) GetByID(ctx context.Context, id string) (*entity.Campaign, error) {
+	var c entity.Campaign
+	var description, createdBy *string
+	err := r.q.QueryRow(ctx, `
+		SELECT id, company_id, name, description, status, scheduled_at, created_by, created_at, updated_at
+		FROM crm_campaigns WHERE id = $1`, id,
+	).Scan(&c.ID, &c.CompanyID, &c.Name, &description, &c.Status, &c.ScheduledAt, &createdBy, &c.CreatedAt, &c.UpdatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if description != nil {
+		c.Description = *description
+	}
+	if createdBy != nil {
+		c.CreatedBy = *createdBy
+	}
+	return &c, nil
+}
+
+func (r *CRMCampaignRepo) GetMetrics(ctx context.Context, campaignID string) (*entity.CampaignMetrics, error) {
+	var m entity.CampaignMetrics
+	var revenue pgtype.Numeric
+	err := r.q.QueryRow(ctx, `
+		SELECT campaign_id, sent, opened, clicked, converted, revenue
+		FROM crm_campaign_metrics
+		WHERE campaign_id = $1`, campaignID,
+	).Scan(&m.CampaignID, &m.Sent, &m.Opened, &m.Clicked, &m.Converted, &revenue)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if revenue.Valid && revenue.Int != nil {
+		m.Revenue = decimal.NewFromBigInt(revenue.Int, revenue.Exp)
+	}
+	return &m, nil
 }
