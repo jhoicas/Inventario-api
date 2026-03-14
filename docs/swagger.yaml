@@ -1181,6 +1181,17 @@ definitions:
     required:
     - name
     type: object
+  dto.UpdateCustomerRequest:
+    properties:
+      email:
+        type: string
+      name:
+        type: string
+      phone:
+        type: string
+      tax_id:
+        type: string
+    type: object
   dto.UpdateProductRequest:
     properties:
       attributes:
@@ -2189,6 +2200,39 @@ paths:
       tags:
       - crm
   /api/crm/opportunities:
+    get:
+      description: Lista las oportunidades CRM de la empresa con paginación
+      parameters:
+      - description: Limit
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/dto.OpportunityResponse'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Listar oportunidades
+      tags:
+      - crm
     post:
       consumes:
       - application/json
@@ -2677,6 +2721,59 @@ paths:
       security:
       - Bearer: []
       summary: Crear cliente
+      tags:
+      - customers
+  /api/customers/{id}:
+    put:
+      consumes:
+      - application/json
+      description: Actualiza un cliente asociado a la empresa autenticada
+      parameters:
+      - description: Customer ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Datos del cliente
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateCustomerRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.CustomerResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Actualizar cliente
       tags:
       - customers
   /api/customers/lookup:

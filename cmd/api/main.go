@@ -170,6 +170,7 @@ func main() {
 	crmTaskRepo := postgres.NewCRMTaskRepository(pool)
 	crmTicketRepo := postgres.NewCRMTicketRepository(pool)
 	crmCampaignRepo := postgres.NewCRMCampaignRepository(pool)
+	crmOpportunityRepo := postgres.NewCRMOpportunityRepository(pool)
 	slaConfigRepo := postgres.NewSLAConfigRepository(pool)
 	_ = slaConfigRepo // disponible para futuros endpoints
 	slaWorker := crm.NewSLAWorker(crmTicketRepo, 24*time.Hour)
@@ -179,7 +180,8 @@ func main() {
 	aiCRMUC := crm.NewAICRMUseCase(anthropicSvc)
 	pqrUC := crm.NewPQRUseCase(crmTicketRepo, customerRepo, aiCRMUC, crmInteractionRepo)
 	campaignUC := crm.NewCampaignUseCase(crmCampaignRepo)
-	crmHandler := httpRouter.NewCRMHandler(loyaltyUC, taskUC, pqrUC, aiCRMUC, crmInteractionRepo, nil, invoiceRepo, campaignUC)
+	opportunityUC := crm.NewOpportunityUseCase(crmOpportunityRepo)
+	crmHandler := httpRouter.NewCRMHandler(loyaltyUC, taskUC, pqrUC, aiCRMUC, crmInteractionRepo, opportunityUC, invoiceRepo, campaignUC)
 
 	// PDF: representación gráfica de la factura electrónica DIAN
 	pdfGenerator := infrapdf.NewMarotoPDFGenerator()

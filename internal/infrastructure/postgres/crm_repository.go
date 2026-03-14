@@ -22,6 +22,7 @@ var _ repository.CRMInteractionRepository = (*CRMInteractionRepo)(nil)
 var _ repository.CRMTaskRepository = (*CRMTaskRepo)(nil)
 var _ repository.CRMTicketRepository = (*CRMTicketRepo)(nil)
 var _ repository.CRMCampaignRepository = (*CRMCampaignRepo)(nil)
+var _ repository.CRMOpportunityRepository = (*CRMOpportunityRepo)(nil)
 
 // CRMCategoryRepo implementación de CRMCategoryRepository.
 type CRMCategoryRepo struct{ q Querier }
@@ -744,4 +745,120 @@ func (r *CRMCampaignRepo) GetMetrics(ctx context.Context, campaignID string) (*e
 		m.Revenue = decimal.NewFromBigInt(revenue.Int, revenue.Exp)
 	}
 	return &m, nil
+}
+
+// ---------------------------------------------------------------------------
+// CRMOpportunityRepo
+// ---------------------------------------------------------------------------
+
+// CRMOpportunityRepo implementación de CRMOpportunityRepository.
+type CRMOpportunityRepo struct{ q Querier }
+
+func NewCRMOpportunityRepository(q Querier) *CRMOpportunityRepo { return &CRMOpportunityRepo{q: q} }
+
+func (r *CRMOpportunityRepo) Create(ctx context.Context, opp *entity.Opportunity) error {
+	if opp.ID == "" {
+		opp.ID = uuid.New().String()
+	}
+	_, err := r.q.Exec(ctx, `
+		INSERT INTO crm_opportunities (id, company_id, customer_id, title, amount, probability, stage, expected_close_date, created_by, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+		opp.ID,
+		opp.CompanyID,
+		nullIfEmpty(opp.CustomerID),
+		opp.Title,
+		opp.Amount,
+		opp.Probability,
+		string(opp.Stage),
+		nullIfZeroTime(opp.ExpectedCloseDate),
+		nullIfEmpty(opp.CreatedBy),
+		opp.CreatedAt,
+		opp.UpdatedAt,
+	)
+	return err
+}
+
+func (r *CRMOpportunityRepo) GetByID(ctx context.Context, id string) (*entity.Opportunity, error) {
+	var o entity.Opportunity
+	var customerID, createdBy *string
+	var stage string
+	var amount pgtype.Numeric
+	var expectedCloseDate *time.Time
+	err := r.q.QueryRow(ctx, `
+		SELECT id, company_id, customer_id, title, amount, probability, stage, expected_close_date, created_by, created_at, updated_at
+		FROM crm_opportunities WHERE id = $1`, id,
+	).Scan(&o.ID, &o.CompanyID, &customerID, &o.Title, &amount, &o.Probability, &stage, &expectedCloseDate, &createdBy, &o.CreatedAt, &o.UpdatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if amount.Valid && amount.Int != nil {
+		o.Amount = decimal.NewFromBigInt(amount.Int, amount.Exp)
+	}
+	if customerID != nil {
+		o.CustomerID = *customerID
+	}
+	if createdBy != nil {
+		o.CreatedBy = *createdBy
+	}
+	o.Stage = entity.OpportunityStage(stage)
+	if expectedCloseDate != nil {
+		o.ExpectedCloseDate = *expectedCloseDate
+	}
+	return &o, nil
+}
+
+func (r *CRMOpportunityRepo) UpdateStage(ctx context.Context, id string, stage entity.OpportunityStage, updatedAt time.Time) error {
+	_, err := r.q.Exec(ctx,
+		`UPDATE crm_opportunities SET stage = $2, updated_at = $3 WHERE id = $1`,
+		id, string(stage), updatedAt,
+	)
+	return err
+}
+
+func (r *CRMOpportunityRepo) ListByCompany(ctx context.Context, companyID string) ([]*entity.Opportunity, error) {
+	rows, err := r.q.Query(ctx, `
+		SELECT id, company_id, customer_id, title, amount, probability, stage, expected_close_date, created_by, created_at, updated_at
+		FROM crm_opportunities
+		WHERE company_id = $1
+		ORDER BY created_at DESC`, companyID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	list := make([]*entity.Opportunity, 0)
+	for rows.Next() {
+		var o entity.Opportunity
+		var customerID, createdBy *string
+		var stage string
+		var amount pgtype.Numeric
+		var expectedCloseDate *time.Time
+		if err := rows.Scan(&o.ID, &o.CompanyID, &customerID, &o.Title, &amount, &o.Probability, &stage, &expectedCloseDate, &createdBy, &o.CreatedAt, &o.UpdatedAt); err != nil {
+			return nil, err
+		}
+		if amount.Valid && amount.Int != nil {
+			o.Amount = decimal.NewFromBigInt(amount.Int, amount.Exp)
+		}
+		if customerID != nil {
+			o.CustomerID = *customerID
+		}
+		if createdBy != nil {
+			o.CreatedBy = *createdBy
+		}
+		o.Stage = entity.OpportunityStage(stage)
+		if expectedCloseDate != nil {
+			o.ExpectedCloseDate = *expectedCloseDate
+		}
+		list = append(list, &o)
+	}
+	return list, rows.Err()
+}
+
+func nullIfZeroTime(t time.Time) *time.Time {
+	if t.IsZero() {
+		return nil
+	}
+	return &t
 }

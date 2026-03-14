@@ -823,6 +823,35 @@ func (h *CRMHandler) CreateOpportunity(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(out)
 }
 
+// ListOpportunities lista oportunidades de la empresa.
+// @Summary      Listar oportunidades
+// @Description  Lista las oportunidades CRM de la empresa con paginación
+// @Tags         crm
+// @Security     Bearer
+// @Produce      json
+// @Param        limit   query     int    false "Limit"
+// @Param        offset  query     int    false "Offset"
+// @Success      200     {array}   dto.OpportunityResponse
+// @Failure      401     {object}  dto.ErrorResponse
+// @Failure      503     {object}  dto.ErrorResponse
+// @Router       /api/crm/opportunities [get]
+func (h *CRMHandler) ListOpportunities(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	if companyID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if h.OpportunityUC == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "opportunity no configurado"})
+	}
+	limit, _ := strconv.Atoi(c.Query("limit", "20"))
+	offset, _ := strconv.Atoi(c.Query("offset", "0"))
+	out, err := h.OpportunityUC.ListByCompany(c.Context(), companyID, limit, offset)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.JSON(out)
+}
+
 // UpdateOpportunityStage actualiza la etapa de una oportunidad.
 // @Summary      Actualizar etapa de oportunidad
 // @Description  Cambia la etapa del embudo de ventas de una oportunidad

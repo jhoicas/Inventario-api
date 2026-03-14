@@ -269,6 +269,7 @@ func Router(app *fiber.App, deps RouterDeps) {
 		crmGroup.Post("/ai/summarize-timeline", h.SummarizeTimeline)
 		// Opportunities (embudo de ventas)
 		crmGroup.Post("/opportunities", h.CreateOpportunity)
+		crmGroup.Get("/opportunities", h.ListOpportunities)
 		crmGroup.Put("/opportunities/:id/stage", h.UpdateOpportunityStage)
 		crmGroup.Get("/opportunities/funnel", h.GetOpportunityFunnel)
 		// Campaigns
