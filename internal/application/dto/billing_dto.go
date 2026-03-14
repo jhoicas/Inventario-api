@@ -20,6 +20,14 @@ type CustomerResponse struct {
 	Phone     string `json:"phone,omitempty"`
 }
 
+// UpdateCustomerRequest body para actualizar un cliente.
+type UpdateCustomerRequest struct {
+	Name  string `json:"name"`
+	TaxID string `json:"tax_id"`
+	Email string `json:"email"`
+	Phone string `json:"phone"`
+}
+
 // CreateInvoiceRequest body para POST /api/invoices.
 // WarehouseID: bodega de la cual se descuenta el inventario.
 type CreateInvoiceRequest struct {

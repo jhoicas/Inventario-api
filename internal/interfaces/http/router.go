@@ -104,6 +104,7 @@ func Router(app *fiber.App, deps RouterDeps) {
 	cust.Get("/", customerHandler.List)
 	// Creación de clientes: admin y vendedor
 	cust.Post("/", RequireRole(entity.RoleAdmin, entity.RoleVendedor), customerHandler.Create)
+	cust.Put("/:id", RequireRole(entity.RoleAdmin, entity.RoleVendedor), customerHandler.Update)
 	// Consulta DIAN por documento: JWT + RequireModule(billing) + DIANConfigMiddleware
 	if deps.CustomerLookup != nil && deps.CompanyRepo != nil {
 		cust.Get("/lookup",

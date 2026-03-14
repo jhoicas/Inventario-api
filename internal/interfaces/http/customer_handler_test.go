@@ -21,6 +21,7 @@ import (
 type fakeCustomerUseCase struct {
 	createFunc func(companyID string, in dto.CreateCustomerRequest) (*dto.CustomerResponse, error)
 	listFunc   func(companyID string, search string, limit, offset int) ([]*dto.CustomerResponse, error)
+	updateFunc func(companyID, customerID string, in dto.UpdateCustomerRequest) (*dto.CustomerResponse, error)
 }
 
 func (f *fakeCustomerUseCase) Create(companyID string, in dto.CreateCustomerRequest) (*dto.CustomerResponse, error) {
@@ -35,6 +36,13 @@ func (f *fakeCustomerUseCase) List(companyID string, search string, limit, offse
 		return f.listFunc(companyID, search, limit, offset)
 	}
 	return nil, errors.New("list not configured")
+}
+
+func (f *fakeCustomerUseCase) Update(companyID, customerID string, in dto.UpdateCustomerRequest) (*dto.CustomerResponse, error) {
+	if f.updateFunc != nil {
+		return f.updateFunc(companyID, customerID, in)
+	}
+	return nil, errors.New("update not configured")
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -68,6 +76,15 @@ func validCustomerResponse() *dto.CustomerResponse {
 		TaxID:     "123456789-0",
 		Email:     "cliente@example.com",
 		Phone:     "+57 3000000000",
+	}
+}
+
+func validUpdateCustomerRequest() dto.UpdateCustomerRequest {
+	return dto.UpdateCustomerRequest{
+		Name:  "Droguerías La Rebaja (B2B)",
+		TaxID: "890300111-1",
+		Email: "compras@larebaja.com",
+		Phone: "3001112232",
 	}
 }
 
@@ -329,3 +346,113 @@ func TestCustomerHandler_List(t *testing.T) {
 	}
 }
 
+func TestCustomerHandler_Update(t *testing.T) {
+	tests := []struct {
+		name           string
+		body           interface{}
+		companyID      string
+		customerID     string
+		mockSetup      func() *fakeCustomerUseCase
+		expectedStatus int
+	}{
+		{
+			name:       "Success",
+			body:       validUpdateCustomerRequest(),
+			companyID:  customerTestCompanyID,
+			customerID: "cust-001",
+			mockSetup: func() *fakeCustomerUseCase {
+				return &fakeCustomerUseCase{updateFunc: func(_ string, _ string, _ dto.UpdateCustomerRequest) (*dto.CustomerResponse, error) {
+					return &dto.CustomerResponse{ID: "cust-001", CompanyID: customerTestCompanyID, Name: "Droguerías La Rebaja (B2B)", TaxID: "890300111-1", Email: "compras@larebaja.com", Phone: "3001112232"}, nil
+				}}
+			},
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name:           "Unauthorized",
+			body:           validUpdateCustomerRequest(),
+			companyID:      "",
+			customerID:     "cust-001",
+			mockSetup:      func() *fakeCustomerUseCase { return &fakeCustomerUseCase{} },
+			expectedStatus: http.StatusUnauthorized,
+		},
+		{
+			name:       "Validation",
+			body:       dto.UpdateCustomerRequest{},
+			companyID:  customerTestCompanyID,
+			customerID: "cust-001",
+			mockSetup: func() *fakeCustomerUseCase {
+				return &fakeCustomerUseCase{updateFunc: func(_, _ string, _ dto.UpdateCustomerRequest) (*dto.CustomerResponse, error) {
+					return nil, domain.ErrInvalidInput
+				}}
+			},
+			expectedStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "NotFound",
+			body:       validUpdateCustomerRequest(),
+			companyID:  customerTestCompanyID,
+			customerID: "missing",
+			mockSetup: func() *fakeCustomerUseCase {
+				return &fakeCustomerUseCase{updateFunc: func(_, _ string, _ dto.UpdateCustomerRequest) (*dto.CustomerResponse, error) {
+					return nil, domain.ErrNotFound
+				}}
+			},
+			expectedStatus: http.StatusNotFound,
+		},
+		{
+			name:       "Duplicate",
+			body:       validUpdateCustomerRequest(),
+			companyID:  customerTestCompanyID,
+			customerID: "cust-001",
+			mockSetup: func() *fakeCustomerUseCase {
+				return &fakeCustomerUseCase{updateFunc: func(_, _ string, _ dto.UpdateCustomerRequest) (*dto.CustomerResponse, error) {
+					return nil, domain.ErrDuplicate
+				}}
+			},
+			expectedStatus: http.StatusConflict,
+		},
+		{
+			name:       "Forbidden",
+			body:       validUpdateCustomerRequest(),
+			companyID:  customerTestCompanyID,
+			customerID: "cust-001",
+			mockSetup: func() *fakeCustomerUseCase {
+				return &fakeCustomerUseCase{updateFunc: func(_, _ string, _ dto.UpdateCustomerRequest) (*dto.CustomerResponse, error) {
+					return nil, domain.ErrForbidden
+				}}
+			},
+			expectedStatus: http.StatusForbidden,
+		},
+		{
+			name:           "InvalidBody",
+			body:           "not valid json",
+			companyID:      customerTestCompanyID,
+			customerID:     "cust-001",
+			mockSetup:      func() *fakeCustomerUseCase { return &fakeCustomerUseCase{} },
+			expectedStatus: http.StatusBadRequest,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fakeUC := tt.mockSetup()
+			handler := NewCustomerHandler(fakeUC)
+			app := fiber.New(fiber.Config{DisableStartupMessage: true})
+			if tt.companyID != "" {
+				app.Use(mockCustomerAuthMiddleware(tt.companyID))
+			} else {
+				app.Use(func(c *fiber.Ctx) error { return c.Next() })
+			}
+			app.Put("/customers/:id", handler.Update)
+
+			bodyBytes, _ := json.Marshal(tt.body)
+			req := httptest.NewRequest(http.MethodPut, "/customers/"+tt.customerID, bytes.NewReader(bodyBytes))
+			req.Header.Set("Content-Type", "application/json")
+
+			resp, err := app.Test(req, -1)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
+		})
+	}
+}

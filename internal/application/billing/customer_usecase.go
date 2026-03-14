@@ -78,3 +78,45 @@ func (uc *CustomerUseCase) List(companyID string, search string, limit, offset i
 	}
 	return out, nil
 }
+
+// Update actualiza un cliente existente de la empresa.
+func (uc *CustomerUseCase) Update(companyID, customerID string, in dto.UpdateCustomerRequest) (*dto.CustomerResponse, error) {
+	if customerID == "" || in.Name == "" || in.TaxID == "" {
+		return nil, domain.ErrInvalidInput
+	}
+	current, err := uc.repo.GetByID(customerID)
+	if err != nil {
+		return nil, err
+	}
+	if current == nil {
+		return nil, domain.ErrNotFound
+	}
+	if current.CompanyID != companyID {
+		return nil, domain.ErrForbidden
+	}
+	if in.TaxID != current.TaxID {
+		existing, err := uc.repo.GetByCompanyAndTaxID(companyID, in.TaxID)
+		if err != nil {
+			return nil, err
+		}
+		if existing != nil && existing.ID != customerID {
+			return nil, domain.ErrDuplicate
+		}
+	}
+	current.Name = in.Name
+	current.TaxID = in.TaxID
+	current.Email = in.Email
+	current.Phone = in.Phone
+	current.UpdatedAt = time.Now()
+	if err := uc.repo.Update(current); err != nil {
+		return nil, err
+	}
+	return &dto.CustomerResponse{
+		ID:        current.ID,
+		CompanyID: current.CompanyID,
+		Name:      current.Name,
+		TaxID:     current.TaxID,
+		Email:     current.Email,
+		Phone:     current.Phone,
+	}, nil
+}

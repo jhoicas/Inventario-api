@@ -12,6 +12,7 @@ import (
 type CustomerUseCase interface {
 	Create(companyID string, in dto.CreateCustomerRequest) (*dto.CustomerResponse, error)
 	List(companyID string, search string, limit, offset int) ([]*dto.CustomerResponse, error)
+	Update(companyID, customerID string, in dto.UpdateCustomerRequest) (*dto.CustomerResponse, error)
 }
 
 // CustomerHandler maneja las peticiones HTTP de clientes (facturación, protegido).
@@ -87,4 +88,48 @@ func (h *CustomerHandler) List(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}
 	return c.JSON(list)
+}
+
+// Update godoc
+// @Summary      Actualizar cliente
+// @Description  Actualiza un cliente asociado a la empresa autenticada
+// @Tags         customers
+// @Security     Bearer
+// @Accept       json
+// @Produce      json
+// @Param        id    path      string                     true  "Customer ID"
+// @Param        body  body      dto.UpdateCustomerRequest  true  "Datos del cliente"
+// @Success      200   {object}  dto.CustomerResponse
+// @Failure      400   {object}  dto.ErrorResponse
+// @Failure      401   {object}  dto.ErrorResponse
+// @Failure      403   {object}  dto.ErrorResponse
+// @Failure      404   {object}  dto.ErrorResponse
+// @Failure      409   {object}  dto.ErrorResponse
+// @Failure      500   {object}  dto.ErrorResponse
+// @Router       /api/customers/{id} [put]
+func (h *CustomerHandler) Update(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	id := c.Params("id")
+	if companyID == "" || id == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	var in dto.UpdateCustomerRequest
+	if err := c.BodyParser(&in); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
+	}
+	customer, err := h.uc.Update(companyID, id, in)
+	if err != nil {
+		switch err {
+		case domain.ErrInvalidInput:
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "name y tax_id son requeridos"})
+		case domain.ErrNotFound:
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "cliente no encontrado"})
+		case domain.ErrForbidden:
+			return c.Status(fiber.StatusForbidden).JSON(dto.ErrorResponse{Code: "FORBIDDEN", Message: "acceso denegado"})
+		case domain.ErrDuplicate:
+			return c.Status(fiber.StatusConflict).JSON(dto.ErrorResponse{Code: "DUPLICATE", Message: "ya existe un cliente con ese NIT/cédula"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.JSON(customer)
 }
