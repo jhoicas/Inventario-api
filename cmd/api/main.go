@@ -173,7 +173,7 @@ func main() {
 	taskUC := crm.NewTaskUseCase(crmTaskRepo)
 	aiCRMUC := crm.NewAICRMUseCase(anthropicSvc)
 	pqrUC := crm.NewPQRUseCase(crmTicketRepo, customerRepo, aiCRMUC, crmInteractionRepo)
-	crmHandler := httpRouter.NewCRMHandler(loyaltyUC, taskUC, pqrUC, aiCRMUC, crmInteractionRepo, nil, invoiceRepo)
+	crmHandler := httpRouter.NewCRMHandler(loyaltyUC, taskUC, pqrUC, aiCRMUC, crmInteractionRepo, nil, invoiceRepo, nil)
 
 	// PDF: representación gráfica de la factura electrónica DIAN
 	pdfGenerator := infrapdf.NewMarotoPDFGenerator()

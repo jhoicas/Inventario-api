@@ -67,3 +67,10 @@ type CRMOpportunityRepository interface {
 	UpdateStage(ctx context.Context, id string, stage entity.OpportunityStage, updatedAt time.Time) error
 	ListByCompany(ctx context.Context, companyID string) ([]*entity.Opportunity, error)
 }
+
+// CRMCampaignRepository puerto de persistencia para campañas CRM.
+type CRMCampaignRepository interface {
+	Create(ctx context.Context, c *entity.Campaign) error
+	GetByID(ctx context.Context, id string) (*entity.Campaign, error)
+	GetMetrics(ctx context.Context, campaignID string) (*entity.CampaignMetrics, error)
+}

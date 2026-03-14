@@ -26,6 +26,7 @@ type CRMHandler struct {
 	PQRUC           *crm.PQRUseCase
 	AICRMUC         *crm.AICRMUseCase
 	OpportunityUC   *crm.OpportunityUseCase
+	CampaignUC      *crm.CampaignUseCase
 	InvoiceHistory  invoiceHistoryRepo
 	InteractionRepo interface {
 		Create(interaction *entity.CRMInteraction) error
@@ -45,6 +46,7 @@ func NewCRMHandler(
 	},
 	opportunityUC *crm.OpportunityUseCase,
 	invoiceHistory invoiceHistoryRepo,
+	campaignUC *crm.CampaignUseCase,
 ) *CRMHandler {
 	return &CRMHandler{
 		LoyaltyUC:       loyaltyUC,
@@ -52,6 +54,7 @@ func NewCRMHandler(
 		PQRUC:           pqrUC,
 		AICRMUC:         aiCRMUC,
 		OpportunityUC:   opportunityUC,
+		CampaignUC:      campaignUC,
 		InvoiceHistory:  invoiceHistory,
 		InteractionRepo: interactionRepo,
 	}
@@ -793,6 +796,71 @@ func (h *CRMHandler) GenerateCampaignCopy(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}
 	return c.JSON(fiber.Map{"text": text})
+}
+
+// CreateCampaign crea una campaña de marketing CRM.
+// @Summary      Crear campaña
+// @Description  Crea una campaña de marketing en estado BORRADOR
+// @Tags         crm
+// @Security     Bearer
+// @Accept       json
+// @Produce      json
+// @Param        body  body      dto.CreateCampaignRequest  true  "Campaign"
+// @Success      201   {object}  dto.CampaignResponse
+// @Failure      400   {object}  dto.ErrorResponse
+// @Failure      503   {object}  dto.ErrorResponse
+// @Router       /api/crm/campaigns [post]
+func (h *CRMHandler) CreateCampaign(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	userID := GetUserID(c)
+	if companyID == "" || userID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if h.CampaignUC == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "campaigns no configurado"})
+	}
+	var in dto.CreateCampaignRequest
+	if err := c.BodyParser(&in); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
+	}
+	out, err := h.CampaignUC.Create(c.Context(), companyID, userID, in)
+	if err != nil {
+		if err == domain.ErrInvalidInput {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "name requerido"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.Status(fiber.StatusCreated).JSON(out)
+}
+
+// GetCampaignMetrics retorna las métricas de una campaña.
+// @Summary      Métricas de campaña
+// @Description  Devuelve contadores de envío, apertura, clics, conversión e ingresos de una campaña
+// @Tags         crm
+// @Security     Bearer
+// @Produce      json
+// @Param        id  path  string  true  "Campaign ID"
+// @Success      200  {object}  dto.CampaignMetricsResponse
+// @Failure      404  {object}  dto.ErrorResponse
+// @Failure      503  {object}  dto.ErrorResponse
+// @Router       /api/crm/campaigns/{id}/metrics [get]
+func (h *CRMHandler) GetCampaignMetrics(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	id := c.Params("id")
+	if companyID == "" || id == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if h.CampaignUC == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "campaigns no configurado"})
+	}
+	out, err := h.CampaignUC.GetMetrics(c.Context(), id)
+	if err != nil {
+		if err == domain.ErrNotFound {
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "campaña no encontrada"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.JSON(out)
 }
 
 // SummarizeTimeline resume el timeline de interacciones de un cliente con IA.

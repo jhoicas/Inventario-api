@@ -190,3 +190,37 @@ type FunnelStageDTO struct {
 	Count       int             `json:"count"`
 	TotalAmount decimal.Decimal `json:"total_amount"`
 }
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Campaigns
+// ──────────────────────────────────────────────────────────────────────────────
+
+// CreateCampaignRequest body para crear una campaña de marketing.
+type CreateCampaignRequest struct {
+	Name        string     `json:"name" validate:"required"`
+	Description string     `json:"description"`
+	ScheduledAt *time.Time `json:"scheduled_at"`
+}
+
+// CampaignResponse campaña en respuestas.
+type CampaignResponse struct {
+	ID          string     `json:"id"`
+	CompanyID   string     `json:"company_id"`
+	Name        string     `json:"name"`
+	Description string     `json:"description"`
+	Status      string     `json:"status"`
+	ScheduledAt *time.Time `json:"scheduled_at,omitempty"`
+	CreatedBy   string     `json:"created_by"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
+}
+
+// CampaignMetricsResponse métricas de envío y conversión de una campaña.
+type CampaignMetricsResponse struct {
+	CampaignID string          `json:"campaign_id"`
+	Sent       int             `json:"sent"`
+	Opened     int             `json:"opened"`
+	Clicked    int             `json:"clicked"`
+	Converted  int             `json:"converted"`
+	Revenue    decimal.Decimal `json:"revenue"`
+}
