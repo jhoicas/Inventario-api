@@ -303,6 +303,65 @@ func (r *CRMInteractionRepo) ListByCustomer(customerID string, limit, offset int
 	return list, rows.Err()
 }
 
+func (r *CRMInteractionRepo) ListInteractions(customerID string, f repository.InteractionFilters) ([]*entity.CRMInteraction, int64, error) {
+	limit := f.Limit
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	offset := f.Offset
+	if offset < 0 {
+		offset = 0
+	}
+
+	query := `SELECT id, company_id, customer_id, type, subject, body, created_by, created_at,
+			COUNT(*) OVER() AS total
+		FROM crm_interactions
+		WHERE customer_id = $1`
+	args := []any{customerID}
+	idx := 2
+
+	if f.Type != "" {
+		query += fmt.Sprintf(" AND type = $%d", idx)
+		args = append(args, f.Type)
+		idx++
+	}
+	if !f.StartDate.IsZero() {
+		query += fmt.Sprintf(" AND created_at >= $%d", idx)
+		args = append(args, f.StartDate)
+		idx++
+	}
+	if !f.EndDate.IsZero() {
+		query += fmt.Sprintf(" AND created_at <= $%d", idx)
+		args = append(args, f.EndDate)
+		idx++
+	}
+
+	query += fmt.Sprintf(" ORDER BY created_at DESC LIMIT $%d OFFSET $%d", idx, idx+1)
+	args = append(args, limit, offset)
+
+	rows, err := r.q.Query(context.Background(), query, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var list []*entity.CRMInteraction
+	var total int64
+	for rows.Next() {
+		var m entity.CRMInteraction
+		var typ string
+		if err := rows.Scan(&m.ID, &m.CompanyID, &m.CustomerID, &typ, &m.Subject, &m.Body, &m.CreatedBy, &m.CreatedAt, &total); err != nil {
+			return nil, 0, err
+		}
+		m.Type = entity.InteractionType(typ)
+		list = append(list, &m)
+	}
+	return list, total, rows.Err()
+}
+
 // CRMTaskRepo implementación de CRMTaskRepository.
 type CRMTaskRepo struct{ q Querier }
 

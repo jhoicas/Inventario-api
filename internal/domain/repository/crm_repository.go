@@ -33,11 +33,23 @@ type CRMProfileRepository interface {
 	ListByCompany(companyID string, limit, offset int) ([]*entity.CRMCustomerProfile, error)
 }
 
+// InteractionFilters filtros opcionales para ListInteractions.
+type InteractionFilters struct {
+	Type      string    // filtra por tipo exacto (call, email, meeting, other); vacío = todos
+	StartDate time.Time // filtra created_at >= StartDate cuando no es zero
+	EndDate   time.Time // filtra created_at <= EndDate cuando no es zero
+	Limit     int
+	Offset    int
+}
+
 // CRMInteractionRepository puerto de persistencia para interacciones.
 type CRMInteractionRepository interface {
 	Create(interaction *entity.CRMInteraction) error
 	GetByID(id string) (*entity.CRMInteraction, error)
 	ListByCustomer(customerID string, limit, offset int) ([]*entity.CRMInteraction, error)
+	// ListInteractions lista interacciones de un cliente con filtros opcionales.
+	// Devuelve el slice de resultados y el total (sin paginación) para el header X-Total-Count.
+	ListInteractions(customerID string, f InteractionFilters) ([]*entity.CRMInteraction, int64, error)
 }
 
 // CRMTaskRepository puerto de persistencia para tareas.
