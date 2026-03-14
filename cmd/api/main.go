@@ -173,7 +173,7 @@ func main() {
 	_ = slaConfigRepo // disponible para futuros endpoints
 	slaWorker := crm.NewSLAWorker(crmTicketRepo, 24*time.Hour)
 	go slaWorker.Start(workerCtx)
-	loyaltyUC := crm.NewLoyaltyUseCase(crmProfileRepo, customerRepo, crmCategoryRepo, crmBenefitRepo)
+	loyaltyUC := crm.NewLoyaltyUseCase(crmProfileRepo, customerRepo, crmCategoryRepo, crmBenefitRepo, crmInteractionRepo)
 	taskUC := crm.NewTaskUseCase(crmTaskRepo)
 	aiCRMUC := crm.NewAICRMUseCase(anthropicSvc)
 	pqrUC := crm.NewPQRUseCase(crmTicketRepo, customerRepo, aiCRMUC, crmInteractionRepo)

@@ -2,6 +2,8 @@ package crm
 
 import (
 	"context"
+	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -9,14 +11,16 @@ import (
 	"github.com/jhoicas/Inventario-api/internal/domain"
 	"github.com/jhoicas/Inventario-api/internal/domain/entity"
 	"github.com/jhoicas/Inventario-api/internal/domain/repository"
+	"github.com/shopspring/decimal"
 )
 
 // LoyaltyUseCase gestiona categorías de fidelización y perfiles CRM.
 type LoyaltyUseCase struct {
-	profileRepo   repository.CRMProfileRepository
-	customerRepo  repository.CustomerRepository
-	categoryRepo  repository.CRMCategoryRepository
-	benefitRepo   repository.CRMBenefitRepository
+	profileRepo     repository.CRMProfileRepository
+	customerRepo    repository.CustomerRepository
+	categoryRepo    repository.CRMCategoryRepository
+	benefitRepo     repository.CRMBenefitRepository
+	interactionRepo repository.CRMInteractionRepository
 }
 
 // NewLoyaltyUseCase construye el caso de uso.
@@ -25,13 +29,182 @@ func NewLoyaltyUseCase(
 	customerRepo repository.CustomerRepository,
 	categoryRepo repository.CRMCategoryRepository,
 	benefitRepo repository.CRMBenefitRepository,
+	interactionRepo repository.CRMInteractionRepository,
 ) *LoyaltyUseCase {
 	return &LoyaltyUseCase{
-		profileRepo:  profileRepo,
-		customerRepo: customerRepo,
-		categoryRepo: categoryRepo,
-		benefitRepo:  benefitRepo,
+		profileRepo:     profileRepo,
+		customerRepo:    customerRepo,
+		categoryRepo:    categoryRepo,
+		benefitRepo:     benefitRepo,
+		interactionRepo: interactionRepo,
 	}
+}
+
+const loyaltyPointsSubjectPrefix = "LOYALTY_POINTS_"
+
+type loyaltyPointEventPayload struct {
+	Delta       int    `json:"delta"`
+	Reason      string `json:"reason"`
+	ReferenceID string `json:"reference_id,omitempty"`
+}
+
+// AwardPoints acredita puntos al cliente y registra un evento de historial.
+func (uc *LoyaltyUseCase) AwardPoints(ctx context.Context, customerID string, points int, reason, referenceID string) error {
+	if customerID == "" || points <= 0 || strings.TrimSpace(reason) == "" {
+		return domain.ErrInvalidInput
+	}
+	customer, err := uc.customerRepo.GetByID(customerID)
+	if err != nil {
+		return err
+	}
+	if customer == nil {
+		return domain.ErrNotFound
+	}
+	if uc.interactionRepo == nil {
+		return domain.ErrConflict
+	}
+
+	payload, err := json.Marshal(loyaltyPointEventPayload{Delta: points, Reason: reason, ReferenceID: referenceID})
+	if err != nil {
+		return err
+	}
+	now := time.Now()
+	return uc.interactionRepo.Create(&entity.CRMInteraction{
+		ID:         uuid.New().String(),
+		CompanyID:  customer.CompanyID,
+		CustomerID: customerID,
+		Type:       entity.InteractionTypeOther,
+		Subject:    loyaltyPointsSubjectPrefix + "AWARD",
+		Body:       string(payload),
+		CreatedBy:  "system",
+		CreatedAt:  now,
+	})
+}
+
+// GetBalance obtiene balance, tier actual, umbral al siguiente tier e historial de puntos.
+func (uc *LoyaltyUseCase) GetBalance(ctx context.Context, customerID string) (*dto.LoyaltyBalanceDTO, error) {
+	if customerID == "" {
+		return nil, domain.ErrInvalidInput
+	}
+	profile, err := uc.profileRepo.GetByCustomerID(customerID)
+	if err != nil {
+		return nil, err
+	}
+	if profile == nil {
+		return nil, domain.ErrNotFound
+	}
+
+	balance := 0
+	history := make([]dto.PointEventDTO, 0)
+	if uc.interactionRepo != nil {
+		batchSize := 100
+		offset := 0
+		for {
+			list, _, listErr := uc.interactionRepo.ListInteractions(customerID, repository.InteractionFilters{
+				Type:   string(entity.InteractionTypeOther),
+				Limit:  batchSize,
+				Offset: offset,
+			})
+			if listErr != nil {
+				return nil, listErr
+			}
+			if len(list) == 0 {
+				break
+			}
+			for _, it := range list {
+				if !strings.HasPrefix(it.Subject, loyaltyPointsSubjectPrefix) {
+					continue
+				}
+				var payload loyaltyPointEventPayload
+				if err := json.Unmarshal([]byte(it.Body), &payload); err != nil {
+					continue
+				}
+				balance += payload.Delta
+				history = append(history, dto.PointEventDTO{
+					Points:      payload.Delta,
+					Reason:      payload.Reason,
+					ReferenceID: payload.ReferenceID,
+					OccurredAt:  it.CreatedAt,
+				})
+			}
+			if len(list) < batchSize {
+				break
+			}
+			offset += batchSize
+		}
+	}
+
+	tier := ""
+	if profile.CategoryID != "" {
+		cat, _ := uc.categoryRepo.GetByID(profile.CategoryID)
+		if cat != nil {
+			tier = cat.Name
+		}
+	}
+
+	nextTierThreshold := 0
+	cats, err := uc.categoryRepo.ListByCompany(profile.CompanyID, 200, 0)
+	if err == nil {
+		current := decimal.NewFromInt(int64(balance))
+		var next *decimal.Decimal
+		for _, c := range cats {
+			if c.MinLTV.GreaterThan(current) {
+				candidate := c.MinLTV
+				if next == nil || candidate.LessThan(*next) {
+					next = &candidate
+				}
+			}
+		}
+		if next != nil {
+			nextTierThreshold = int(next.IntPart())
+		}
+	}
+
+	return &dto.LoyaltyBalanceDTO{
+		Balance:           balance,
+		Tier:              tier,
+		NextTierThreshold: nextTierThreshold,
+		History:           history,
+	}, nil
+}
+
+// RedeemPoints debita puntos del cliente y registra el evento en historial.
+func (uc *LoyaltyUseCase) RedeemPoints(ctx context.Context, customerID string, points int, reason string) error {
+	if customerID == "" || points <= 0 || strings.TrimSpace(reason) == "" {
+		return domain.ErrInvalidInput
+	}
+	balance, err := uc.GetBalance(ctx, customerID)
+	if err != nil {
+		return err
+	}
+	if balance.Balance < points {
+		return domain.ErrConflict
+	}
+	customer, err := uc.customerRepo.GetByID(customerID)
+	if err != nil {
+		return err
+	}
+	if customer == nil {
+		return domain.ErrNotFound
+	}
+	if uc.interactionRepo == nil {
+		return domain.ErrConflict
+	}
+	payload, err := json.Marshal(loyaltyPointEventPayload{Delta: -points, Reason: reason})
+	if err != nil {
+		return err
+	}
+	now := time.Now()
+	return uc.interactionRepo.Create(&entity.CRMInteraction{
+		ID:         uuid.New().String(),
+		CompanyID:  customer.CompanyID,
+		CustomerID: customerID,
+		Type:       entity.InteractionTypeOther,
+		Subject:    loyaltyPointsSubjectPrefix + "REDEEM",
+		Body:       string(payload),
+		CreatedBy:  "system",
+		CreatedAt:  now,
+	})
 }
 
 // GetProfile360 devuelve la vista 360 del cliente (datos base + perfil CRM + categoría y beneficios si aplica).
@@ -55,10 +228,10 @@ func (uc *LoyaltyUseCase) GetProfile360(ctx context.Context, companyID, customer
 			Email:     p360.Customer.Email,
 			Phone:     p360.Customer.Phone,
 		},
-		ProfileID:   p360.ProfileID,
-		CategoryID:  p360.CategoryID,
-		LTV:         p360.LTV,
-		Benefits:    []dto.BenefitResponse{},
+		ProfileID:  p360.ProfileID,
+		CategoryID: p360.CategoryID,
+		LTV:        p360.LTV,
+		Benefits:   []dto.BenefitResponse{},
 	}
 	if p360.CategoryID != "" {
 		cat, _ := uc.categoryRepo.GetByID(p360.CategoryID)

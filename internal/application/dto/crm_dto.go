@@ -112,6 +112,22 @@ type InteractionListResponse struct {
 	Total int64                 `json:"total"`
 }
 
+// PointEventDTO evento de puntos de fidelización.
+type PointEventDTO struct {
+	Points      int       `json:"points"`
+	Reason      string    `json:"reason"`
+	ReferenceID string    `json:"reference_id,omitempty"`
+	OccurredAt  time.Time `json:"occurred_at"`
+}
+
+// LoyaltyBalanceDTO balance actual de puntos, tier y umbral siguiente.
+type LoyaltyBalanceDTO struct {
+	Balance           int             `json:"balance"`
+	Tier              string          `json:"tier"`
+	NextTierThreshold int             `json:"next_tier_threshold"`
+	History           []PointEventDTO `json:"history"`
+}
+
 // TicketResponse ticket PQR en respuestas.
 type TicketResponse struct {
 	ID               string    `json:"id"`
