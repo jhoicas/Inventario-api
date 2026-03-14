@@ -106,6 +106,12 @@ type InteractionResponse struct {
 	CreatedAt  time.Time `json:"created_at"`
 }
 
+// InteractionListResponse lista paginada de interacciones.
+type InteractionListResponse struct {
+	Items []InteractionResponse `json:"items"`
+	Total int64                 `json:"total"`
+}
+
 // TicketResponse ticket PQR en respuestas.
 type TicketResponse struct {
 	ID               string    `json:"id"`

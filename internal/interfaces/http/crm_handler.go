@@ -31,6 +31,7 @@ type CRMHandler struct {
 	InteractionRepo interface {
 		Create(interaction *entity.CRMInteraction) error
 		ListByCustomer(customerID string, limit, offset int) ([]*entity.CRMInteraction, error)
+		ListInteractions(customerID string, f repository.InteractionFilters) ([]*entity.CRMInteraction, int64, error)
 	}
 }
 
@@ -43,6 +44,7 @@ func NewCRMHandler(
 	interactionRepo interface {
 		Create(interaction *entity.CRMInteraction) error
 		ListByCustomer(customerID string, limit, offset int) ([]*entity.CRMInteraction, error)
+		ListInteractions(customerID string, f repository.InteractionFilters) ([]*entity.CRMInteraction, int64, error)
 	},
 	opportunityUC *crm.OpportunityUseCase,
 	invoiceHistory invoiceHistoryRepo,
@@ -441,6 +443,98 @@ func (h *CRMHandler) CreateInteraction(c *fiber.Ctx) error {
 		CreatedAt:  m.CreatedAt,
 	}
 	return c.Status(fiber.StatusCreated).JSON(resp)
+}
+
+// ListInteractions lista interacciones de un cliente con filtros opcionales.
+// @Summary      Listar interacciones por cliente
+// @Description  Lista interacciones CRM de un cliente con filtros por tipo y rango de fecha
+// @Tags         crm
+// @Security     Bearer
+// @Produce      json
+// @Param        id          path   string  true   "Customer ID"
+// @Param        type        query  string  false  "Tipo: call|email|meeting|other"
+// @Param        start_date  query  string  false  "Fecha inicio RFC3339"
+// @Param        end_date    query  string  false  "Fecha fin RFC3339"
+// @Param        limit       query  int     false  "Límite (máx 100)"
+// @Param        offset      query  int     false  "Offset"
+// @Success      200  {object}  dto.InteractionListResponse
+// @Failure      400  {object}  dto.ErrorResponse
+// @Failure      401  {object}  dto.ErrorResponse
+// @Router       /api/crm/customers/{id}/interactions [get]
+func (h *CRMHandler) ListInteractions(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	customerID := c.Params("id")
+	if companyID == "" || customerID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+
+	interactionType := c.Query("type")
+	if interactionType != "" {
+		typ := entity.InteractionType(interactionType)
+		if typ != entity.InteractionTypeCall && typ != entity.InteractionTypeEmail && typ != entity.InteractionTypeMeeting && typ != entity.InteractionTypeOther {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "type debe ser call, email, meeting u other"})
+		}
+	}
+
+	var startDate time.Time
+	if raw := c.Query("start_date"); raw != "" {
+		parsed, err := time.Parse(time.RFC3339, raw)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "start_date debe estar en formato RFC3339"})
+		}
+		startDate = parsed
+	}
+
+	var endDate time.Time
+	if raw := c.Query("end_date"); raw != "" {
+		parsed, err := time.Parse(time.RFC3339, raw)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "end_date debe estar en formato RFC3339"})
+		}
+		endDate = parsed
+	}
+
+	limit, _ := strconv.Atoi(c.Query("limit", "20"))
+	offset, _ := strconv.Atoi(c.Query("offset", "0"))
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	items, total, err := h.InteractionRepo.ListInteractions(customerID, repository.InteractionFilters{
+		Type:      interactionType,
+		StartDate: startDate,
+		EndDate:   endDate,
+		Limit:     limit,
+		Offset:    offset,
+	})
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+
+	out := make([]dto.InteractionResponse, 0, len(items))
+	for _, m := range items {
+		out = append(out, dto.InteractionResponse{
+			ID:         m.ID,
+			CompanyID:  m.CompanyID,
+			CustomerID: m.CustomerID,
+			Type:       string(m.Type),
+			Subject:    m.Subject,
+			Body:       m.Body,
+			CreatedBy:  m.CreatedBy,
+			CreatedAt:  m.CreatedAt,
+		})
+	}
+
+	return c.JSON(dto.InteractionListResponse{
+		Items: out,
+		Total: total,
+	})
 }
 
 // CreateTicket radica un ticket PQR.

@@ -1,4 +1,28 @@
+basePath: /
 definitions:
+  billing.AcquirerInfo:
+    properties:
+      business_name:
+        type: string
+      dv:
+        type: string
+      id_code:
+        type: string
+      status_code:
+        type: string
+      status_description:
+        type: string
+      tax_id:
+        type: string
+      tax_scheme:
+        type: string
+      type_liability:
+        type: string
+      type_organization:
+        type: string
+      type_regime:
+        type: string
+    type: object
   dto.AssignCategoryRequest:
     properties:
       category_id:
@@ -19,6 +43,42 @@ definitions:
       id:
         type: string
       name:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  dto.CampaignMetricsResponse:
+    properties:
+      campaign_id:
+        type: string
+      clicked:
+        type: integer
+      converted:
+        type: integer
+      opened:
+        type: integer
+      revenue:
+        type: number
+      sent:
+        type: integer
+    type: object
+  dto.CampaignResponse:
+    properties:
+      company_id:
+        type: string
+      created_at:
+        type: string
+      created_by:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      scheduled_at:
+        type: string
+      status:
         type: string
       updated_at:
         type: string
@@ -84,6 +144,28 @@ definitions:
       updated_at:
         type: string
     type: object
+  dto.CreateBenefitRequest:
+    properties:
+      description:
+        type: string
+      name:
+        maxLength: 200
+        minLength: 1
+        type: string
+    required:
+    - name
+    type: object
+  dto.CreateCampaignRequest:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+      scheduled_at:
+        type: string
+    required:
+    - name
+    type: object
   dto.CreateCompanyRequest:
     properties:
       address:
@@ -113,6 +195,15 @@ definitions:
       phone:
         type: string
       tax_id:
+        type: string
+    type: object
+  dto.CreateDebitNoteRequest:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/dto.DebitNoteItemRequest'
+        type: array
+      reason:
         type: string
     type: object
   dto.CreateInteractionRequest:
@@ -146,6 +237,25 @@ definitions:
       warehouse_id:
         type: string
     type: object
+  dto.CreateOpportunityRequest:
+    properties:
+      amount:
+        type: number
+      customer_id:
+        type: string
+      expected_close_date:
+        type: string
+      probability:
+        description: 0–100
+        type: integer
+      stage:
+        description: defaults to "prospecto"
+        type: string
+      title:
+        type: string
+    required:
+    - title
+    type: object
   dto.CreateProductRequest:
     properties:
       attributes:
@@ -175,6 +285,41 @@ definitions:
     - sku
     - unit_measure
     type: object
+  dto.CreateResolutionRequest:
+    properties:
+      environment:
+        description: test|prod
+        type: string
+      from_number:
+        type: integer
+      prefix:
+        type: string
+      resolution_number:
+        type: string
+      to_number:
+        type: integer
+      valid_from:
+        description: formato YYYY-MM-DD
+        type: string
+      valid_until:
+        description: formato YYYY-MM-DD
+        type: string
+    type: object
+  dto.CreateSupplierRequest:
+    properties:
+      email:
+        type: string
+      lead_time_days:
+        type: integer
+      name:
+        type: string
+      nit:
+        type: string
+      payment_term_days:
+        type: integer
+      phone:
+        type: string
+    type: object
   dto.CreateTaskRequest:
     properties:
       customer_id:
@@ -201,6 +346,37 @@ definitions:
     - description
     - subject
     type: object
+  dto.CreateUserRequest:
+    properties:
+      company_id:
+        type: string
+      email:
+        type: string
+      name:
+        maxLength: 200
+        minLength: 1
+        type: string
+      password:
+        minLength: 8
+        type: string
+      roles:
+        description: roles asignados al usuario
+        items:
+          type: string
+        type: array
+    required:
+    - company_id
+    - email
+    - name
+    - password
+    type: object
+  dto.CreateVoidInvoiceRequest:
+    properties:
+      concept_code:
+        type: integer
+      reason:
+        type: string
+    type: object
   dto.CreateWarehouseRequest:
     properties:
       address:
@@ -211,6 +387,18 @@ definitions:
         type: string
     required:
     - name
+    type: object
+  dto.CustomerPurchaseStatsDTO:
+    properties:
+      avg_ticket:
+        type: number
+      invoice_count:
+        type: integer
+      last_purchase_date:
+        description: RFC3339 o vacío
+        type: string
+      total_purchases:
+        type: number
     type: object
   dto.CustomerResponse:
     properties:
@@ -227,12 +415,48 @@ definitions:
       tax_id:
         type: string
     type: object
+  dto.DebitNoteItemRequest:
+    properties:
+      product_id:
+        type: string
+      quantity:
+        type: number
+      unit_price:
+        type: number
+    type: object
+  dto.DebitNoteResponse:
+    properties:
+      cufe:
+        type: string
+      debit_note_id:
+        type: string
+      dian_status:
+        type: string
+    type: object
   dto.ErrorResponse:
     properties:
       code:
         type: string
       message:
         type: string
+    type: object
+  dto.FunnelStageDTO:
+    properties:
+      count:
+        type: integer
+      stage:
+        type: string
+      total_amount:
+        type: number
+    type: object
+  dto.InteractionListResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/dto.InteractionResponse'
+        type: array
+      total:
+        type: integer
     type: object
   dto.InteractionResponse:
     properties:
@@ -294,6 +518,19 @@ definitions:
       unit_price:
         type: number
     type: object
+  dto.InvoiceListResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/dto.InvoiceResponse'
+        type: array
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
   dto.InvoiceResponse:
     properties:
       company_id:
@@ -327,6 +564,23 @@ definitions:
         type: string
       tax_total:
         type: number
+    type: object
+  dto.InvoiceSummaryDTO:
+    properties:
+      date:
+        type: string
+      dian_status:
+        type: string
+      document_type:
+        type: string
+      grand_total:
+        type: number
+      id:
+        type: string
+      number:
+        type: string
+      prefix:
+        type: string
     type: object
   dto.LoginRequest:
     properties:
@@ -407,12 +661,75 @@ definitions:
           $ref: '#/definitions/dto.SKURankingDTO'
         type: array
     type: object
+  dto.MovementDTO:
+    properties:
+      balance:
+        type: number
+      created_at:
+        type: string
+      created_by:
+        type: string
+      date:
+        type: string
+      id:
+        type: string
+      notes:
+        type: string
+      product_id:
+        type: string
+      quantity:
+        type: number
+      total_cost:
+        type: number
+      transaction_id:
+        type: string
+      type:
+        type: string
+      unit_cost:
+        type: number
+      warehouse_id:
+        type: string
+    type: object
+  dto.OpportunityResponse:
+    properties:
+      amount:
+        type: number
+      company_id:
+        type: string
+      created_at:
+        type: string
+      created_by:
+        type: string
+      customer_id:
+        type: string
+      expected_close_date:
+        type: string
+      id:
+        type: string
+      probability:
+        type: integer
+      stage:
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+    type: object
   dto.PageResponse:
     properties:
       limit:
         type: integer
       offset:
         type: integer
+      total:
+        type: integer
+    type: object
+  dto.PaginatedMovementsDTO:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/dto.MovementDTO'
+        type: array
       total:
         type: integer
     type: object
@@ -480,6 +797,17 @@ definitions:
       profile_id:
         type: string
     type: object
+  dto.PurchaseHistoryResponse:
+    properties:
+      invoices:
+        items:
+          $ref: '#/definitions/dto.InvoiceSummaryDTO'
+        type: array
+      stats:
+        $ref: '#/definitions/dto.CustomerPurchaseStatsDTO'
+      total:
+        type: integer
+    type: object
   dto.RawMaterialImpactDTO:
     properties:
       name:
@@ -497,6 +825,11 @@ definitions:
     type: object
   dto.RegisterMovementRequest:
     properties:
+      adjustment_reason:
+        description: |-
+          AdjustmentReason es obligatorio cuando Type == "ADJUSTMENT".
+          Valores válidos: MERMA | ROBO | VENCIMIENTO | CONTEO_FISICO | DETERIORO | OTRO
+        type: string
       from_warehouse_id:
         type: string
       product_id:
@@ -524,16 +857,30 @@ definitions:
       password:
         minLength: 8
         type: string
-      role:
-        enum:
-        - admin
-        - bodeguero
-        - vendedor
-        type: string
+      roles:
+        description: opcional; si se omite se usa rol por defecto
+        items:
+          type: string
+        type: array
     required:
     - company_id
     - email
     - password
+    type: object
+  dto.ReorderConfigRequest:
+    properties:
+      lead_time_days:
+        type: integer
+      max_stock:
+        type: number
+      min_stock:
+        type: number
+      product_id:
+        type: string
+      reorder_point:
+        type: number
+      warehouse_id:
+        type: string
     type: object
   dto.ReplenishmentSuggestionDTO:
     properties:
@@ -571,6 +918,33 @@ definitions:
       units_sold_last_90d:
         description: volumen de ventas reciente
         type: number
+    type: object
+  dto.ResolutionResponse:
+    properties:
+      alert_threshold:
+        type: boolean
+      company_id:
+        type: string
+      created_at:
+        type: string
+      environment:
+        type: string
+      from_number:
+        type: integer
+      id:
+        type: string
+      prefix:
+        type: string
+      resolution_number:
+        type: string
+      to_number:
+        type: integer
+      updated_at:
+        type: string
+      valid_from:
+        type: string
+      valid_until:
+        type: string
     type: object
   dto.ReturnInvoiceRequest:
     properties:
@@ -623,6 +997,65 @@ definitions:
       units_sold:
         type: number
     type: object
+  dto.SendCustomEmailRequest:
+    properties:
+      body:
+        type: string
+      subject:
+        type: string
+      to:
+        type: string
+    type: object
+  dto.StockSummaryDTO:
+    properties:
+      available_stock:
+        type: number
+      avg_cost:
+        type: number
+      current_stock:
+        type: number
+      last_updated:
+        type: string
+      product_id:
+        type: string
+      reserved_stock:
+        type: number
+      warehouse_id:
+        description: vacío si es agregado de todas las bodegas
+        type: string
+    type: object
+  dto.SupplierListResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/dto.SupplierResponse'
+        type: array
+      page:
+        $ref: '#/definitions/dto.PageResponse'
+    type: object
+  dto.SupplierResponse:
+    properties:
+      company_id:
+        type: string
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      lead_time_days:
+        type: integer
+      name:
+        type: string
+      nit:
+        type: string
+      payment_term_days:
+        type: integer
+      phone:
+        type: string
+      updated_at:
+        type: string
+    type: object
   dto.TaskResponse:
     properties:
       company_id:
@@ -669,6 +1102,8 @@ definitions:
         type: string
       description:
         type: string
+      escalation_reason:
+        type: string
       id:
         type: string
       sentiment:
@@ -691,6 +1126,17 @@ definitions:
       offset:
         type: integer
     type: object
+  dto.UpdateBenefitRequest:
+    properties:
+      description:
+        type: string
+      name:
+        maxLength: 200
+        minLength: 1
+        type: string
+    required:
+    - name
+    type: object
   dto.UpdateProductRequest:
     properties:
       attributes:
@@ -712,6 +1158,21 @@ definitions:
       unspsc_code:
         type: string
     type: object
+  dto.UpdateSupplierRequest:
+    properties:
+      email:
+        type: string
+      lead_time_days:
+        type: integer
+      name:
+        type: string
+      nit:
+        type: string
+      payment_term_days:
+        type: integer
+      phone:
+        type: string
+    type: object
   dto.UpdateTaskRequest:
     properties:
       description:
@@ -727,6 +1188,8 @@ definitions:
   dto.UpdateTicketRequest:
     properties:
       description:
+        type: string
+      sentiment:
         type: string
       status:
         type: string
@@ -745,11 +1208,22 @@ definitions:
         type: string
       name:
         type: string
-      role:
-        type: string
+      roles:
+        items:
+          type: string
+        type: array
       status:
         type: string
       updated_at:
+        type: string
+    type: object
+  dto.VoidInvoiceResponse:
+    properties:
+      credit_note_id:
+        type: string
+      cufe:
+        type: string
+      dian_status:
         type: string
     type: object
   dto.WarehouseListResponse:
@@ -776,8 +1250,58 @@ definitions:
       updated_at:
         type: string
     type: object
+  http.createStocktakeRequest:
+    properties:
+      warehouse_id:
+        type: string
+    type: object
+  http.receivePurchaseOrderRequest:
+    properties:
+      warehouse_id:
+        type: string
+    type: object
+  http.updateStocktakeCountsRequest:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/inventory.StocktakeItemInput'
+        type: array
+    type: object
+  inventory.CreatePurchaseOrderInput:
+    properties:
+      date:
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/inventory.PurchaseOrderItemInput'
+        type: array
+      number:
+        type: string
+      supplier_id:
+        type: string
+    type: object
+  inventory.PurchaseOrderItemInput:
+    properties:
+      product_id:
+        type: string
+      quantity:
+        type: number
+      unit_cost:
+        type: number
+    type: object
+  inventory.StocktakeItemInput:
+    properties:
+      counted_qty:
+        type: number
+      product_id:
+        type: string
+    type: object
+host: api.naturerp.ludoia.com
 info:
   contact: {}
+  description: API para el sistema ERP.
+  title: Tu API ERP
+  version: "1.0"
 paths:
   /api/analytics/margins:
     get:
@@ -990,6 +1514,63 @@ paths:
       summary: Obtener empresa por ID
       tags:
       - companies
+  /api/companies/{id}/resolutions:
+    get:
+      parameters:
+      - description: ID de la empresa
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/dto.ResolutionResponse'
+            type: array
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Listar resoluciones DIAN de una empresa
+      tags:
+      - companies
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: ID de la empresa
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Datos de la resolución
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateResolutionRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.ResolutionResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Crear resolución DIAN de una empresa
+      tags:
+      - companies
   /api/crm/ai/campaign-copy:
     post:
       consumes:
@@ -1015,6 +1596,8 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
       summary: Generar copy de campaña con IA
       tags:
       - crm
@@ -1043,7 +1626,116 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
       summary: Resumir timeline de interacciones con IA
+      tags:
+      - crm
+  /api/crm/benefits/{benefitId}:
+    put:
+      consumes:
+      - application/json
+      description: Actualiza un beneficio de fidelización (solo admin)
+      parameters:
+      - description: Benefit ID
+        in: path
+        name: benefitId
+        required: true
+        type: string
+      - description: Benefit
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateBenefitRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.BenefitResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Actualizar beneficio
+      tags:
+      - crm
+  /api/crm/campaigns:
+    post:
+      consumes:
+      - application/json
+      description: Crea una campaña de marketing en estado BORRADOR
+      parameters:
+      - description: Campaign
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateCampaignRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.CampaignResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Crear campaña
+      tags:
+      - crm
+  /api/crm/campaigns/{id}/metrics:
+    get:
+      description: Devuelve contadores de envío, apertura, clics, conversión e ingresos
+        de una campaña
+      parameters:
+      - description: Campaign ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.CampaignMetricsResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Métricas de campaña
       tags:
       - crm
   /api/crm/categories:
@@ -1069,7 +1761,55 @@ paths:
             items:
               $ref: '#/definitions/dto.CategoryResponse'
             type: array
+      security:
+      - Bearer: []
       summary: Listar categorías CRM
+      tags:
+      - crm
+  /api/crm/categories/{categoryId}/benefits:
+    post:
+      consumes:
+      - application/json
+      description: Crea un beneficio asociado a una categoría de fidelización (solo
+        admin)
+      parameters:
+      - description: Category ID
+        in: path
+        name: categoryId
+        required: true
+        type: string
+      - description: Benefit
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateBenefitRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.BenefitResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Crear beneficio
       tags:
       - crm
   /api/crm/categories/{id}/benefits:
@@ -1100,6 +1840,8 @@ paths:
             items:
               $ref: '#/definitions/dto.BenefitResponse'
             type: array
+      security:
+      - Bearer: []
       summary: Listar beneficios por categoría
       tags:
       - crm
@@ -1138,7 +1880,59 @@ paths:
           description: Not Found
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
       summary: Asignar categoría al cliente
+      tags:
+      - crm
+  /api/crm/customers/{id}/interactions:
+    get:
+      description: Lista interacciones CRM de un cliente con filtros por tipo y rango
+        de fecha
+      parameters:
+      - description: Customer ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: 'Tipo: call|email|meeting|other'
+        in: query
+        name: type
+        type: string
+      - description: Fecha inicio RFC3339
+        in: query
+        name: start_date
+        type: string
+      - description: Fecha fin RFC3339
+        in: query
+        name: end_date
+        type: string
+      - description: Límite (máx 100)
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.InteractionListResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Listar interacciones por cliente
       tags:
       - crm
   /api/crm/customers/{id}/profile360:
@@ -1172,7 +1966,51 @@ paths:
           description: Not Found
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
       summary: Vista 360 del cliente
+      tags:
+      - crm
+  /api/crm/customers/{id}/purchase-history:
+    get:
+      description: Devuelve estadísticas agregadas y lista de facturas paginadas del
+        cliente
+      parameters:
+      - description: Customer ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Límite de facturas a retornar (máx 100)
+        in: query
+        name: limit
+        type: integer
+      - description: Offset para paginación
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PurchaseHistoryResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Historial de compras del cliente
       tags:
       - crm
   /api/crm/interactions:
@@ -1199,7 +2037,106 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
       summary: Registrar interacción
+      tags:
+      - crm
+  /api/crm/opportunities:
+    post:
+      consumes:
+      - application/json
+      description: Crea una oportunidad de negocio en el embudo de ventas
+      parameters:
+      - description: Opportunity
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateOpportunityRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.OpportunityResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Crear oportunidad
+      tags:
+      - crm
+  /api/crm/opportunities/{id}/stage:
+    put:
+      consumes:
+      - application/json
+      description: Cambia la etapa del embudo de ventas de una oportunidad
+      parameters:
+      - description: Opportunity ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: '{\'
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Actualizar etapa de oportunidad
+      tags:
+      - crm
+  /api/crm/opportunities/funnel:
+    get:
+      description: Retorna el conteo y monto total de oportunidades agrupadas por
+        etapa
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/dto.FunnelStageDTO'
+            type: array
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Embudo de ventas
       tags:
       - crm
   /api/crm/tasks:
@@ -1228,6 +2165,8 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/dto.TaskResponseList'
+      security:
+      - Bearer: []
       summary: Listar tareas
       tags:
       - crm
@@ -1253,6 +2192,8 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
       summary: Crear tarea CRM
       tags:
       - crm
@@ -1278,6 +2219,8 @@ paths:
           description: Not Found
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
       summary: Obtener tarea
       tags:
       - crm
@@ -1312,6 +2255,8 @@ paths:
           description: Not Found
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
       summary: Actualizar tarea
       tags:
       - crm
@@ -1321,6 +2266,10 @@ paths:
       - application/json
       description: Lista los tickets PQR de la empresa con paginación
       parameters:
+      - description: Buscar por asunto (subject)
+        in: query
+        name: search
+        type: string
       - description: Limit
         in: query
         name: limit
@@ -1329,6 +2278,14 @@ paths:
         in: query
         name: offset
         type: integer
+      - description: Filtrar por status
+        in: query
+        name: status
+        type: string
+      - description: 'Orden por created_at: asc|desc'
+        in: query
+        name: sort
+        type: string
       produces:
       - application/json
       responses:
@@ -1336,6 +2293,8 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/dto.TicketResponseList'
+      security:
+      - Bearer: []
       summary: Listar tickets PQR
       tags:
       - crm
@@ -1365,6 +2324,8 @@ paths:
           description: Not Found
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
       summary: Radicar ticket PQR
       tags:
       - crm
@@ -1390,6 +2351,8 @@ paths:
           description: Not Found
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
       summary: Obtener ticket PQR
       tags:
       - crm
@@ -1420,7 +2383,75 @@ paths:
           description: Not Found
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
       summary: Actualizar ticket PQR
+      tags:
+      - crm
+  /api/crm/tickets/{id}/escalate:
+    put:
+      consumes:
+      - application/json
+      description: Marca el ticket como ESCALATED, persiste la razón y genera una
+        entrada de auditoría
+      parameters:
+      - description: Ticket ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: '{\'
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Escalar ticket PQR
+      tags:
+      - crm
+  /api/crm/tickets/overdue:
+    get:
+      description: Devuelve los tickets cuyo SLA ha expirado y fueron marcados como
+        OVERDUE
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/dto.TicketResponse'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Tickets vencidos (OVERDUE)
       tags:
       - crm
   /api/customers:
@@ -1429,6 +2460,10 @@ paths:
       - application/json
       description: Lista los clientes de la empresa autenticada con paginación
       parameters:
+      - description: Buscar por nombre o NIT (tax_id)
+        in: query
+        name: search
+        type: string
       - description: Límite de resultados
         in: query
         name: limit
@@ -1498,7 +2533,193 @@ paths:
       summary: Crear cliente
       tags:
       - customers
+  /api/customers/lookup:
+    get:
+      description: Retorna los datos tributarios de un contribuyente consultando el
+        servicio GetAcquirer de la DIAN
+      parameters:
+      - description: 'Tipo de documento (ej: 31=NIT, 13=Cédula)'
+        in: query
+        name: id_type
+        required: true
+        type: string
+      - description: Número de documento
+        in: query
+        name: id_number
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/billing.AcquirerInfo'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Consultar contribuyente en DIAN
+      tags:
+      - customers
+  /api/emails/send:
+    post:
+      consumes:
+      - application/json
+      description: Envía un correo manual indicando destinatario, asunto y cuerpo
+      parameters:
+      - description: Datos del correo
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.SendCustomEmailRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Enviar correo libre
+      tags:
+      - billing
+  /api/inventory/adjustments:
+    post:
+      consumes:
+      - application/json
+      description: Registra un movimiento de tipo ADJUSTMENT con razón obligatoria
+        (MERMA|ROBO|VENCIMIENTO|CONTEO_FISICO|DETERIORO|OTRO).
+      parameters:
+      - description: product_id, warehouse_id, quantity (±), adjustment_reason
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.RegisterMovementRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: '{ \"movement_id\": \"uuid\" }'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Registrar ajuste de inventario
+      tags:
+      - inventory
   /api/inventory/movements:
+    get:
+      description: Devuelve movimientos paginados con filtros por producto, bodega,
+        tipo y rango de fechas.
+      parameters:
+      - description: ID de producto
+        in: query
+        name: product_id
+        type: string
+      - description: ID de bodega
+        in: query
+        name: warehouse_id
+        type: string
+      - description: Tipo de movimiento (IN|OUT|ADJUSTMENT|TRANSFER|RETURN)
+        in: query
+        name: type
+        type: string
+      - description: Fecha inicio (YYYY-MM-DD)
+        in: query
+        name: start_date
+        type: string
+      - description: Fecha fin (YYYY-MM-DD)
+        in: query
+        name: end_date
+        type: string
+      - default: 20
+        description: Límite
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PaginatedMovementsDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Listar movimientos de inventario
+      tags:
+      - inventory
     post:
       consumes:
       - application/json
@@ -1571,7 +2792,237 @@ paths:
       summary: Lista semanal de reposición
       tags:
       - inventory
+  /api/inventory/stock:
+    get:
+      description: Devuelve el resumen de stock de un producto en una bodega o agregado
+        de todas las bodegas.
+      parameters:
+      - description: ID del producto (UUID)
+        in: query
+        name: product_id
+        required: true
+        type: string
+      - description: ID de la bodega (UUID). Vacío = stock agregado de todas las bodegas.
+        in: query
+        name: warehouse_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.StockSummaryDTO'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Resumen de stock
+      tags:
+      - inventory
+  /api/inventory/stocktake:
+    post:
+      consumes:
+      - application/json
+      description: Copia el stock actual de la bodega y abre un stocktake en estado
+        OPEN.
+      parameters:
+      - description: warehouse_id
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/http.createStocktakeRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: '{ \"stocktake_id\": \"uuid\" }'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Crear snapshot de conteo físico
+      tags:
+      - inventory
+  /api/inventory/stocktake/{id}:
+    put:
+      consumes:
+      - application/json
+      description: Actualiza cantidades contadas del stocktake y recalcula diferencias.
+      parameters:
+      - description: stocktake_id
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: items
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/http.updateStocktakeCountsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Actualizar conteo físico
+      tags:
+      - inventory
+  /api/inventory/stocktake/{id}/close:
+    post:
+      description: Cierra el stocktake y genera movimientos ADJUSTMENT por cada diferencia
+        != 0.
+      parameters:
+      - description: stocktake_id
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Cerrar conteo físico
+      tags:
+      - inventory
   /api/invoices:
+    get:
+      description: Devuelve facturas paginadas filtradas por fecha, cliente, estado
+        DIAN y prefijo
+      parameters:
+      - description: Fecha inicio (YYYY-MM-DD)
+        in: query
+        name: start_date
+        type: string
+      - description: Fecha fin (YYYY-MM-DD)
+        in: query
+        name: end_date
+        type: string
+      - description: ID del cliente
+        in: query
+        name: customer_id
+        type: string
+      - description: Estado DIAN (DRAFT|SIGNED|EXITOSO|RECHAZADO|ERROR_GENERATION)
+        in: query
+        name: dian_status
+        type: string
+      - description: Prefijo de la factura
+        in: query
+        name: prefix
+        type: string
+      - default: 20
+        description: Límite de resultados
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Desplazamiento
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.InvoiceListResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Listar facturas
+      tags:
+      - billing
     post:
       consumes:
       - application/json
@@ -1662,6 +3113,60 @@ paths:
       summary: Obtener factura por ID
       tags:
       - billing
+  /api/invoices/{id}/debit-note:
+    post:
+      consumes:
+      - application/json
+      description: Registra una Nota Débito electrónica asociada a una factura existente
+        y la envía a DIAN
+      parameters:
+      - description: ID de la factura original
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Motivo e ítems de la nota débito
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateDebitNoteRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.DebitNoteResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Registrar nota débito
+      tags:
+      - billing
   /api/invoices/{id}/pdf:
     get:
       consumes:
@@ -1708,6 +3213,49 @@ paths:
       security:
       - Bearer: []
       summary: Descargar PDF de la factura
+      tags:
+      - billing
+  /api/invoices/{id}/retry-dian:
+    post:
+      description: Reintenta el envío a la DIAN de una factura en estado CONTINGENCIA
+      parameters:
+      - description: ID de la factura
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.InvoiceDIANStatusDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Reintentar envío DIAN
       tags:
       - billing
   /api/invoices/{id}/return:
@@ -1764,6 +3312,48 @@ paths:
       summary: Registrar devolución de factura (Nota Crédito)
       tags:
       - billing
+  /api/invoices/{id}/send-email:
+    post:
+      description: Envía la factura electrónica (PDF + XML firmado) al correo del
+        cliente
+      parameters:
+      - description: ID de la factura
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Enviar factura por correo
+      tags:
+      - billing
   /api/invoices/{id}/status:
     get:
       consumes:
@@ -1806,6 +3396,60 @@ paths:
       security:
       - Bearer: []
       summary: Obtener estado DIAN de una factura
+      tags:
+      - billing
+  /api/invoices/{id}/void:
+    post:
+      consumes:
+      - application/json
+      description: Crea una Nota Crédito total sobre una factura en estado Sent, la
+        envía a DIAN y marca la factura como VOID
+      parameters:
+      - description: ID de la factura original
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Código de concepto y motivo
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateVoidInvoiceRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.VoidInvoiceResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Anular factura por nota crédito total
       tags:
       - billing
   /api/products:
@@ -1922,6 +3566,402 @@ paths:
       summary: Actualizar producto
       tags:
       - products
+  /api/products/{id}/reorder-config:
+    put:
+      consumes:
+      - application/json
+      description: Upsert de configuración en product_reorder_config por producto
+        y bodega.
+      parameters:
+      - description: ID del producto
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: warehouse_id, reorder_point, min_stock, max_stock, lead_time_days
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.ReorderConfigRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Configurar reposición por producto
+      tags:
+      - inventory
+  /api/purchase-orders:
+    post:
+      consumes:
+      - application/json
+      description: Crea una orden de compra en estado BORRADOR.
+      parameters:
+      - description: supplier_id, number, date, items
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/inventory.CreatePurchaseOrderInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Crear orden de compra
+      tags:
+      - inventory
+  /api/purchase-orders/{id}/receive:
+    put:
+      consumes:
+      - application/json
+      description: Registra movimientos IN por cada ítem de la orden de compra en
+        una sola transacción.
+      parameters:
+      - description: purchase_order_id
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: warehouse_id
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/http.receivePurchaseOrderRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Recibir orden de compra
+      tags:
+      - inventory
+  /api/suppliers:
+    get:
+      parameters:
+      - description: Buscar por nombre o NIT
+        in: query
+        name: search
+        type: string
+      - default: 20
+        description: Límite
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.SupplierListResponse'
+      security:
+      - Bearer: []
+      summary: Listar proveedores
+      tags:
+      - suppliers
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Datos del proveedor
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateSupplierRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.SupplierResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Crear proveedor
+      tags:
+      - suppliers
+  /api/suppliers/{id}:
+    get:
+      parameters:
+      - description: ID del proveedor
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.SupplierResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Obtener proveedor por ID
+      tags:
+      - suppliers
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: ID del proveedor
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Datos a actualizar
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateSupplierRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.SupplierResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Actualizar proveedor
+      tags:
+      - suppliers
+  /api/users:
+    get:
+      description: Lista los usuarios de la empresa autenticada (solo admin)
+      parameters:
+      - default: 20
+        description: Límite
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/dto.UserResponse'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Listar usuarios
+      tags:
+      - users
+    post:
+      consumes:
+      - application/json
+      description: Crea un usuario dentro de la empresa autenticada (solo admin)
+      parameters:
+      - description: Datos del usuario (password plano, se hashea)
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.UserResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Crear usuario
+      tags:
+      - users
+  /api/users/{id}:
+    put:
+      consumes:
+      - application/json
+      description: Actualiza roles o estado de un usuario (solo admin)
+      parameters:
+      - description: ID del usuario
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: '{\'
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.UserResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Actualizar usuario
+      tags:
+      - users
   /api/warehouses:
     get:
       parameters:
@@ -1997,4 +4037,12 @@ paths:
       summary: Obtener bodega por ID
       tags:
       - warehouses
+securityDefinitions:
+  Bearer:
+    description: |-
+      Escribe "Bearer " seguido de un espacio y tu token.
+      Escribe "Bearer " seguido de un espacio y tu token.
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"

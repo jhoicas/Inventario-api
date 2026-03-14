@@ -254,6 +254,7 @@ func Router(app *fiber.App, deps RouterDeps) {
 		crmGroup.Get("/tasks/:id", h.GetTask)
 		crmGroup.Put("/tasks/:id", h.UpdateTask)
 		crmGroup.Post("/interactions", h.CreateInteraction)
+		crmGroup.Get("/customers/:id/interactions", h.ListInteractions)
 		crmGroup.Post("/tickets", h.CreateTicket)
 		crmGroup.Get("/tickets", h.ListTickets)
 		crmGroup.Get("/tickets/overdue", h.ListOverdueTickets)
