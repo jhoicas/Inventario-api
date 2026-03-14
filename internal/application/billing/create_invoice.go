@@ -292,6 +292,24 @@ func (uc *CreateInvoiceUseCase) GetInvoiceDIANStatus(ctx context.Context, compan
 	}, nil
 }
 
+// GetDIANSummary devuelve contadores DIAN para la empresa en contexto.
+func (uc *CreateInvoiceUseCase) GetDIANSummary(ctx context.Context, companyID string) (*dto.DIANSummaryDTO, error) {
+	if companyID == "" {
+		return nil, domain.ErrInvalidInput
+	}
+
+	summary, err := uc.invoiceRepo.GetDIANSummary(companyID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &dto.DIANSummaryDTO{
+		SentToday: summary.SentToday,
+		Pending:   summary.Pending,
+		Rejected:  summary.Rejected,
+	}, nil
+}
+
 // ListInvoices retorna facturas paginadas y filtradas para una empresa.
 func (uc *CreateInvoiceUseCase) ListInvoices(ctx context.Context, companyID string, in dto.InvoiceFilter) (*dto.InvoiceListResponse, error) {
 	if companyID == "" {

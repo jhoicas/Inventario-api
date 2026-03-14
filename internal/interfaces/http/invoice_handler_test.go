@@ -23,6 +23,7 @@ import (
 type fakeCreateInvoiceUseCase struct {
 	createInvoiceFunc        func(ctx context.Context, companyID, userID string, in dto.CreateInvoiceRequest) (*dto.InvoiceResponse, error)
 	getInvoiceDIANStatusFunc func(ctx context.Context, companyID, id string) (*dto.InvoiceDIANStatusDTO, error)
+	getDIANSummaryFunc       func(ctx context.Context, companyID string) (*dto.DIANSummaryDTO, error)
 	getInvoiceFunc           func(ctx context.Context, companyID, id string) (*dto.InvoiceResponse, error)
 	listInvoicesFunc         func(ctx context.Context, companyID string, in dto.InvoiceFilter) (*dto.InvoiceListResponse, error)
 	retryDIANFunc            func(ctx context.Context, companyID, id string) (*dto.InvoiceDIANStatusDTO, error)
@@ -36,6 +37,10 @@ func (f *fakeCreateInvoiceUseCaseNoRetry) CreateInvoice(ctx context.Context, com
 
 func (f *fakeCreateInvoiceUseCaseNoRetry) GetInvoiceDIANStatus(ctx context.Context, companyID, id string) (*dto.InvoiceDIANStatusDTO, error) {
 	return nil, errors.New("getInvoiceDIANStatus not configured")
+}
+
+func (f *fakeCreateInvoiceUseCaseNoRetry) GetDIANSummary(ctx context.Context, companyID string) (*dto.DIANSummaryDTO, error) {
+	return nil, errors.New("getDIANSummary not configured")
 }
 
 func (f *fakeCreateInvoiceUseCaseNoRetry) GetInvoice(ctx context.Context, companyID, id string) (*dto.InvoiceResponse, error) {
@@ -58,6 +63,13 @@ func (f *fakeCreateInvoiceUseCase) GetInvoiceDIANStatus(ctx context.Context, com
 		return f.getInvoiceDIANStatusFunc(ctx, companyID, id)
 	}
 	return nil, errors.New("getInvoiceDIANStatus not configured")
+}
+
+func (f *fakeCreateInvoiceUseCase) GetDIANSummary(ctx context.Context, companyID string) (*dto.DIANSummaryDTO, error) {
+	if f.getDIANSummaryFunc != nil {
+		return f.getDIANSummaryFunc(ctx, companyID)
+	}
+	return nil, errors.New("getDIANSummary not configured")
 }
 
 func (f *fakeCreateInvoiceUseCase) GetInvoice(ctx context.Context, companyID, id string) (*dto.InvoiceResponse, error) {
@@ -1701,6 +1713,89 @@ func TestInvoiceHandler_RetryDIAN(t *testing.T) {
 				assert.Equal(t, tt.expectedBody.ID, out.ID)
 				assert.Equal(t, tt.expectedBody.DIANStatus, out.DIANStatus)
 				assert.Equal(t, tt.expectedBody.Errors, out.Errors)
+				return
+			}
+
+			var errResp dto.ErrorResponse
+			require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
+			assert.Equal(t, tt.expectedCode, errResp.Code)
+		})
+	}
+}
+
+func TestInvoiceHandler_GetDIANSummary(t *testing.T) {
+	tests := []struct {
+		name           string
+		companyID      string
+		useCase        *fakeCreateInvoiceUseCase
+		expectedStatus int
+		expectedCode   string
+		expectedBody   *dto.DIANSummaryDTO
+	}{
+		{
+			name:      "Success",
+			companyID: invoiceTestCompanyID,
+			useCase: &fakeCreateInvoiceUseCase{
+				getDIANSummaryFunc: func(_ context.Context, companyID string) (*dto.DIANSummaryDTO, error) {
+					if companyID != invoiceTestCompanyID {
+						return nil, errors.New("unexpected company id")
+					}
+					return &dto.DIANSummaryDTO{SentToday: 4, Pending: 3, Rejected: 2}, nil
+				},
+			},
+			expectedStatus: http.StatusOK,
+			expectedBody:   &dto.DIANSummaryDTO{SentToday: 4, Pending: 3, Rejected: 2},
+		},
+		{
+			name:      "Unauthorized",
+			companyID: "",
+			useCase: &fakeCreateInvoiceUseCase{
+				getDIANSummaryFunc: func(_ context.Context, _ string) (*dto.DIANSummaryDTO, error) {
+					return nil, errors.New("must not be called")
+				},
+			},
+			expectedStatus: http.StatusUnauthorized,
+			expectedCode:   "UNAUTHORIZED",
+		},
+		{
+			name:      "InternalError",
+			companyID: invoiceTestCompanyID,
+			useCase: &fakeCreateInvoiceUseCase{
+				getDIANSummaryFunc: func(_ context.Context, _ string) (*dto.DIANSummaryDTO, error) {
+					return nil, errors.New("db error")
+				},
+			},
+			expectedStatus: http.StatusInternalServerError,
+			expectedCode:   "INTERNAL",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := NewInvoiceHandlerWithBillingOps(
+				tt.useCase,
+				&fakeCreateCreditNoteUseCase{},
+				&fakeCreateDebitNoteUseCase{},
+				&fakeVoidInvoiceUseCase{},
+				&fakeInvoicePDFUseCase{},
+				&fakeInvoiceMailerUseCase{},
+			)
+
+			app := fiber.New(fiber.Config{DisableStartupMessage: true})
+			app.Use(mockInvoiceAuthCompanyOnly(tt.companyID))
+			app.Get("/billing/dian/summary", handler.GetDIANSummary)
+
+			req := httptest.NewRequest(http.MethodGet, "/billing/dian/summary", nil)
+			resp, err := app.Test(req, -1)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+
+			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
+
+			if tt.expectedStatus == http.StatusOK {
+				var out dto.DIANSummaryDTO
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+				assert.Equal(t, *tt.expectedBody, out)
 				return
 			}
 

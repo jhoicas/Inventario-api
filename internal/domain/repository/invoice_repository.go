@@ -18,6 +18,8 @@ type InvoiceRepository interface {
 	GetDetailsByInvoiceID(invoiceID string) ([]*entity.InvoiceDetail, error)
 	// GetDIANStatus devuelve solo los campos de estado DIAN (ligero, para polling).
 	GetDIANStatus(id string) (*entity.Invoice, error)
+	// GetDIANSummary devuelve los contadores de resumen DIAN para una empresa.
+	GetDIANSummary(companyID string) (*DIANSummary, error)
 
 	// UpdateReturnStatus actualiza el estado de devolución lógico de la factura original
 	// (por ejemplo, 'Returned' o 'Partially_Returned'). La implementación puede usar
@@ -53,4 +55,11 @@ type CustomerPurchaseStats struct {
 	AvgTicket        decimal.Decimal
 	LastPurchaseDate time.Time
 	InvoiceCount     int
+}
+
+// DIANSummary contadores para tablero de estados DIAN.
+type DIANSummary struct {
+	SentToday int
+	Pending   int
+	Rejected  int
 }

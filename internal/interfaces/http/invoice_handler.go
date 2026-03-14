@@ -15,6 +15,7 @@ import (
 type CreateInvoiceUseCase interface {
 	CreateInvoice(ctx context.Context, companyID, userID string, in dto.CreateInvoiceRequest) (*dto.InvoiceResponse, error)
 	GetInvoiceDIANStatus(ctx context.Context, companyID, id string) (*dto.InvoiceDIANStatusDTO, error)
+	GetDIANSummary(ctx context.Context, companyID string) (*dto.DIANSummaryDTO, error)
 	GetInvoice(ctx context.Context, companyID, id string) (*dto.InvoiceResponse, error)
 	ListInvoices(ctx context.Context, companyID string, in dto.InvoiceFilter) (*dto.InvoiceListResponse, error)
 }
@@ -146,6 +147,30 @@ func (h *InvoiceHandler) GetInvoices(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}
+	return c.JSON(out)
+}
+
+// GetDIANSummary godoc
+// @Summary      Resumen de estado DIAN
+// @Description  Devuelve contadores para tablero DIAN: enviados hoy, pendientes y rechazados
+// @Tags         billing
+// @Security     Bearer
+// @Produce      json
+// @Success      200  {object}  dto.DIANSummaryDTO
+// @Failure      401  {object}  dto.ErrorResponse
+// @Failure      500  {object}  dto.ErrorResponse
+// @Router       /api/billing/dian/summary [get]
+func (h *InvoiceHandler) GetDIANSummary(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	if companyID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+
+	out, err := h.uc.GetDIANSummary(c.Context(), companyID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+
 	return c.JSON(out)
 }
 

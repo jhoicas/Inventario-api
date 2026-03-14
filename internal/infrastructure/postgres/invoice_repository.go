@@ -225,6 +225,28 @@ func (r *InvoiceRepo) GetDIANStatus(id string) (*entity.Invoice, error) {
 	return &inv, nil
 }
 
+// GetDIANSummary devuelve los contadores DIAN para tablero de facturación.
+func (r *InvoiceRepo) GetDIANSummary(companyID string) (*repository.DIANSummary, error) {
+	const query = `
+		SELECT
+			COUNT(*) FILTER (WHERE date = CURRENT_DATE AND dian_status = 'Sent') AS sent_today,
+			COUNT(*) FILTER (WHERE dian_status IN ('Pending', 'DRAFT'))         AS pending,
+			COUNT(*) FILTER (WHERE dian_status = 'Error')                        AS rejected
+		FROM invoices
+		WHERE company_id = $1`
+
+	var out repository.DIANSummary
+	err := r.q.QueryRow(context.Background(), query, companyID).Scan(
+		&out.SentToday,
+		&out.Pending,
+		&out.Rejected,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("get dian summary: %w", err)
+	}
+	return &out, nil
+}
+
 // GetDetailsByInvoiceID obtiene todas las líneas de una factura.
 func (r *InvoiceRepo) GetDetailsByInvoiceID(invoiceID string) ([]*entity.InvoiceDetail, error) {
 	query := `

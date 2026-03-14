@@ -184,3 +184,10 @@ type InvoiceDIANStatusDTO struct {
 	TrackID    string `json:"track_id"`    // ZipKey devuelto por el WS DIAN
 	Errors     string `json:"errors"`      // Mensajes de rechazo de la DIAN (vacío si OK)
 }
+
+// DIANSummaryDTO resumen de estados DIAN para dashboard de facturación.
+type DIANSummaryDTO struct {
+	SentToday int `json:"sent_today"`
+	Pending   int `json:"pending"`
+	Rejected  int `json:"rejected"`
+}
