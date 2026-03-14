@@ -137,28 +137,26 @@ func (h *CRMHandler) AssignCategory(c *fiber.Ctx) error {
 // @Security     Bearer
 // @Accept       json
 // @Produce      json
-// @Param        id    path      string                 true  "Customer ID"
 // @Param        body  body      dto.AwardPointsRequest true  "Award points payload"
 // @Success      200   {object}  map[string]string
 // @Failure      400   {object}  dto.ErrorResponse
 // @Failure      404   {object}  dto.ErrorResponse
 // @Failure      409   {object}  dto.ErrorResponse
-// @Router       /api/crm/customers/{id}/points/award [post]
+// @Router       /api/crm/loyalty/points [post]
 func (h *CRMHandler) AwardPoints(c *fiber.Ctx) error {
 	companyID := GetCompanyID(c)
-	customerID := c.Params("id")
-	if companyID == "" || customerID == "" {
+	if companyID == "" {
 		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
 	}
 	var in dto.AwardPointsRequest
 	if err := c.BodyParser(&in); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
 	}
-	err := h.LoyaltyUC.AwardPoints(c.Context(), customerID, in.Points, in.Reason, in.ReferenceID)
+	err := h.LoyaltyUC.AwardPoints(c.Context(), in.CustomerID, in.Points, in.Reason, in.ReferenceID)
 	if err != nil {
 		switch err {
 		case domain.ErrInvalidInput:
-			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "points y reason son requeridos"})
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "customer_id, points y reason son requeridos"})
 		case domain.ErrNotFound:
 			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "cliente no encontrado"})
 		case domain.ErrConflict:
@@ -169,7 +167,7 @@ func (h *CRMHandler) AwardPoints(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"status": "ok"})
 }
 
-// GetLoyaltyBalance obtiene el balance de puntos y su historial.
+// GetLoyalty obtiene el balance de puntos y su historial.
 // @Summary      Balance de puntos
 // @Description  Devuelve balance actual, tier, próximo umbral e historial de eventos de puntos
 // @Tags         crm
@@ -178,8 +176,8 @@ func (h *CRMHandler) AwardPoints(c *fiber.Ctx) error {
 // @Param        id   path      string  true  "Customer ID"
 // @Success      200  {object}  dto.LoyaltyBalanceDTO
 // @Failure      404  {object}  dto.ErrorResponse
-// @Router       /api/crm/customers/{id}/points/balance [get]
-func (h *CRMHandler) GetLoyaltyBalance(c *fiber.Ctx) error {
+// @Router       /api/crm/customers/{id}/loyalty [get]
+func (h *CRMHandler) GetLoyalty(c *fiber.Ctx) error {
 	companyID := GetCompanyID(c)
 	customerID := c.Params("id")
 	if companyID == "" || customerID == "" {
@@ -207,28 +205,26 @@ func (h *CRMHandler) GetLoyaltyBalance(c *fiber.Ctx) error {
 // @Security     Bearer
 // @Accept       json
 // @Produce      json
-// @Param        id    path      string                  true  "Customer ID"
 // @Param        body  body      dto.RedeemPointsRequest true  "Redeem points payload"
 // @Success      200   {object}  map[string]string
 // @Failure      400   {object}  dto.ErrorResponse
 // @Failure      404   {object}  dto.ErrorResponse
 // @Failure      409   {object}  dto.ErrorResponse
-// @Router       /api/crm/customers/{id}/points/redeem [post]
+// @Router       /api/crm/loyalty/redeem [post]
 func (h *CRMHandler) RedeemPoints(c *fiber.Ctx) error {
 	companyID := GetCompanyID(c)
-	customerID := c.Params("id")
-	if companyID == "" || customerID == "" {
+	if companyID == "" {
 		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
 	}
 	var in dto.RedeemPointsRequest
 	if err := c.BodyParser(&in); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
 	}
-	err := h.LoyaltyUC.RedeemPoints(c.Context(), customerID, in.Points, in.Reason)
+	err := h.LoyaltyUC.RedeemPoints(c.Context(), in.CustomerID, in.Points, in.Reason)
 	if err != nil {
 		switch err {
 		case domain.ErrInvalidInput:
-			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "points y reason son requeridos"})
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "customer_id, points y reason son requeridos"})
 		case domain.ErrNotFound:
 			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "cliente no encontrado"})
 		case domain.ErrConflict:

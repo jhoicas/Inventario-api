@@ -53,6 +53,7 @@ type AssignCategoryRequest struct {
 
 // AwardPointsRequest body para acreditar puntos al cliente.
 type AwardPointsRequest struct {
+	CustomerID  string `json:"customer_id"`
 	Points      int    `json:"points"`
 	Reason      string `json:"reason"`
 	ReferenceID string `json:"reference_id"`
@@ -60,8 +61,9 @@ type AwardPointsRequest struct {
 
 // RedeemPointsRequest body para redimir puntos del cliente.
 type RedeemPointsRequest struct {
-	Points int    `json:"points"`
-	Reason string `json:"reason"`
+	CustomerID string `json:"customer_id"`
+	Points     int    `json:"points"`
+	Reason     string `json:"reason"`
 }
 
 // CreateBenefitRequest body para crear un beneficio en una categoría.

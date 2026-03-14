@@ -32,6 +32,8 @@ definitions:
     type: object
   dto.AwardPointsRequest:
     properties:
+      customer_id:
+        type: string
       points:
         type: integer
       reason:
@@ -858,6 +860,8 @@ definitions:
     type: object
   dto.RedeemPointsRequest:
     properties:
+      customer_id:
+        type: string
       points:
         type: integer
       reason:
@@ -1975,50 +1979,7 @@ paths:
       summary: Listar interacciones por cliente
       tags:
       - crm
-  /api/crm/customers/{id}/points/award:
-    post:
-      consumes:
-      - application/json
-      description: Acredita puntos de fidelización a un cliente y registra el motivo/referencia
-      parameters:
-      - description: Customer ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Award points payload
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/dto.AwardPointsRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/dto.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/dto.ErrorResponse'
-        "409":
-          description: Conflict
-          schema:
-            $ref: '#/definitions/dto.ErrorResponse'
-      security:
-      - Bearer: []
-      summary: Acreditar puntos
-      tags:
-      - crm
-  /api/crm/customers/{id}/points/balance:
+  /api/crm/customers/{id}/loyalty:
     get:
       description: Devuelve balance actual, tier, próximo umbral e historial de eventos
         de puntos
@@ -2042,49 +2003,6 @@ paths:
       security:
       - Bearer: []
       summary: Balance de puntos
-      tags:
-      - crm
-  /api/crm/customers/{id}/points/redeem:
-    post:
-      consumes:
-      - application/json
-      description: Debita puntos del balance del cliente y registra el motivo
-      parameters:
-      - description: Customer ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Redeem points payload
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/dto.RedeemPointsRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/dto.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/dto.ErrorResponse'
-        "409":
-          description: Conflict
-          schema:
-            $ref: '#/definitions/dto.ErrorResponse'
-      security:
-      - Bearer: []
-      summary: Redimir puntos
       tags:
       - crm
   /api/crm/customers/{id}/profile360:
@@ -2192,6 +2110,82 @@ paths:
       security:
       - Bearer: []
       summary: Registrar interacción
+      tags:
+      - crm
+  /api/crm/loyalty/points:
+    post:
+      consumes:
+      - application/json
+      description: Acredita puntos de fidelización a un cliente y registra el motivo/referencia
+      parameters:
+      - description: Award points payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.AwardPointsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Acreditar puntos
+      tags:
+      - crm
+  /api/crm/loyalty/redeem:
+    post:
+      consumes:
+      - application/json
+      description: Debita puntos del balance del cliente y registra el motivo
+      parameters:
+      - description: Redeem points payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.RedeemPointsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Redimir puntos
       tags:
       - crm
   /api/crm/opportunities:
