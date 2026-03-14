@@ -30,6 +30,15 @@ definitions:
       ltv:
         type: number
     type: object
+  dto.AwardPointsRequest:
+    properties:
+      points:
+        type: integer
+      reason:
+        type: string
+      reference_id:
+        type: string
+    type: object
   dto.BenefitResponse:
     properties:
       category_id:
@@ -599,6 +608,19 @@ definitions:
       user:
         $ref: '#/definitions/dto.UserResponse'
     type: object
+  dto.LoyaltyBalanceDTO:
+    properties:
+      balance:
+        type: integer
+      history:
+        items:
+          $ref: '#/definitions/dto.PointEventDTO'
+        type: array
+      next_tier_threshold:
+        type: integer
+      tier:
+        type: string
+    type: object
   dto.MarginByChannelDTO:
     properties:
       channel_id:
@@ -740,6 +762,17 @@ definitions:
       start_date:
         type: string
     type: object
+  dto.PointEventDTO:
+    properties:
+      occurred_at:
+        type: string
+      points:
+        type: integer
+      reason:
+        type: string
+      reference_id:
+        type: string
+    type: object
   dto.ProductListResponse:
     properties:
       items:
@@ -822,6 +855,13 @@ definitions:
       usage_pct:
         description: participación % sobre el costo total de materias primas
         type: number
+    type: object
+  dto.RedeemPointsRequest:
+    properties:
+      points:
+        type: integer
+      reason:
+        type: string
     type: object
   dto.RegisterMovementRequest:
     properties:
@@ -1933,6 +1973,118 @@ paths:
       security:
       - Bearer: []
       summary: Listar interacciones por cliente
+      tags:
+      - crm
+  /api/crm/customers/{id}/points/award:
+    post:
+      consumes:
+      - application/json
+      description: Acredita puntos de fidelización a un cliente y registra el motivo/referencia
+      parameters:
+      - description: Customer ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Award points payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.AwardPointsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Acreditar puntos
+      tags:
+      - crm
+  /api/crm/customers/{id}/points/balance:
+    get:
+      description: Devuelve balance actual, tier, próximo umbral e historial de eventos
+        de puntos
+      parameters:
+      - description: Customer ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.LoyaltyBalanceDTO'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Balance de puntos
+      tags:
+      - crm
+  /api/crm/customers/{id}/points/redeem:
+    post:
+      consumes:
+      - application/json
+      description: Debita puntos del balance del cliente y registra el motivo
+      parameters:
+      - description: Customer ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Redeem points payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.RedeemPointsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Redimir puntos
       tags:
       - crm
   /api/crm/customers/{id}/profile360:

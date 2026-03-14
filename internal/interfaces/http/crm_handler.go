@@ -130,6 +130,115 @@ func (h *CRMHandler) AssignCategory(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"status": "ok"})
 }
 
+// AwardPoints acredita puntos al cliente en el motor de fidelización.
+// @Summary      Acreditar puntos
+// @Description  Acredita puntos de fidelización a un cliente y registra el motivo/referencia
+// @Tags         crm
+// @Security     Bearer
+// @Accept       json
+// @Produce      json
+// @Param        id    path      string                 true  "Customer ID"
+// @Param        body  body      dto.AwardPointsRequest true  "Award points payload"
+// @Success      200   {object}  map[string]string
+// @Failure      400   {object}  dto.ErrorResponse
+// @Failure      404   {object}  dto.ErrorResponse
+// @Failure      409   {object}  dto.ErrorResponse
+// @Router       /api/crm/customers/{id}/points/award [post]
+func (h *CRMHandler) AwardPoints(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	customerID := c.Params("id")
+	if companyID == "" || customerID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	var in dto.AwardPointsRequest
+	if err := c.BodyParser(&in); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
+	}
+	err := h.LoyaltyUC.AwardPoints(c.Context(), customerID, in.Points, in.Reason, in.ReferenceID)
+	if err != nil {
+		switch err {
+		case domain.ErrInvalidInput:
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "points y reason son requeridos"})
+		case domain.ErrNotFound:
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "cliente no encontrado"})
+		case domain.ErrConflict:
+			return c.Status(fiber.StatusConflict).JSON(dto.ErrorResponse{Code: "CONFLICT", Message: "operación no permitida"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.JSON(fiber.Map{"status": "ok"})
+}
+
+// GetLoyaltyBalance obtiene el balance de puntos y su historial.
+// @Summary      Balance de puntos
+// @Description  Devuelve balance actual, tier, próximo umbral e historial de eventos de puntos
+// @Tags         crm
+// @Security     Bearer
+// @Produce      json
+// @Param        id   path      string  true  "Customer ID"
+// @Success      200  {object}  dto.LoyaltyBalanceDTO
+// @Failure      404  {object}  dto.ErrorResponse
+// @Router       /api/crm/customers/{id}/points/balance [get]
+func (h *CRMHandler) GetLoyaltyBalance(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	customerID := c.Params("id")
+	if companyID == "" || customerID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	out, err := h.LoyaltyUC.GetBalance(c.Context(), customerID)
+	if err != nil {
+		switch err {
+		case domain.ErrInvalidInput:
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "customer_id inválido"})
+		case domain.ErrNotFound:
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "cliente no encontrado"})
+		case domain.ErrConflict:
+			return c.Status(fiber.StatusConflict).JSON(dto.ErrorResponse{Code: "CONFLICT", Message: "operación no permitida"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.JSON(out)
+}
+
+// RedeemPoints redime puntos del cliente si tiene balance suficiente.
+// @Summary      Redimir puntos
+// @Description  Debita puntos del balance del cliente y registra el motivo
+// @Tags         crm
+// @Security     Bearer
+// @Accept       json
+// @Produce      json
+// @Param        id    path      string                  true  "Customer ID"
+// @Param        body  body      dto.RedeemPointsRequest true  "Redeem points payload"
+// @Success      200   {object}  map[string]string
+// @Failure      400   {object}  dto.ErrorResponse
+// @Failure      404   {object}  dto.ErrorResponse
+// @Failure      409   {object}  dto.ErrorResponse
+// @Router       /api/crm/customers/{id}/points/redeem [post]
+func (h *CRMHandler) RedeemPoints(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	customerID := c.Params("id")
+	if companyID == "" || customerID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	var in dto.RedeemPointsRequest
+	if err := c.BodyParser(&in); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
+	}
+	err := h.LoyaltyUC.RedeemPoints(c.Context(), customerID, in.Points, in.Reason)
+	if err != nil {
+		switch err {
+		case domain.ErrInvalidInput:
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "points y reason son requeridos"})
+		case domain.ErrNotFound:
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "cliente no encontrado"})
+		case domain.ErrConflict:
+			return c.Status(fiber.StatusConflict).JSON(dto.ErrorResponse{Code: "CONFLICT", Message: "puntos insuficientes"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.JSON(fiber.Map{"status": "ok"})
+}
+
 // ListCategories lista categorías de fidelización.
 // @Summary      Listar categorías CRM
 // @Description  Lista las categorías de fidelización configuradas para la empresa

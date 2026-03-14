@@ -244,6 +244,9 @@ func Router(app *fiber.App, deps RouterDeps) {
 		h := deps.CRMHandler
 		crmGroup.Get("/customers/:id/profile360", h.GetProfile360)
 		crmGroup.Put("/customers/:id/category", h.AssignCategory)
+		crmGroup.Post("/customers/:id/points/award", h.AwardPoints)
+		crmGroup.Get("/customers/:id/points/balance", h.GetLoyaltyBalance)
+		crmGroup.Post("/customers/:id/points/redeem", h.RedeemPoints)
 		crmGroup.Get("/categories", h.ListCategories)
 		crmGroup.Get("/categories/:id/benefits", h.ListBenefitsByCategory)
 		// Beneficios: escritura solo admin

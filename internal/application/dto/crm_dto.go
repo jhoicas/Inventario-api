@@ -51,6 +51,19 @@ type AssignCategoryRequest struct {
 	LTV        decimal.Decimal `json:"ltv"`
 }
 
+// AwardPointsRequest body para acreditar puntos al cliente.
+type AwardPointsRequest struct {
+	Points      int    `json:"points"`
+	Reason      string `json:"reason"`
+	ReferenceID string `json:"reference_id"`
+}
+
+// RedeemPointsRequest body para redimir puntos del cliente.
+type RedeemPointsRequest struct {
+	Points int    `json:"points"`
+	Reason string `json:"reason"`
+}
+
 // CreateBenefitRequest body para crear un beneficio en una categoría.
 type CreateBenefitRequest struct {
 	Name        string `json:"name" validate:"required,min=1,max=200"`
