@@ -139,6 +139,32 @@ type InvoiceListResponse struct {
 	Offset int               `json:"offset"`
 }
 
+// InvoiceSummaryDTO resumen ligero de factura para uso en historial de compras por cliente.
+type InvoiceSummaryDTO struct {
+	ID           string          `json:"id"`
+	Prefix       string          `json:"prefix"`
+	Number       string          `json:"number"`
+	Date         string          `json:"date"`
+	GrandTotal   decimal.Decimal `json:"grand_total"`
+	DocumentType string          `json:"document_type"`
+	DIANStatus   string          `json:"dian_status"`
+}
+
+// CustomerPurchaseStatsDTO estadísticas de compra agregadas para un cliente.
+type CustomerPurchaseStatsDTO struct {
+	TotalPurchases   decimal.Decimal `json:"total_purchases"`
+	AvgTicket        decimal.Decimal `json:"avg_ticket"`
+	LastPurchaseDate string          `json:"last_purchase_date"` // RFC3339 o vacío
+	InvoiceCount     int             `json:"invoice_count"`
+}
+
+// PurchaseHistoryResponse respuesta de GET /api/crm/customers/:id/purchase-history.
+type PurchaseHistoryResponse struct {
+	Stats    CustomerPurchaseStatsDTO `json:"stats"`
+	Invoices []InvoiceSummaryDTO      `json:"invoices"`
+	Total    int64                    `json:"total"`
+}
+
 // InvoiceDIANStatusDTO respuesta ligera para el endpoint de polling
 // GET /api/invoices/:id/status.
 // El frontend consulta este endpoint periódicamente hasta que dian_status sea

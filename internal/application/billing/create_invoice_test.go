@@ -367,6 +367,14 @@ func (f *fakeInvoiceRepo) List(filter repository.InvoiceListFilter) ([]*entity.I
 	return nil, 0, nil
 }
 
+func (f *fakeInvoiceRepo) ListByCustomer(customerID string, limit, offset int) ([]*entity.Invoice, int64, error) {
+	return nil, 0, nil
+}
+
+func (f *fakeInvoiceRepo) GetCustomerStats(customerID string) (*repository.CustomerPurchaseStats, error) {
+	return nil, nil
+}
+
 var _ repository.InvoiceRepository = (*fakeInvoiceRepo)(nil)
 
 // ── Helpers de dominio ────────────────────────────────────────────────────────

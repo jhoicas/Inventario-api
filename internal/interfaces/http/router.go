@@ -264,6 +264,11 @@ func Router(app *fiber.App, deps RouterDeps) {
 		crmGroup.Post("/opportunities", h.CreateOpportunity)
 		crmGroup.Put("/opportunities/:id/stage", h.UpdateOpportunityStage)
 		crmGroup.Get("/opportunities/funnel", h.GetOpportunityFunnel)
+		// Historial de compras: requiere módulo billing activo además de crm
+		crmGroup.Get("/customers/:id/purchase-history",
+			RequireModule(entity.ModuleBilling, deps.ModuleService),
+			h.GetPurchaseHistory,
+		)
 	}
 
 	// ── IA (reservado para futuros usos; sugerencia de clasificación de productos deshabilitada — parametrización manual)

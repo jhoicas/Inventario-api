@@ -10,7 +10,14 @@ import (
 	"github.com/jhoicas/Inventario-api/internal/application/dto"
 	"github.com/jhoicas/Inventario-api/internal/domain"
 	"github.com/jhoicas/Inventario-api/internal/domain/entity"
+	"github.com/jhoicas/Inventario-api/internal/domain/repository"
 )
+
+// invoiceHistoryRepo es la interfaz mínima de InvoiceRepository que necesita CRMHandler.
+type invoiceHistoryRepo interface {
+	ListByCustomer(customerID string, limit, offset int) ([]*entity.Invoice, int64, error)
+	GetCustomerStats(customerID string) (*repository.CustomerPurchaseStats, error)
+}
 
 // CRMHandler maneja las peticiones HTTP del módulo CRM (protegido + RequireModule crm).
 type CRMHandler struct {
@@ -19,6 +26,7 @@ type CRMHandler struct {
 	PQRUC           *crm.PQRUseCase
 	AICRMUC         *crm.AICRMUseCase
 	OpportunityUC   *crm.OpportunityUseCase
+	InvoiceHistory  invoiceHistoryRepo
 	InteractionRepo interface {
 		Create(interaction *entity.CRMInteraction) error
 		ListByCustomer(customerID string, limit, offset int) ([]*entity.CRMInteraction, error)
@@ -36,6 +44,7 @@ func NewCRMHandler(
 		ListByCustomer(customerID string, limit, offset int) ([]*entity.CRMInteraction, error)
 	},
 	opportunityUC *crm.OpportunityUseCase,
+	invoiceHistory invoiceHistoryRepo,
 ) *CRMHandler {
 	return &CRMHandler{
 		LoyaltyUC:       loyaltyUC,
@@ -43,6 +52,7 @@ func NewCRMHandler(
 		PQRUC:           pqrUC,
 		AICRMUC:         aiCRMUC,
 		OpportunityUC:   opportunityUC,
+		InvoiceHistory:  invoiceHistory,
 		InteractionRepo: interactionRepo,
 	}
 }
@@ -677,6 +687,83 @@ func (h *CRMHandler) GetOpportunityFunnel(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}
 	return c.JSON(out)
+}
+
+// GetPurchaseHistory retorna el historial de compras y estadísticas de un cliente.
+// Solo disponible cuando el módulo billing está activo (garantizado por el router).
+// @Summary      Historial de compras del cliente
+// @Description  Devuelve estadísticas agregadas y lista de facturas paginadas del cliente
+// @Tags         crm
+// @Security     Bearer
+// @Produce      json
+// @Param        id      path   string  true  "Customer ID"
+// @Param        limit   query  int     false "Límite de facturas a retornar (máx 100)"
+// @Param        offset  query  int     false "Offset para paginación"
+// @Success      200  {object}  dto.PurchaseHistoryResponse
+// @Failure      401  {object}  dto.ErrorResponse
+// @Failure      503  {object}  dto.ErrorResponse
+// @Failure      500  {object}  dto.ErrorResponse
+// @Router       /api/crm/customers/{id}/purchase-history [get]
+func (h *CRMHandler) GetPurchaseHistory(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	customerID := c.Params("id")
+	if companyID == "" || customerID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if h.InvoiceHistory == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "módulo billing no disponible"})
+	}
+
+	limit := c.QueryInt("limit", 20)
+	offset := c.QueryInt("offset", 0)
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	stats, err := h.InvoiceHistory.GetCustomerStats(customerID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+
+	invoices, total, err := h.InvoiceHistory.ListByCustomer(customerID, limit, offset)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+
+	summaries := make([]dto.InvoiceSummaryDTO, 0, len(invoices))
+	for _, inv := range invoices {
+		summaries = append(summaries, dto.InvoiceSummaryDTO{
+			ID:           inv.ID,
+			Prefix:       inv.Prefix,
+			Number:       inv.Number,
+			Date:         inv.Date.Format(time.RFC3339),
+			GrandTotal:   inv.GrandTotal,
+			DocumentType: inv.DocumentType,
+			DIANStatus:   inv.DIAN_Status,
+		})
+	}
+
+	var lastPurchaseStr string
+	if !stats.LastPurchaseDate.IsZero() {
+		lastPurchaseStr = stats.LastPurchaseDate.Format(time.RFC3339)
+	}
+
+	return c.JSON(dto.PurchaseHistoryResponse{
+		Stats: dto.CustomerPurchaseStatsDTO{
+			TotalPurchases:   stats.TotalPurchases,
+			AvgTicket:        stats.AvgTicket,
+			LastPurchaseDate: lastPurchaseStr,
+			InvoiceCount:     stats.InvoiceCount,
+		},
+		Invoices: summaries,
+		Total:    total,
+	})
 }
 
 // GenerateCampaignCopy genera copy de campaña con IA.

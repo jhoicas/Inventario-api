@@ -1,6 +1,11 @@
 package repository
 
-import "github.com/jhoicas/Inventario-api/internal/domain/entity"
+import (
+	"time"
+
+	"github.com/jhoicas/Inventario-api/internal/domain/entity"
+	"github.com/shopspring/decimal"
+)
 
 // InvoiceRepository define el puerto de persistencia para Invoice y detalles.
 type InvoiceRepository interface {
@@ -22,6 +27,12 @@ type InvoiceRepository interface {
 	// List devuelve facturas filtradas y paginadas para una empresa.
 	// Los campos vacíos/cero de InvoiceListFilter se ignoran.
 	List(filter InvoiceListFilter) ([]*entity.Invoice, int, error)
+
+	// ListByCustomer devuelve las facturas de un cliente con paginación.
+	ListByCustomer(customerID string, limit, offset int) ([]*entity.Invoice, int64, error)
+
+	// GetCustomerStats retorna estadísticas de compra agregadas para un cliente.
+	GetCustomerStats(customerID string) (*CustomerPurchaseStats, error)
 }
 
 // InvoiceListFilter parámetros de consulta para el listado de facturas.
@@ -34,4 +45,12 @@ type InvoiceListFilter struct {
 	Prefix     string
 	Limit      int
 	Offset     int
+}
+
+// CustomerPurchaseStats estadísticas de compra agregadas de un cliente.
+type CustomerPurchaseStats struct {
+	TotalPurchases   decimal.Decimal
+	AvgTicket        decimal.Decimal
+	LastPurchaseDate time.Time
+	InvoiceCount     int
 }

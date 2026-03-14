@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jhoicas/Inventario-api/internal/domain/entity"
 	"github.com/jhoicas/Inventario-api/internal/domain/repository"
+	"github.com/shopspring/decimal"
 )
 
 var _ repository.InvoiceRepository = (*InvoiceRepo)(nil)
@@ -383,4 +384,115 @@ func (r *InvoiceRepo) List(filter repository.InvoiceListFilter) ([]*entity.Invoi
 	}
 
 	return list, total, nil
+}
+
+// ListByCustomer devuelve las facturas de un cliente con paginación.
+func (r *InvoiceRepo) ListByCustomer(customerID string, limit, offset int) ([]*entity.Invoice, int64, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	var total int64
+	const countQ = `SELECT COUNT(1) FROM invoices WHERE customer_id = $1`
+	if err := r.q.QueryRow(context.Background(), countQ, customerID).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("count invoices by customer: %w", err)
+	}
+
+	const dataQ = `
+		SELECT id, company_id, customer_id, prefix, number, date,
+		       net_total, tax_total, grand_total, dian_status,
+		       COALESCE(cufe, ''), COALESCE(uuid, ''), COALESCE(xml_signed, ''),
+		       COALESCE(qr_data, ''), COALESCE(track_id_dian, ''), COALESCE(dian_errors, ''),
+		       COALESCE(document_type, ''),
+		       COALESCE(original_invoice_id, ''),
+		       COALESCE(original_invoice_number, ''),
+		       COALESCE(original_invoice_cufe, ''),
+		       original_invoice_issue_on,
+		       COALESCE(discrepancy_code, ''),
+		       COALESCE(discrepancy_reason, ''),
+		       created_at, updated_at
+		FROM invoices
+		WHERE customer_id = $1
+		ORDER BY date DESC, created_at DESC
+		LIMIT $2 OFFSET $3`
+
+	rows, err := r.q.Query(context.Background(), dataQ, customerID, limit, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list invoices by customer: %w", err)
+	}
+	defer rows.Close()
+
+	var list []*entity.Invoice
+	for rows.Next() {
+		var inv entity.Invoice
+		var origIssueOn *time.Time
+		var discCode string
+		if err := rows.Scan(
+			&inv.ID, &inv.CompanyID, &inv.CustomerID, &inv.Prefix, &inv.Number,
+			&inv.Date, &inv.NetTotal, &inv.TaxTotal, &inv.GrandTotal,
+			&inv.DIAN_Status, &inv.CUFE, &inv.UUID, &inv.XMLSigned,
+			&inv.QRData, &inv.TrackID, &inv.DIANErrors,
+			&inv.DocumentType,
+			&inv.OriginalInvoiceID,
+			&inv.OriginalInvoiceNumber,
+			&inv.OriginalInvoiceCUFE,
+			&origIssueOn,
+			&discCode,
+			&inv.DiscrepancyReason,
+			&inv.CreatedAt, &inv.UpdatedAt,
+		); err != nil {
+			return nil, 0, fmt.Errorf("scan invoice by customer: %w", err)
+		}
+		if origIssueOn != nil {
+			inv.OriginalInvoiceIssueOn = *origIssueOn
+		}
+		if discCode != "" {
+			inv.DiscrepancyCode = entity.CreditNoteConcept(discCode)
+		}
+		list = append(list, &inv)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("iterate invoices by customer: %w", err)
+	}
+	return list, total, nil
+}
+
+// GetCustomerStats retorna estadísticas de compra agregadas para un cliente.
+func (r *InvoiceRepo) GetCustomerStats(customerID string) (*repository.CustomerPurchaseStats, error) {
+	const q = `
+		SELECT
+			COALESCE(SUM(grand_total), 0)                    AS total_purchases,
+			COALESCE(AVG(grand_total), 0)                    AS avg_ticket,
+			COALESCE(MAX(date), '0001-01-01'::date)          AS last_purchase_date,
+			COALESCE(COUNT(1), 0)                            AS invoice_count
+		FROM invoices
+		WHERE customer_id = $1`
+
+	var stats repository.CustomerPurchaseStats
+	var lastDate *time.Time
+	var totalPurchases, avgTicket decimal.Decimal
+	var count int64
+
+	if err := r.q.QueryRow(context.Background(), q, customerID).Scan(
+		&totalPurchases,
+		&avgTicket,
+		&lastDate,
+		&count,
+	); err != nil {
+		return nil, fmt.Errorf("get customer stats: %w", err)
+	}
+
+	stats.TotalPurchases = totalPurchases
+	stats.AvgTicket = avgTicket
+	stats.InvoiceCount = int(count)
+	if lastDate != nil {
+		stats.LastPurchaseDate = *lastDate
+	}
+	return &stats, nil
 }
