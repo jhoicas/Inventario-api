@@ -139,7 +139,7 @@ func headerRow(invoice *entity.Invoice, company *entity.Company) core.Row {
 
 // emisorRow: datos del emisor (empresa).
 func emisorRow(company *entity.Company) core.Row {
-	return row.New(12).Add(
+	return row.New(14).Add(
 		col.New(12).Add(
 			text.New("DATOS DEL EMISOR", props.Text{
 				Style: fontstyle.Bold, Size: 8, Color: colorPrimary, Top: 1,
@@ -148,14 +148,14 @@ func emisorRow(company *entity.Company) core.Row {
 				nonEmpty(company.Address, "—"),
 				nonEmpty(company.Phone, "—"),
 				nonEmpty(company.Email, "—"),
-			), props.Text{Size: 8, Top: 7, Color: colorGray}),
+			), props.Text{Size: 8, Top: 8, Color: colorGray}),
 		),
 	)
 }
 
 // receptorRow: datos del comprador.
 func receptorRow(customer *entity.Customer) core.Row {
-	return row.New(14).Add(
+	return row.New(18).Add(
 		col.New(12).Add(
 			text.New("RECEPTOR / ADQUIRIENTE", props.Text{
 				Style: fontstyle.Bold, Size: 8, Color: colorPrimary, Top: 1,
@@ -167,7 +167,7 @@ func receptorRow(customer *entity.Customer) core.Row {
 				customer.TaxID,
 				nonEmpty(customer.Email, "—"),
 				nonEmpty(customer.Phone, "—"),
-			), props.Text{Size: 8, Top: 12, Color: colorGray}),
+			), props.Text{Size: 8, Top: 13, Color: colorGray}),
 		),
 	)
 }
