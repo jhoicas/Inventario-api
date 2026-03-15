@@ -39,14 +39,15 @@ type InvoiceRepository interface {
 
 // InvoiceListFilter parámetros de consulta para el listado de facturas.
 type InvoiceListFilter struct {
-	CompanyID  string
-	StartDate  string // YYYY-MM-DD; vacío = sin límite inferior
-	EndDate    string // YYYY-MM-DD; vacío = sin límite superior
-	CustomerID string
-	DIANStatus string
-	Prefix     string
-	Limit      int
-	Offset     int
+	CompanyID    string
+	StartDate    string // YYYY-MM-DD; vacío = sin límite inferior
+	EndDate      string // YYYY-MM-DD; vacío = sin límite superior
+	CustomerID   string
+	DIANStatus   string
+	DocumentType string
+	Prefix       string
+	Limit        int
+	Offset       int
 }
 
 // CustomerPurchaseStats estadísticas de compra agregadas de un cliente.

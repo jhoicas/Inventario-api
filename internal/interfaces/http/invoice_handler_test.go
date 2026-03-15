@@ -1805,3 +1805,47 @@ func TestInvoiceHandler_GetDIANSummary(t *testing.T) {
 		})
 	}
 }
+
+func TestInvoiceHandler_GetCreditNotes(t *testing.T) {
+	uc := &fakeCreateInvoiceUseCase{
+		listInvoicesFunc: func(_ context.Context, companyID string, in dto.InvoiceFilter) (*dto.InvoiceListResponse, error) {
+			assert.Equal(t, invoiceTestCompanyID, companyID)
+			assert.Equal(t, "CREDIT_NOTE", in.DocumentType)
+			assert.Equal(t, 5, in.Limit)
+			assert.Equal(t, 10, in.Offset)
+			return &dto.InvoiceListResponse{
+				Items:  []dto.InvoiceResponse{{ID: "cn-1", Prefix: "NC", Number: "1001", DIAN_Status: "DRAFT"}},
+				Total:  1,
+				Limit:  5,
+				Offset: 10,
+			}, nil
+		},
+	}
+
+	handler := NewInvoiceHandlerWithBillingOps(
+		uc,
+		&fakeCreateCreditNoteUseCase{},
+		&fakeCreateDebitNoteUseCase{},
+		&fakeVoidInvoiceUseCase{},
+		&fakeInvoicePDFUseCase{},
+		&fakeInvoiceMailerUseCase{},
+	)
+
+	app := fiber.New(fiber.Config{DisableStartupMessage: true})
+	app.Use(mockInvoiceAuthCompanyOnly(invoiceTestCompanyID))
+	app.Get("/invoices/credit-notes", handler.GetCreditNotes)
+
+	req := httptest.NewRequest(http.MethodGet, "/invoices/credit-notes?limit=5&offset=10", nil)
+	resp, err := app.Test(req, -1)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var out dto.InvoiceListResponse
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+	assert.Equal(t, 1, out.Total)
+	require.Len(t, out.Items, 1)
+	assert.Equal(t, "cn-1", out.Items[0].ID)
+	assert.Equal(t, "NC", out.Items[0].Prefix)
+}

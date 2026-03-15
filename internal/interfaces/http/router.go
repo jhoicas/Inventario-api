@@ -187,6 +187,10 @@ func Router(app *fiber.App, deps RouterDeps) {
 		RequireRole(entity.RoleAdmin, entity.RoleVendedor),
 		invoiceHandler.GetInvoices,
 	)
+	invGroup2.Get("/credit-notes",
+		RequireRole(entity.RoleAdmin, entity.RoleVendedor),
+		invoiceHandler.GetCreditNotes,
+	)
 	// POST — emitir factura: admin y vendedor
 	invGroup2.Post("/",
 		RequireRole(entity.RoleAdmin, entity.RoleVendedor),

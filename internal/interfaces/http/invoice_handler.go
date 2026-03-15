@@ -134,13 +134,55 @@ func (h *InvoiceHandler) GetInvoices(c *fiber.Ctx) error {
 	}
 
 	filter := dto.InvoiceFilter{
-		StartDate:  c.Query("start_date"),
-		EndDate:    c.Query("end_date"),
-		CustomerID: c.Query("customer_id"),
-		DIANStatus: c.Query("dian_status"),
-		Prefix:     c.Query("prefix"),
-		Limit:      c.QueryInt("limit", 20),
-		Offset:     c.QueryInt("offset", 0),
+		StartDate:    c.Query("start_date"),
+		EndDate:      c.Query("end_date"),
+		CustomerID:   c.Query("customer_id"),
+		DIANStatus:   c.Query("dian_status"),
+		DocumentType: c.Query("document_type"),
+		Prefix:       c.Query("prefix"),
+		Limit:        c.QueryInt("limit", 20),
+		Offset:       c.QueryInt("offset", 0),
+	}
+
+	out, err := h.uc.ListInvoices(c.Context(), companyID, filter)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.JSON(out)
+}
+
+// GetCreditNotes godoc
+// @Summary      Listar notas crédito
+// @Description  Devuelve notas crédito paginadas filtradas por fecha, cliente, estado DIAN y prefijo
+// @Tags         billing
+// @Security     Bearer
+// @Produce      json
+// @Param        start_date   query     string  false  "Fecha inicio (YYYY-MM-DD)"
+// @Param        end_date     query     string  false  "Fecha fin (YYYY-MM-DD)"
+// @Param        customer_id  query     string  false  "ID del cliente"
+// @Param        dian_status  query     string  false  "Estado DIAN"
+// @Param        prefix       query     string  false  "Prefijo de la nota crédito"
+// @Param        limit        query     int     false  "Límite de resultados"   default(20)
+// @Param        offset       query     int     false  "Desplazamiento"         default(0)
+// @Success      200  {object}  dto.InvoiceListResponse
+// @Failure      401  {object}  dto.ErrorResponse
+// @Failure      500  {object}  dto.ErrorResponse
+// @Router       /api/invoices/credit-notes [get]
+func (h *InvoiceHandler) GetCreditNotes(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	if companyID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+
+	filter := dto.InvoiceFilter{
+		StartDate:    c.Query("start_date"),
+		EndDate:      c.Query("end_date"),
+		CustomerID:   c.Query("customer_id"),
+		DIANStatus:   c.Query("dian_status"),
+		DocumentType: "CREDIT_NOTE",
+		Prefix:       c.Query("prefix"),
+		Limit:        c.QueryInt("limit", 20),
+		Offset:       c.QueryInt("offset", 0),
 	}
 
 	out, err := h.uc.ListInvoices(c.Context(), companyID, filter)

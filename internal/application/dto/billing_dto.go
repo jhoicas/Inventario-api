@@ -130,13 +130,14 @@ type InvoiceDetailResponse struct {
 
 // InvoiceFilter parámetros de filtrado y paginación para GET /api/invoices.
 type InvoiceFilter struct {
-	StartDate  string `query:"start_date"` // YYYY-MM-DD
-	EndDate    string `query:"end_date"`   // YYYY-MM-DD
-	CustomerID string `query:"customer_id"`
-	DIANStatus string `query:"dian_status"`
-	Prefix     string `query:"prefix"`
-	Limit      int    `query:"limit"`
-	Offset     int    `query:"offset"`
+	StartDate    string `query:"start_date"` // YYYY-MM-DD
+	EndDate      string `query:"end_date"`   // YYYY-MM-DD
+	CustomerID   string `query:"customer_id"`
+	DIANStatus   string `query:"dian_status"`
+	DocumentType string `query:"document_type"`
+	Prefix       string `query:"prefix"`
+	Limit        int    `query:"limit"`
+	Offset       int    `query:"offset"`
 }
 
 // InvoiceListResponse respuesta paginada de facturas.

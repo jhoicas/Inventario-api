@@ -319,6 +319,11 @@ func (r *InvoiceRepo) List(filter repository.InvoiceListFilter) ([]*entity.Invoi
 		conds = append(conds, fmt.Sprintf("dian_status = $%d", idx))
 		idx++
 	}
+	if filter.DocumentType != "" {
+		args = append(args, filter.DocumentType)
+		conds = append(conds, fmt.Sprintf("COALESCE(document_type, 'INVOICE') = $%d", idx))
+		idx++
+	}
 	if filter.Prefix != "" {
 		args = append(args, filter.Prefix)
 		conds = append(conds, fmt.Sprintf("prefix = $%d", idx))

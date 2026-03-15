@@ -326,14 +326,15 @@ func (uc *CreateInvoiceUseCase) ListInvoices(ctx context.Context, companyID stri
 	}
 
 	invoices, total, err := uc.invoiceRepo.List(repository.InvoiceListFilter{
-		CompanyID:  companyID,
-		StartDate:  in.StartDate,
-		EndDate:    in.EndDate,
-		CustomerID: in.CustomerID,
-		DIANStatus: in.DIANStatus,
-		Prefix:     in.Prefix,
-		Limit:      limit,
-		Offset:     offset,
+		CompanyID:    companyID,
+		StartDate:    in.StartDate,
+		EndDate:      in.EndDate,
+		CustomerID:   in.CustomerID,
+		DIANStatus:   in.DIANStatus,
+		DocumentType: in.DocumentType,
+		Prefix:       in.Prefix,
+		Limit:        limit,
+		Offset:       offset,
 	})
 	if err != nil {
 		return nil, err
