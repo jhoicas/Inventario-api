@@ -292,3 +292,132 @@ func TestRouter_StocktakeRoutesProtections(t *testing.T) {
 		})
 	}
 }
+
+type fakeDIANSettingsRepoForRouter struct{}
+
+func (f *fakeDIANSettingsRepoForRouter) Upsert(ctx context.Context, settings *entity.DIANSettings) error {
+	return nil
+}
+
+func (f *fakeDIANSettingsRepoForRouter) GetByCompanyID(ctx context.Context, companyID string) (*entity.DIANSettings, error) {
+	return nil, nil
+}
+
+func TestRouter_DIANSettingsGetRouteProtections(t *testing.T) {
+	dianSettingsUC := usecase.NewDIANSettingsUseCase(
+		&fakeCompanyRepoForRouter{},
+		&fakeDIANSettingsRepoForRouter{},
+		nil,
+		nil,
+	)
+
+	routes := []string{
+		"/api/settings/dian",
+		"/api/dian/settings",
+		"/api/dian/configuration",
+	}
+
+	tests := []struct {
+		name           string
+		authHeader     string
+		moduleActive   bool
+		expectedStatus int
+		expectedCode   string
+	}{
+		{
+			name:           "Unauthorized_NoToken",
+			authHeader:     "",
+			moduleActive:   true,
+			expectedStatus: http.StatusUnauthorized,
+			expectedCode:   "MISSING_TOKEN",
+		},
+		{
+			name:           "Forbidden_ModuleDisabled",
+			authHeader:     tokenForRouterRole(t, entity.RoleAdmin),
+			moduleActive:   false,
+			expectedStatus: http.StatusForbidden,
+			expectedCode:   "MODULE_DISABLED",
+		},
+		{
+			name:           "Forbidden_RoleNotAllowed",
+			authHeader:     tokenForRouterRole(t, entity.RoleVendedor),
+			moduleActive:   true,
+			expectedStatus: http.StatusForbidden,
+			expectedCode:   "FORBIDDEN",
+		},
+		{
+			name:           "PassesMiddlewares_ReachesHandler",
+			authHeader:     tokenForRouterRole(t, entity.RoleAdmin),
+			moduleActive:   true,
+			expectedStatus: http.StatusNotFound,
+			expectedCode:   "NOT_FOUND",
+		},
+	}
+
+	for _, route := range routes {
+		for _, tt := range tests {
+			t.Run(route+"/"+tt.name, func(t *testing.T) {
+				companyRepo := &fakeCompanyRepoForRouter{hasActiveModuleFunc: func(ctx context.Context, companyID, moduleName string) (bool, error) {
+					if companyID != routerTestCompanyID {
+						return false, nil
+					}
+					if moduleName != entity.ModuleBilling {
+						return false, nil
+					}
+					return tt.moduleActive, nil
+				}}
+
+				app := fiber.New(fiber.Config{DisableStartupMessage: true})
+				Router(app, RouterDeps{
+					ModuleService:  usecase.NewModuleService(companyRepo),
+					DIANSettingsUC: dianSettingsUC,
+					JWTSecret:      routerTestJWTSecret,
+				})
+
+				req := httptest.NewRequest(http.MethodGet, route, nil)
+				if tt.authHeader != "" {
+					req.Header.Set("Authorization", tt.authHeader)
+				}
+
+				resp, err := app.Test(req, -1)
+				require.NoError(t, err)
+				defer resp.Body.Close()
+
+				assert.Equal(t, tt.expectedStatus, resp.StatusCode)
+				var out map[string]any
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+				assert.Equal(t, tt.expectedCode, out["code"])
+			})
+		}
+	}
+
+	for _, route := range routes {
+		t.Run(route+"/RoutePathExists", func(t *testing.T) {
+			companyRepo := &fakeCompanyRepoForRouter{hasActiveModuleFunc: func(ctx context.Context, companyID, moduleName string) (bool, error) {
+				if moduleName == entity.ModuleBilling {
+					return true, nil
+				}
+				return false, nil
+			}}
+
+			app := fiber.New(fiber.Config{DisableStartupMessage: true})
+			Router(app, RouterDeps{
+				ModuleService:  usecase.NewModuleService(companyRepo),
+				DIANSettingsUC: dianSettingsUC,
+				JWTSecret:      routerTestJWTSecret,
+			})
+
+			req := httptest.NewRequest(http.MethodGet, route, nil)
+			req.Header.Set("Authorization", tokenForRouterRole(t, entity.RoleAdmin))
+
+			resp, err := app.Test(req, -1)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+
+			assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+			var out map[string]any
+			require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+			assert.Equal(t, "NOT_FOUND", out["code"])
+		})
+	}
+}

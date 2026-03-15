@@ -108,3 +108,33 @@ func (uc *DIANSettingsUseCase) Save(companyID string, in dto.UpsertDIANSettingsR
 		UpdatedAt:           settings.UpdatedAt,
 	}, nil
 }
+
+func (uc *DIANSettingsUseCase) Get(companyID string) (*dto.DIANSettingsResponse, error) {
+	if strings.TrimSpace(companyID) == "" {
+		return nil, domain.ErrUnauthorized
+	}
+
+	company, err := uc.companyRepo.GetByID(companyID)
+	if err != nil {
+		return nil, err
+	}
+	if company == nil {
+		return nil, domain.ErrNotFound
+	}
+
+	settings, err := uc.settingsRepo.GetByCompanyID(context.Background(), companyID)
+	if err != nil {
+		return nil, err
+	}
+	if settings == nil {
+		return nil, domain.ErrNotFound
+	}
+
+	return &dto.DIANSettingsResponse{
+		CompanyID:           settings.CompanyID,
+		Environment:         settings.Environment,
+		CertificateFileName: settings.CertificateFileName,
+		CertificateFileSize: settings.CertificateFileSize,
+		UpdatedAt:           settings.UpdatedAt,
+	}, nil
+}

@@ -130,15 +130,30 @@ func Router(app *fiber.App, deps RouterDeps) {
 
 	if deps.DIANSettingsUC != nil {
 		settingsHandler := NewSettingsHandler(deps.DIANSettingsUC)
+		protected.Get("/settings/dian",
+			RequireModule(entity.ModuleBilling, deps.ModuleService),
+			RequireRole(entity.RoleAdmin),
+			settingsHandler.GetDIANSettings,
+		)
 		protected.Put("/settings/dian",
 			RequireModule(entity.ModuleBilling, deps.ModuleService),
 			RequireRole(entity.RoleAdmin),
 			settingsHandler.UpdateDIANSettings,
 		)
+		protected.Get("/dian/settings",
+			RequireModule(entity.ModuleBilling, deps.ModuleService),
+			RequireRole(entity.RoleAdmin),
+			settingsHandler.GetDIANSettings,
+		)
 		protected.Put("/dian/settings",
 			RequireModule(entity.ModuleBilling, deps.ModuleService),
 			RequireRole(entity.RoleAdmin),
 			settingsHandler.UpdateDIANSettings,
+		)
+		protected.Get("/dian/configuration",
+			RequireModule(entity.ModuleBilling, deps.ModuleService),
+			RequireRole(entity.RoleAdmin),
+			settingsHandler.GetDIANSettings,
 		)
 		protected.Put("/dian/configuration",
 			RequireModule(entity.ModuleBilling, deps.ModuleService),

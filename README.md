@@ -83,6 +83,12 @@ curl -X PUT http://localhost:8080/api/settings/dian `
   -F "certificate=@C:/ruta/certificado.p12;type=application/x-pkcs12"
 ```
 
+**Consultar configuración activa:**
+```powershell
+curl -X GET http://localhost:8080/api/settings/dian `
+  -H "Authorization: Bearer <TOKEN_ADMIN>"
+```
+
 **Aliases soportados:**
 ```powershell
 curl -X PUT http://localhost:8080/api/dian/settings `
@@ -96,6 +102,12 @@ curl -X PUT http://localhost:8080/api/dian/configuration `
   -F "environment=test" `
   -F "certificate_password=tu_password_p12" `
   -F "certificate=@C:/ruta/certificado.p12;type=application/x-pkcs12"
+
+curl -X GET http://localhost:8080/api/dian/settings `
+  -H "Authorization: Bearer <TOKEN_ADMIN>"
+
+curl -X GET http://localhost:8080/api/dian/configuration `
+  -H "Authorization: Bearer <TOKEN_ADMIN>"
 ```
 
 Validaciones clave:

@@ -19,6 +19,14 @@ import (
 
 type fakeDIANSettingsUseCase struct {
 	saveFunc func(companyID string, in dto.UpsertDIANSettingsRequest) (*dto.DIANSettingsResponse, error)
+	getFunc  func(companyID string) (*dto.DIANSettingsResponse, error)
+}
+
+func newSettingsTestApp() *fiber.App {
+	return fiber.New(fiber.Config{
+		DisableStartupMessage: true,
+		BodyLimit:             int(maxDIANCertificateSizeBytes) * 3,
+	})
 }
 
 func (f *fakeDIANSettingsUseCase) Save(companyID string, in dto.UpsertDIANSettingsRequest) (*dto.DIANSettingsResponse, error) {
@@ -26,6 +34,13 @@ func (f *fakeDIANSettingsUseCase) Save(companyID string, in dto.UpsertDIANSettin
 		return f.saveFunc(companyID, in)
 	}
 	return nil, errors.New("save not configured")
+}
+
+func (f *fakeDIANSettingsUseCase) Get(companyID string) (*dto.DIANSettingsResponse, error) {
+	if f.getFunc != nil {
+		return f.getFunc(companyID)
+	}
+	return nil, errors.New("get not configured")
 }
 
 func multipartRequest(t *testing.T, url, environment, password, filename string, fileData []byte) (*http.Request, string) {
@@ -69,7 +84,7 @@ func TestSettingsHandler_UpdateDIANSettings(t *testing.T) {
 			}, nil
 		}}
 
-		app := fiber.New(fiber.Config{DisableStartupMessage: true})
+		app := newSettingsTestApp()
 		handler := NewSettingsHandler(fakeUC)
 		app.Put("/api/settings/dian", func(c *fiber.Ctx) error {
 			c.Locals(LocalCompanyID, "company-1")
@@ -90,7 +105,7 @@ func TestSettingsHandler_UpdateDIANSettings(t *testing.T) {
 
 	t.Run("UnsupportedContentType", func(t *testing.T) {
 		fakeUC := &fakeDIANSettingsUseCase{}
-		app := fiber.New(fiber.Config{DisableStartupMessage: true})
+		app := newSettingsTestApp()
 		handler := NewSettingsHandler(fakeUC)
 		app.Put("/api/settings/dian", handler.UpdateDIANSettings)
 
@@ -105,7 +120,7 @@ func TestSettingsHandler_UpdateDIANSettings(t *testing.T) {
 
 	t.Run("Validation_MissingFile", func(t *testing.T) {
 		fakeUC := &fakeDIANSettingsUseCase{}
-		app := fiber.New(fiber.Config{DisableStartupMessage: true})
+		app := newSettingsTestApp()
 		handler := NewSettingsHandler(fakeUC)
 		app.Put("/api/settings/dian", func(c *fiber.Ctx) error {
 			c.Locals(LocalCompanyID, "company-1")
@@ -123,7 +138,7 @@ func TestSettingsHandler_UpdateDIANSettings(t *testing.T) {
 
 	t.Run("Validation_InvalidExtension", func(t *testing.T) {
 		fakeUC := &fakeDIANSettingsUseCase{}
-		app := fiber.New(fiber.Config{DisableStartupMessage: true})
+		app := newSettingsTestApp()
 		handler := NewSettingsHandler(fakeUC)
 		app.Put("/api/settings/dian", func(c *fiber.Ctx) error {
 			c.Locals(LocalCompanyID, "company-1")
@@ -140,7 +155,7 @@ func TestSettingsHandler_UpdateDIANSettings(t *testing.T) {
 
 	t.Run("Validation_TooLarge", func(t *testing.T) {
 		fakeUC := &fakeDIANSettingsUseCase{}
-		app := fiber.New(fiber.Config{DisableStartupMessage: true})
+		app := newSettingsTestApp()
 		handler := NewSettingsHandler(fakeUC)
 		app.Put("/api/settings/dian", func(c *fiber.Ctx) error {
 			c.Locals(LocalCompanyID, "company-1")
@@ -160,7 +175,7 @@ func TestSettingsHandler_UpdateDIANSettings(t *testing.T) {
 		fakeUC := &fakeDIANSettingsUseCase{saveFunc: func(companyID string, in dto.UpsertDIANSettingsRequest) (*dto.DIANSettingsResponse, error) {
 			return nil, domain.ErrInvalidInput
 		}}
-		app := fiber.New(fiber.Config{DisableStartupMessage: true})
+		app := newSettingsTestApp()
 		handler := NewSettingsHandler(fakeUC)
 		app.Put("/api/settings/dian", func(c *fiber.Ctx) error {
 			c.Locals(LocalCompanyID, "company-1")
@@ -179,7 +194,7 @@ func TestSettingsHandler_UpdateDIANSettings(t *testing.T) {
 		fakeUC := &fakeDIANSettingsUseCase{saveFunc: func(companyID string, in dto.UpsertDIANSettingsRequest) (*dto.DIANSettingsResponse, error) {
 			return nil, errors.New("db error")
 		}}
-		app := fiber.New(fiber.Config{DisableStartupMessage: true})
+		app := newSettingsTestApp()
 		handler := NewSettingsHandler(fakeUC)
 		app.Put("/api/settings/dian", func(c *fiber.Ctx) error {
 			c.Locals(LocalCompanyID, "company-1")
@@ -192,5 +207,71 @@ func TestSettingsHandler_UpdateDIANSettings(t *testing.T) {
 		defer resp.Body.Close()
 
 		assert.Equal(t, http.StatusInternalServerError, resp.StatusCode)
+	})
+}
+
+func TestSettingsHandler_GetDIANSettings(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		fakeUC := &fakeDIANSettingsUseCase{getFunc: func(companyID string) (*dto.DIANSettingsResponse, error) {
+			assert.Equal(t, "company-1", companyID)
+			return &dto.DIANSettingsResponse{
+				CompanyID:           "company-1",
+				Environment:         "test",
+				CertificateFileName: "cert_20260101.p12",
+				CertificateFileSize: 1024,
+				UpdatedAt:           time.Now(),
+			}, nil
+		}}
+
+		app := newSettingsTestApp()
+		handler := NewSettingsHandler(fakeUC)
+		app.Get("/api/settings/dian", func(c *fiber.Ctx) error {
+			c.Locals(LocalCompanyID, "company-1")
+			return c.Next()
+		}, handler.GetDIANSettings)
+
+		req := httptest.NewRequest(http.MethodGet, "/api/settings/dian", nil)
+		resp, err := app.Test(req, -1)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		var out dto.DIANSettingsResponse
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+		assert.Equal(t, "company-1", out.CompanyID)
+		assert.Equal(t, "test", out.Environment)
+	})
+
+	t.Run("Unauthorized", func(t *testing.T) {
+		fakeUC := &fakeDIANSettingsUseCase{}
+		app := newSettingsTestApp()
+		handler := NewSettingsHandler(fakeUC)
+		app.Get("/api/settings/dian", handler.GetDIANSettings)
+
+		req := httptest.NewRequest(http.MethodGet, "/api/settings/dian", nil)
+		resp, err := app.Test(req, -1)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+	})
+
+	t.Run("NotFound", func(t *testing.T) {
+		fakeUC := &fakeDIANSettingsUseCase{getFunc: func(companyID string) (*dto.DIANSettingsResponse, error) {
+			return nil, domain.ErrNotFound
+		}}
+		app := newSettingsTestApp()
+		handler := NewSettingsHandler(fakeUC)
+		app.Get("/api/settings/dian", func(c *fiber.Ctx) error {
+			c.Locals(LocalCompanyID, "company-1")
+			return c.Next()
+		}, handler.GetDIANSettings)
+
+		req := httptest.NewRequest(http.MethodGet, "/api/settings/dian", nil)
+		resp, err := app.Test(req, -1)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 	})
 }

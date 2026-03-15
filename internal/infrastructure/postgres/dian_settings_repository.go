@@ -2,8 +2,10 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jhoicas/Inventario-api/internal/domain/entity"
 	"github.com/jhoicas/Inventario-api/internal/domain/repository"
@@ -58,4 +60,40 @@ func (r *DIANSettingsRepo) Upsert(ctx context.Context, settings *entity.DIANSett
 		return fmt.Errorf("upsert dian_settings: %w", err)
 	}
 	return nil
+}
+
+func (r *DIANSettingsRepo) GetByCompanyID(ctx context.Context, companyID string) (*entity.DIANSettings, error) {
+	const q = `
+		SELECT
+			company_id,
+			environment,
+			certificate_path,
+			certificate_file_name,
+			certificate_file_size,
+			certificate_password_encrypted,
+			created_at,
+			updated_at
+		FROM dian_settings
+		WHERE company_id = $1
+	`
+
+	var settings entity.DIANSettings
+	err := r.pool.QueryRow(ctx, q, companyID).Scan(
+		&settings.CompanyID,
+		&settings.Environment,
+		&settings.CertificatePath,
+		&settings.CertificateFileName,
+		&settings.CertificateFileSize,
+		&settings.CertificatePasswordEncrypted,
+		&settings.CreatedAt,
+		&settings.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get dian_settings by company_id: %w", err)
+	}
+
+	return &settings, nil
 }
