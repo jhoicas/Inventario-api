@@ -44,7 +44,7 @@ func (r *CustomerRepo) Create(customer *entity.Customer) error {
 // GetByID obtiene un cliente por ID.
 func (r *CustomerRepo) GetByID(id string) (*entity.Customer, error) {
 	query := `
-		SELECT id, company_id, name, tax_id, email, phone, created_at, updated_at
+		SELECT id, company_id, name, tax_id, COALESCE(email, ''), COALESCE(phone, ''), created_at, updated_at
 		FROM customers WHERE id = $1`
 	var c entity.Customer
 	err := r.q.QueryRow(context.Background(), query, id).Scan(
@@ -62,7 +62,7 @@ func (r *CustomerRepo) GetByID(id string) (*entity.Customer, error) {
 // GetByCompanyAndTaxID obtiene un cliente por empresa y NIT/cédula.
 func (r *CustomerRepo) GetByCompanyAndTaxID(companyID, taxID string) (*entity.Customer, error) {
 	query := `
-		SELECT id, company_id, name, tax_id, email, phone, created_at, updated_at
+		SELECT id, company_id, name, tax_id, COALESCE(email, ''), COALESCE(phone, ''), created_at, updated_at
 		FROM customers WHERE company_id = $1 AND tax_id = $2`
 	var c entity.Customer
 	err := r.q.QueryRow(context.Background(), query, companyID, taxID).Scan(
@@ -80,7 +80,7 @@ func (r *CustomerRepo) GetByCompanyAndTaxID(companyID, taxID string) (*entity.Cu
 // ListByCompany lista clientes de la empresa con paginación.
 func (r *CustomerRepo) ListByCompany(companyID string, search string, limit, offset int) ([]*entity.Customer, error) {
 	base := `
-		SELECT id, company_id, name, tax_id, email, phone, created_at, updated_at
+		SELECT id, company_id, name, tax_id, COALESCE(email, ''), COALESCE(phone, ''), created_at, updated_at
 		FROM customers
 		WHERE company_id = $1`
 	args := []any{companyID}
