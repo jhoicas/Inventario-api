@@ -41,7 +41,7 @@ func (r *WarehouseRepo) Create(warehouse *entity.Warehouse) error {
 // GetByID obtiene una bodega por ID.
 func (r *WarehouseRepo) GetByID(id string) (*entity.Warehouse, error) {
 	query := `
-		SELECT id, company_id, name, address, created_at, updated_at
+		SELECT id, company_id, name, COALESCE(address, ''), created_at, updated_at
 		FROM warehouses WHERE id = $1`
 	var w entity.Warehouse
 	err := r.pool.QueryRow(context.Background(), query, id).Scan(
@@ -76,7 +76,7 @@ func (r *WarehouseRepo) Update(warehouse *entity.Warehouse) error {
 // ListByCompany lista bodegas por empresa con paginación.
 func (r *WarehouseRepo) ListByCompany(companyID string, limit, offset int) ([]*entity.Warehouse, error) {
 	query := `
-		SELECT id, company_id, name, address, created_at, updated_at
+		SELECT id, company_id, name, COALESCE(address, ''), created_at, updated_at
 		FROM warehouses WHERE company_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`
 	rows, err := r.pool.Query(context.Background(), query, companyID, limit, offset)
 	if err != nil {
