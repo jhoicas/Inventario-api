@@ -86,12 +86,38 @@ func (uc *LoyaltyUseCase) GetBalance(ctx context.Context, customerID string) (*d
 	if customerID == "" {
 		return nil, domain.ErrInvalidInput
 	}
-	profile, err := uc.profileRepo.GetByCustomerID(customerID)
+	customer, err := uc.customerRepo.GetByID(customerID)
 	if err != nil {
 		return nil, err
 	}
-	if profile == nil {
+	if customer == nil {
 		return nil, domain.ErrNotFound
+	}
+	return uc.getBalanceByCustomer(ctx, customerID, customer.CompanyID)
+}
+
+// GetBalanceByCompany obtiene el balance validando pertenencia del cliente a la empresa.
+func (uc *LoyaltyUseCase) GetBalanceByCompany(ctx context.Context, companyID, customerID string) (*dto.LoyaltyBalanceDTO, error) {
+	if companyID == "" || customerID == "" {
+		return nil, domain.ErrInvalidInput
+	}
+	customer, err := uc.customerRepo.GetByID(customerID)
+	if err != nil {
+		return nil, err
+	}
+	if customer == nil {
+		return nil, domain.ErrNotFound
+	}
+	if customer.CompanyID != companyID {
+		return nil, domain.ErrForbidden
+	}
+	return uc.getBalanceByCustomer(ctx, customerID, customer.CompanyID)
+}
+
+func (uc *LoyaltyUseCase) getBalanceByCustomer(ctx context.Context, customerID, companyID string) (*dto.LoyaltyBalanceDTO, error) {
+	profile, err := uc.profileRepo.GetByCustomerID(customerID)
+	if err != nil {
+		return nil, err
 	}
 
 	balance := 0
@@ -135,7 +161,7 @@ func (uc *LoyaltyUseCase) GetBalance(ctx context.Context, customerID string) (*d
 	}
 
 	tier := ""
-	if profile.CategoryID != "" {
+	if profile != nil && profile.CategoryID != "" {
 		cat, _ := uc.categoryRepo.GetByID(profile.CategoryID)
 		if cat != nil {
 			tier = cat.Name
@@ -143,7 +169,7 @@ func (uc *LoyaltyUseCase) GetBalance(ctx context.Context, customerID string) (*d
 	}
 
 	nextTierThreshold := 0
-	cats, err := uc.categoryRepo.ListByCompany(profile.CompanyID, 200, 0)
+	cats, err := uc.categoryRepo.ListByCompany(companyID, 200, 0)
 	if err == nil {
 		current := decimal.NewFromInt(int64(balance))
 		var next *decimal.Decimal

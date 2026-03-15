@@ -183,13 +183,15 @@ func (h *CRMHandler) GetLoyalty(c *fiber.Ctx) error {
 	if companyID == "" || customerID == "" {
 		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
 	}
-	out, err := h.LoyaltyUC.GetBalance(c.Context(), customerID)
+	out, err := h.LoyaltyUC.GetBalanceByCompany(c.Context(), companyID, customerID)
 	if err != nil {
 		switch err {
 		case domain.ErrInvalidInput:
 			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "customer_id inválido"})
 		case domain.ErrNotFound:
 			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "cliente no encontrado"})
+		case domain.ErrForbidden:
+			return c.Status(fiber.StatusForbidden).JSON(dto.ErrorResponse{Code: "FORBIDDEN", Message: "acceso denegado"})
 		case domain.ErrConflict:
 			return c.Status(fiber.StatusConflict).JSON(dto.ErrorResponse{Code: "CONFLICT", Message: "operación no permitida"})
 		}

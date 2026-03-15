@@ -145,3 +145,43 @@ func TestLoyaltyUseCase_RedeemPoints_InsufficientBalance(t *testing.T) {
 	assert.Equal(t, domain.ErrConflict, err)
 	assert.Equal(t, 0, interactionRepo.createCalls)
 }
+
+func TestLoyaltyUseCase_GetBalance_NoProfile_ReturnsZero(t *testing.T) {
+	profileRepo := &loyaltyProfileRepoFake{profile: nil}
+	customerRepo := &loyaltyCustomerRepoFake{customer: &entity.Customer{ID: "cust-1", CompanyID: "comp-1"}}
+	interactionRepo := &loyaltyInteractionRepoFake{events: []*entity.CRMInteraction{}}
+
+	uc := NewLoyaltyUseCase(
+		profileRepo,
+		customerRepo,
+		&loyaltyCategoryRepoFake{},
+		&loyaltyBenefitRepoFake{},
+		interactionRepo,
+	)
+
+	out, err := uc.GetBalance(context.Background(), "cust-1")
+	require.NoError(t, err)
+	require.NotNil(t, out)
+	assert.Equal(t, 0, out.Balance)
+	assert.Equal(t, "", out.Tier)
+	assert.Equal(t, 0, len(out.History))
+}
+
+func TestLoyaltyUseCase_GetBalanceByCompany_Forbidden(t *testing.T) {
+	profileRepo := &loyaltyProfileRepoFake{profile: nil}
+	customerRepo := &loyaltyCustomerRepoFake{customer: &entity.Customer{ID: "cust-1", CompanyID: "comp-1"}}
+	interactionRepo := &loyaltyInteractionRepoFake{events: []*entity.CRMInteraction{}}
+
+	uc := NewLoyaltyUseCase(
+		profileRepo,
+		customerRepo,
+		&loyaltyCategoryRepoFake{},
+		&loyaltyBenefitRepoFake{},
+		interactionRepo,
+	)
+
+	out, err := uc.GetBalanceByCompany(context.Background(), "comp-2", "cust-1")
+	require.Error(t, err)
+	assert.Nil(t, out)
+	assert.Equal(t, domain.ErrForbidden, err)
+}
