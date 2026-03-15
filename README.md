@@ -78,7 +78,7 @@ Endpoint protegido (JWT + módulo `billing` + rol `admin`) para guardar certific
 ```powershell
 curl -X PUT http://localhost:8080/api/settings/dian `
   -H "Authorization: Bearer <TOKEN_ADMIN>" `
-  -F "environment=test" `
+  -F "environment=testing" `
   -F "certificate_password=tu_password_p12" `
   -F "certificate=@C:/ruta/certificado.p12;type=application/x-pkcs12"
 ```
@@ -111,9 +111,11 @@ curl -X GET http://localhost:8080/api/dian/configuration `
 ```
 
 Validaciones clave:
-- `environment`: `test` o `prod`
+- `environment`: `test|testing` o `prod|production`
 - `certificate`: obligatorio, extensión `.p12`, tamaño máximo 5MB
 - `certificate_password`: obligatorio
+
+Cada ambiente se guarda por separado. Subir el certificado de pruebas no sobrescribe el de producción, y viceversa.
 
 Respuestas esperadas: `200`, `400`, `401`, `403`, `413`, `415`, `500`.
 

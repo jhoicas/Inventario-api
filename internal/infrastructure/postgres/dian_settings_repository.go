@@ -35,8 +35,7 @@ func (r *DIANSettingsRepo) Upsert(ctx context.Context, settings *entity.DIANSett
 			updated_at
 		)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-		ON CONFLICT (company_id) DO UPDATE SET
-			environment = EXCLUDED.environment,
+		ON CONFLICT (company_id, environment) DO UPDATE SET
 			certificate_path = EXCLUDED.certificate_path,
 			certificate_file_name = EXCLUDED.certificate_file_name,
 			certificate_file_size = EXCLUDED.certificate_file_size,
@@ -75,6 +74,8 @@ func (r *DIANSettingsRepo) GetByCompanyID(ctx context.Context, companyID string)
 			updated_at
 		FROM dian_settings
 		WHERE company_id = $1
+		ORDER BY updated_at DESC, created_at DESC, environment DESC
+		LIMIT 1
 	`
 
 	var settings entity.DIANSettings
@@ -93,6 +94,43 @@ func (r *DIANSettingsRepo) GetByCompanyID(ctx context.Context, companyID string)
 			return nil, nil
 		}
 		return nil, fmt.Errorf("get dian_settings by company_id: %w", err)
+	}
+
+	return &settings, nil
+}
+
+func (r *DIANSettingsRepo) GetByCompanyIDAndEnvironment(ctx context.Context, companyID, environment string) (*entity.DIANSettings, error) {
+	const q = `
+		SELECT
+			company_id,
+			environment,
+			certificate_path,
+			certificate_file_name,
+			certificate_file_size,
+			certificate_password_encrypted,
+			created_at,
+			updated_at
+		FROM dian_settings
+		WHERE company_id = $1
+		  AND environment = $2
+	`
+
+	var settings entity.DIANSettings
+	err := r.pool.QueryRow(ctx, q, companyID, environment).Scan(
+		&settings.CompanyID,
+		&settings.Environment,
+		&settings.CertificatePath,
+		&settings.CertificateFileName,
+		&settings.CertificateFileSize,
+		&settings.CertificatePasswordEncrypted,
+		&settings.CreatedAt,
+		&settings.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get dian_settings by company_id and environment: %w", err)
 	}
 
 	return &settings, nil

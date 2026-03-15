@@ -14,7 +14,8 @@ const maxDIANCertificateSizeBytes int64 = 5 * 1024 * 1024
 
 type DIANSettingsUseCase interface {
 	Save(companyID string, in dto.UpsertDIANSettingsRequest) (*dto.DIANSettingsResponse, error)
-	Get(companyID string) (*dto.DIANSettingsResponse, error)
+	// Get devuelve la configuración del ambiente indicado, o la más reciente si environment es vacío.
+	Get(companyID, environment string) (*dto.DIANSettingsResponse, error)
 }
 
 type SettingsHandler struct {
@@ -123,10 +124,13 @@ func (h *SettingsHandler) UpdateDIANSettings(c *fiber.Ctx) error {
 
 // GetDIANSettings godoc
 // @Summary      Consultar configuración DIAN activa
+// @Description  Devuelve la configuración DIAN de la empresa. Si se indica `?environment=test|testing|prod|production` devuelve la del ambiente específico; si se omite devuelve la más reciente.
 // @Tags         settings
 // @Security     Bearer
 // @Produce      json
+// @Param        environment  query     string  false  "Ambiente a consultar: test|testing|prod|production"
 // @Success      200  {object}  dto.DIANSettingsResponse
+// @Failure      400  {object}  dto.ErrorResponse
 // @Failure      401  {object}  dto.ErrorResponse
 // @Failure      403  {object}  dto.ErrorResponse
 // @Failure      404  {object}  dto.ErrorResponse
@@ -142,13 +146,17 @@ func (h *SettingsHandler) GetDIANSettings(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
 	}
 
-	out, err := h.uc.Get(companyID)
+	environment := strings.TrimSpace(c.Query("environment"))
+
+	out, err := h.uc.Get(companyID, environment)
 	if err != nil {
 		switch err {
 		case domain.ErrUnauthorized:
 			return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
 		case domain.ErrForbidden:
 			return c.Status(fiber.StatusForbidden).JSON(dto.ErrorResponse{Code: "FORBIDDEN", Message: "acceso denegado"})
+		case domain.ErrInvalidInput:
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "environment inválido: use test, testing, prod o production"})
 		case domain.ErrNotFound:
 			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "configuración DIAN no encontrada"})
 		default:

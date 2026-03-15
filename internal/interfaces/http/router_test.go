@@ -303,6 +303,10 @@ func (f *fakeDIANSettingsRepoForRouter) GetByCompanyID(ctx context.Context, comp
 	return nil, nil
 }
 
+func (f *fakeDIANSettingsRepoForRouter) GetByCompanyIDAndEnvironment(ctx context.Context, companyID, environment string) (*entity.DIANSettings, error) {
+	return nil, nil
+}
+
 func TestRouter_DIANSettingsGetRouteProtections(t *testing.T) {
 	dianSettingsUC := usecase.NewDIANSettingsUseCase(
 		&fakeCompanyRepoForRouter{},

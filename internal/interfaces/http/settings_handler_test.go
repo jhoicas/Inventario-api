@@ -19,7 +19,7 @@ import (
 
 type fakeDIANSettingsUseCase struct {
 	saveFunc func(companyID string, in dto.UpsertDIANSettingsRequest) (*dto.DIANSettingsResponse, error)
-	getFunc  func(companyID string) (*dto.DIANSettingsResponse, error)
+	getFunc  func(companyID string, environment string) (*dto.DIANSettingsResponse, error)
 }
 
 func newSettingsTestApp() *fiber.App {
@@ -36,9 +36,9 @@ func (f *fakeDIANSettingsUseCase) Save(companyID string, in dto.UpsertDIANSettin
 	return nil, errors.New("save not configured")
 }
 
-func (f *fakeDIANSettingsUseCase) Get(companyID string) (*dto.DIANSettingsResponse, error) {
+func (f *fakeDIANSettingsUseCase) Get(companyID, environment string) (*dto.DIANSettingsResponse, error) {
 	if f.getFunc != nil {
-		return f.getFunc(companyID)
+		return f.getFunc(companyID, environment)
 	}
 	return nil, errors.New("get not configured")
 }
@@ -92,6 +92,38 @@ func TestSettingsHandler_UpdateDIANSettings(t *testing.T) {
 		}, handler.UpdateDIANSettings)
 
 		req, _ := multipartRequest(t, "/api/settings/dian", "test", "secret123", "certificado.p12", []byte("dummy-p12"))
+		resp, err := app.Test(req, -1)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		var out dto.DIANSettingsResponse
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+		assert.Equal(t, "company-1", out.CompanyID)
+		assert.Equal(t, "test", out.Environment)
+	})
+
+	t.Run("Success_TestingAlias", func(t *testing.T) {
+		fakeUC := &fakeDIANSettingsUseCase{saveFunc: func(companyID string, in dto.UpsertDIANSettingsRequest) (*dto.DIANSettingsResponse, error) {
+			assert.Equal(t, "company-1", companyID)
+			assert.Equal(t, "testing", in.Environment)
+			return &dto.DIANSettingsResponse{
+				CompanyID:           companyID,
+				Environment:         "test",
+				CertificateFileName: "cert_20250101.p12",
+				CertificateFileSize: int64(len(in.CertificateData)),
+				UpdatedAt:           time.Now(),
+			}, nil
+		}}
+
+		app := newSettingsTestApp()
+		handler := NewSettingsHandler(fakeUC)
+		app.Put("/api/settings/dian", func(c *fiber.Ctx) error {
+			c.Locals(LocalCompanyID, "company-1")
+			return c.Next()
+		}, handler.UpdateDIANSettings)
+
+		req, _ := multipartRequest(t, "/api/settings/dian", "testing", "secret123", "certificado.p12", []byte("dummy-p12"))
 		resp, err := app.Test(req, -1)
 		require.NoError(t, err)
 		defer resp.Body.Close()
@@ -212,8 +244,9 @@ func TestSettingsHandler_UpdateDIANSettings(t *testing.T) {
 
 func TestSettingsHandler_GetDIANSettings(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
-		fakeUC := &fakeDIANSettingsUseCase{getFunc: func(companyID string) (*dto.DIANSettingsResponse, error) {
+		fakeUC := &fakeDIANSettingsUseCase{getFunc: func(companyID string, environment string) (*dto.DIANSettingsResponse, error) {
 			assert.Equal(t, "company-1", companyID)
+			assert.Equal(t, "", environment)
 			return &dto.DIANSettingsResponse{
 				CompanyID:           "company-1",
 				Environment:         "test",
@@ -242,6 +275,61 @@ func TestSettingsHandler_GetDIANSettings(t *testing.T) {
 		assert.Equal(t, "test", out.Environment)
 	})
 
+	t.Run("Success_ExplicitEnvironment_Testing", func(t *testing.T) {
+		fakeUC := &fakeDIANSettingsUseCase{getFunc: func(companyID string, environment string) (*dto.DIANSettingsResponse, error) {
+			assert.Equal(t, "company-1", companyID)
+			assert.Equal(t, "testing", environment) // handler passes raw value; uc normalizes
+			return &dto.DIANSettingsResponse{
+				CompanyID:           "company-1",
+				Environment:         "test",
+				CertificateFileName: "cert_pruebas.p12",
+				CertificateFileSize: 512,
+				UpdatedAt:           time.Now(),
+			}, nil
+		}}
+
+		app := newSettingsTestApp()
+		handler := NewSettingsHandler(fakeUC)
+		app.Get("/api/settings/dian", func(c *fiber.Ctx) error {
+			c.Locals(LocalCompanyID, "company-1")
+			return c.Next()
+		}, handler.GetDIANSettings)
+
+		req := httptest.NewRequest(http.MethodGet, "/api/settings/dian?environment=testing", nil)
+		resp, err := app.Test(req, -1)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		var out dto.DIANSettingsResponse
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+		assert.Equal(t, "test", out.Environment)
+		assert.Equal(t, "cert_pruebas.p12", out.CertificateFileName)
+	})
+
+	t.Run("InvalidEnvironment", func(t *testing.T) {
+		fakeUC := &fakeDIANSettingsUseCase{getFunc: func(companyID string, environment string) (*dto.DIANSettingsResponse, error) {
+			return nil, domain.ErrInvalidInput
+		}}
+
+		app := newSettingsTestApp()
+		handler := NewSettingsHandler(fakeUC)
+		app.Get("/api/settings/dian", func(c *fiber.Ctx) error {
+			c.Locals(LocalCompanyID, "company-1")
+			return c.Next()
+		}, handler.GetDIANSettings)
+
+		req := httptest.NewRequest(http.MethodGet, "/api/settings/dian?environment=unknown", nil)
+		resp, err := app.Test(req, -1)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+		var errResp dto.ErrorResponse
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
+		assert.Equal(t, "VALIDATION", errResp.Code)
+	})
+
 	t.Run("Unauthorized", func(t *testing.T) {
 		fakeUC := &fakeDIANSettingsUseCase{}
 		app := newSettingsTestApp()
@@ -257,7 +345,7 @@ func TestSettingsHandler_GetDIANSettings(t *testing.T) {
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
-		fakeUC := &fakeDIANSettingsUseCase{getFunc: func(companyID string) (*dto.DIANSettingsResponse, error) {
+		fakeUC := &fakeDIANSettingsUseCase{getFunc: func(companyID string, environment string) (*dto.DIANSettingsResponse, error) {
 			return nil, domain.ErrNotFound
 		}}
 		app := newSettingsTestApp()

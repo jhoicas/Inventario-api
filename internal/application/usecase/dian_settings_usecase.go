@@ -46,8 +46,8 @@ func (uc *DIANSettingsUseCase) Save(companyID string, in dto.UpsertDIANSettingsR
 		return nil, domain.ErrUnauthorized
 	}
 
-	env := strings.ToLower(strings.TrimSpace(in.Environment))
-	if env != "test" && env != "prod" {
+	env, ok := normalizeDIANEnvironment(in.Environment)
+	if !ok {
 		return nil, domain.ErrInvalidInput
 	}
 	if strings.TrimSpace(in.CertificatePassword) == "" {
@@ -109,7 +109,10 @@ func (uc *DIANSettingsUseCase) Save(companyID string, in dto.UpsertDIANSettingsR
 	}, nil
 }
 
-func (uc *DIANSettingsUseCase) Get(companyID string) (*dto.DIANSettingsResponse, error) {
+// Get devuelve la configuración DIAN de la empresa.
+// Si environment es vacío, devuelve la configuración más reciente (cualquier ambiente).
+// Si se indica environment ("test"|"prod" o sus alias), devuelve la del ambiente específico.
+func (uc *DIANSettingsUseCase) Get(companyID, environment string) (*dto.DIANSettingsResponse, error) {
 	if strings.TrimSpace(companyID) == "" {
 		return nil, domain.ErrUnauthorized
 	}
@@ -122,7 +125,16 @@ func (uc *DIANSettingsUseCase) Get(companyID string) (*dto.DIANSettingsResponse,
 		return nil, domain.ErrNotFound
 	}
 
-	settings, err := uc.settingsRepo.GetByCompanyID(context.Background(), companyID)
+	var settings *entity.DIANSettings
+	if env := strings.TrimSpace(environment); env != "" {
+		normEnv, ok := normalizeDIANEnvironment(env)
+		if !ok {
+			return nil, domain.ErrInvalidInput
+		}
+		settings, err = uc.settingsRepo.GetByCompanyIDAndEnvironment(context.Background(), companyID, normEnv)
+	} else {
+		settings, err = uc.settingsRepo.GetByCompanyID(context.Background(), companyID)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -137,4 +149,15 @@ func (uc *DIANSettingsUseCase) Get(companyID string) (*dto.DIANSettingsResponse,
 		CertificateFileSize: settings.CertificateFileSize,
 		UpdatedAt:           settings.UpdatedAt,
 	}, nil
+}
+
+func normalizeDIANEnvironment(environment string) (string, bool) {
+	switch strings.ToLower(strings.TrimSpace(environment)) {
+	case "test", "testing", "habilitacion", "hab":
+		return "test", true
+	case "prod", "production", "produccion", "productional":
+		return "prod", true
+	default:
+		return "", false
+	}
 }
