@@ -789,6 +789,9 @@ func (r *CRMOpportunityRepo) GetByID(ctx context.Context, id string) (*entity.Op
 		FROM crm_opportunities WHERE id = $1`, id,
 	).Scan(&o.ID, &o.CompanyID, &customerID, &o.Title, &amount, &o.Probability, &stage, &expectedCloseDate, &createdBy, &o.CreatedAt, &o.UpdatedAt)
 	if err != nil {
+		if isUndefinedTable(err) {
+			return nil, nil
+		}
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
@@ -815,6 +818,9 @@ func (r *CRMOpportunityRepo) UpdateStage(ctx context.Context, id string, stage e
 		`UPDATE crm_opportunities SET stage = $2, updated_at = $3 WHERE id = $1`,
 		id, string(stage), updatedAt,
 	)
+	if isUndefinedTable(err) {
+		return nil
+	}
 	return err
 }
 
@@ -825,6 +831,9 @@ func (r *CRMOpportunityRepo) ListByCompany(ctx context.Context, companyID string
 		WHERE company_id = $1
 		ORDER BY created_at DESC`, companyID)
 	if err != nil {
+		if isUndefinedTable(err) {
+			return []*entity.Opportunity{}, nil
+		}
 		return nil, err
 	}
 	defer rows.Close()

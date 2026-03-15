@@ -24,3 +24,12 @@ func isUndefinedColumn(err error) bool {
 	}
 	return strings.Contains(err.Error(), "42703")
 }
+
+// isUndefinedTable verifica error por tabla o relación inexistente (42P01).
+func isUndefinedTable(err error) bool {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return pgErr.Code == "42P01" // undefined_table
+	}
+	return strings.Contains(err.Error(), "42P01")
+}
