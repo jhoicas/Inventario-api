@@ -25,6 +25,7 @@ type RouterDeps struct {
 	GetStock               *inventory.GetStockUseCase
 	ListMovements          ListMovementsUseCase
 	ReorderConfig          *inventory.UpdateReorderConfigUseCase
+	DIANSettingsUC         *usecase.DIANSettingsUseCase
 	Stocktake              *inventory.StocktakeUseCase
 	PurchaseOrder          *inventory.PurchaseOrderUseCase
 	CustomerUC             *billing.CustomerUseCase
@@ -126,6 +127,25 @@ func Router(app *fiber.App, deps RouterDeps) {
 		RequireRole(entity.RoleAdmin),
 		companyHandler.ListMyResolutions,
 	)
+
+	if deps.DIANSettingsUC != nil {
+		settingsHandler := NewSettingsHandler(deps.DIANSettingsUC)
+		protected.Put("/settings/dian",
+			RequireModule(entity.ModuleBilling, deps.ModuleService),
+			RequireRole(entity.RoleAdmin),
+			settingsHandler.UpdateDIANSettings,
+		)
+		protected.Put("/dian/settings",
+			RequireModule(entity.ModuleBilling, deps.ModuleService),
+			RequireRole(entity.RoleAdmin),
+			settingsHandler.UpdateDIANSettings,
+		)
+		protected.Put("/dian/configuration",
+			RequireModule(entity.ModuleBilling, deps.ModuleService),
+			RequireRole(entity.RoleAdmin),
+			settingsHandler.UpdateDIANSettings,
+		)
+	}
 
 	// ── Inventario (módulo 'inventory' + roles) ────────────────────────────────
 	inventoryHandler := NewInventoryHandler(deps.RegisterMovement, deps.Replenishment, deps.GetStock, deps.ListMovements, deps.ReorderConfig, deps.Stocktake, deps.PurchaseOrder)

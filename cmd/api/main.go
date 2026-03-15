@@ -25,6 +25,7 @@ import (
 	"github.com/jhoicas/Inventario-api/internal/infrastructure/dian/signer"
 	infrapdf "github.com/jhoicas/Inventario-api/internal/infrastructure/pdf"
 	"github.com/jhoicas/Inventario-api/internal/infrastructure/postgres"
+	infrasecurity "github.com/jhoicas/Inventario-api/internal/infrastructure/security"
 	httpRouter "github.com/jhoicas/Inventario-api/internal/interfaces/http"
 	"github.com/jhoicas/Inventario-api/pkg/config"
 	"github.com/jhoicas/Inventario-api/pkg/logger"
@@ -144,6 +145,7 @@ func main() {
 	stockRepo := postgres.NewStockRepository(pool)
 	movementRepo := postgres.NewInventoryMovementRepository(pool)
 	reorderConfigRepo := postgres.NewReorderConfigRepository(pool)
+	dianSettingsRepo := postgres.NewDIANSettingsRepository(pool)
 	purchaseOrderRepo := postgres.NewPurchaseOrderRepository(pool)
 	companyUC := usecase.NewCompanyUseCase(companyRepo, resolutionRepo)
 	warehouseUC := usecase.NewWarehouseUseCase(warehouseRepo)
@@ -151,6 +153,12 @@ func main() {
 	supplierUC := usecase.NewSupplierUseCase(supplierRepo)
 	purchaseOrderUC := inventory.NewPurchaseOrderUseCase(purchaseOrderRepo, supplierRepo, warehouseRepo, txRunner, registerMovementUC)
 	updateReorderConfigUC := inventory.NewUpdateReorderConfigUseCase(productRepo, reorderConfigRepo)
+	encryptor, err := infrasecurity.NewAesGCMEncryptor(cfg.JWT.Secret)
+	if err != nil {
+		log.Fatal().Err(err).Msg("configurar cifrado para DIAN settings")
+	}
+	certStore := infrasecurity.NewDIANCertificateFileStore("")
+	dianSettingsUC := usecase.NewDIANSettingsUseCase(companyRepo, dianSettingsRepo, certStore, encryptor)
 	moduleSvc := usecase.NewModuleService(companyRepo)
 	analyticsUC := usecase.NewAnalyticsUseCase(analyticsRepo)
 	rawMaterialAnalyticsUC := usecase.NewRawMaterialAnalyticsUseCase(analyticsRepo)
@@ -246,6 +254,7 @@ func main() {
 		GetStock:               getStockUC,
 		ListMovements:          listMovementsUC,
 		ReorderConfig:          updateReorderConfigUC,
+		DIANSettingsUC:         dianSettingsUC,
 		PurchaseOrder:          purchaseOrderUC,
 		CustomerUC:             customerUC,
 		CreateInvoice:          createInvoiceUC,

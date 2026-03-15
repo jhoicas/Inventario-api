@@ -70,6 +70,41 @@ curl http://localhost:8080/api/companies
 curl http://localhost:8080/api/companies/{id-aqui}
 ```
 
+## 🔐 Configuración DIAN (.p12)
+
+Endpoint protegido (JWT + módulo `billing` + rol `admin`) para guardar certificado DIAN por empresa del token.
+
+**Ruta principal:**
+```powershell
+curl -X PUT http://localhost:8080/api/settings/dian `
+  -H "Authorization: Bearer <TOKEN_ADMIN>" `
+  -F "environment=test" `
+  -F "certificate_password=tu_password_p12" `
+  -F "certificate=@C:/ruta/certificado.p12;type=application/x-pkcs12"
+```
+
+**Aliases soportados:**
+```powershell
+curl -X PUT http://localhost:8080/api/dian/settings `
+  -H "Authorization: Bearer <TOKEN_ADMIN>" `
+  -F "environment=prod" `
+  -F "certificate_password=tu_password_p12" `
+  -F "certificate=@C:/ruta/certificado.p12;type=application/x-pkcs12"
+
+curl -X PUT http://localhost:8080/api/dian/configuration `
+  -H "Authorization: Bearer <TOKEN_ADMIN>" `
+  -F "environment=test" `
+  -F "certificate_password=tu_password_p12" `
+  -F "certificate=@C:/ruta/certificado.p12;type=application/x-pkcs12"
+```
+
+Validaciones clave:
+- `environment`: `test` o `prod`
+- `certificate`: obligatorio, extensión `.p12`, tamaño máximo 5MB
+- `certificate_password`: obligatorio
+
+Respuestas esperadas: `200`, `400`, `401`, `403`, `413`, `415`, `500`.
+
 ## 📁 Estructura del Proyecto
 
 ```
