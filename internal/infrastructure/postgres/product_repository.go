@@ -6,10 +6,10 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/shopspring/decimal"
 	"github.com/jhoicas/Inventario-api/internal/domain"
 	"github.com/jhoicas/Inventario-api/internal/domain/entity"
 	"github.com/jhoicas/Inventario-api/internal/domain/repository"
+	"github.com/shopspring/decimal"
 )
 
 var _ repository.ProductRepository = (*ProductRepo)(nil)
@@ -46,7 +46,17 @@ func (r *ProductRepo) Create(product *entity.Product) error {
 // GetByID obtiene un producto por ID.
 func (r *ProductRepo) GetByID(id string) (*entity.Product, error) {
 	query := `
-		SELECT id, company_id, sku, name, description, price, cost, tax_rate, unspsc_code, unit_measure, attributes, cogs, reorder_point, created_at, updated_at
+		SELECT id, company_id, sku, name,
+		       COALESCE(description, ''),
+		       COALESCE(price, 0),
+		       COALESCE(cost, 0),
+		       COALESCE(tax_rate, 0),
+		       COALESCE(unspsc_code, ''),
+		       COALESCE(unit_measure, ''),
+		       COALESCE(attributes, '{}'::jsonb),
+		       COALESCE(cogs, 0),
+		       COALESCE(reorder_point, 0),
+		       created_at, updated_at
 		FROM products WHERE id = $1`
 	var p entity.Product
 	err := r.q.QueryRow(context.Background(), query, id).Scan(
@@ -65,7 +75,17 @@ func (r *ProductRepo) GetByID(id string) (*entity.Product, error) {
 // GetByCompanyAndSKU obtiene un producto por empresa y SKU.
 func (r *ProductRepo) GetByCompanyAndSKU(companyID, sku string) (*entity.Product, error) {
 	query := `
-		SELECT id, company_id, sku, name, description, price, cost, tax_rate, unspsc_code, unit_measure, attributes, cogs, reorder_point, created_at, updated_at
+		SELECT id, company_id, sku, name,
+		       COALESCE(description, ''),
+		       COALESCE(price, 0),
+		       COALESCE(cost, 0),
+		       COALESCE(tax_rate, 0),
+		       COALESCE(unspsc_code, ''),
+		       COALESCE(unit_measure, ''),
+		       COALESCE(attributes, '{}'::jsonb),
+		       COALESCE(cogs, 0),
+		       COALESCE(reorder_point, 0),
+		       created_at, updated_at
 		FROM products WHERE company_id = $1 AND sku = $2`
 	var p entity.Product
 	err := r.q.QueryRow(context.Background(), query, companyID, sku).Scan(
@@ -114,7 +134,17 @@ func (r *ProductRepo) UpdateCost(productID string, cost decimal.Decimal) error {
 // ListByCompany lista productos por empresa con paginación.
 func (r *ProductRepo) ListByCompany(companyID string, limit, offset int) ([]*entity.Product, error) {
 	query := `
-		SELECT id, company_id, sku, name, description, price, cost, tax_rate, unspsc_code, unit_measure, attributes, cogs, reorder_point, created_at, updated_at
+		SELECT id, company_id, sku, name,
+		       COALESCE(description, ''),
+		       COALESCE(price, 0),
+		       COALESCE(cost, 0),
+		       COALESCE(tax_rate, 0),
+		       COALESCE(unspsc_code, ''),
+		       COALESCE(unit_measure, ''),
+		       COALESCE(attributes, '{}'::jsonb),
+		       COALESCE(cogs, 0),
+		       COALESCE(reorder_point, 0),
+		       created_at, updated_at
 		FROM products WHERE company_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`
 	rows, err := r.q.Query(context.Background(), query, companyID, limit, offset)
 	if err != nil {
