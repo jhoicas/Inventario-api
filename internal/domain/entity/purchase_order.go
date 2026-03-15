@@ -17,15 +17,16 @@ const (
 
 // PurchaseOrder representa la cabecera de una orden de compra.
 type PurchaseOrder struct {
-	ID         string
-	CompanyID  string
-	SupplierID string
-	Number     string
-	Date       time.Time
-	Status     string
-	Items      []PurchaseOrderItem
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
+	ID           string
+	CompanyID    string
+	SupplierID   string
+	SupplierName string
+	Number       string
+	Date         time.Time
+	Status       string
+	Items        []PurchaseOrderItem
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
 
 // PurchaseOrderItem representa una línea de una orden de compra.

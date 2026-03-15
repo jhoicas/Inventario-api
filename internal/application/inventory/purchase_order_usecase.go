@@ -106,6 +106,23 @@ func (uc *PurchaseOrderUseCase) Create(ctx context.Context, companyID string, in
 	return po.ID, nil
 }
 
+func (uc *PurchaseOrderUseCase) ListByCompany(ctx context.Context, companyID string, limit, offset int) ([]*entity.PurchaseOrder, int64, error) {
+	if companyID == "" {
+		return nil, 0, domain.ErrInvalidInput
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	return uc.poRepo.ListByCompany(ctx, companyID, limit, offset)
+}
+
 func (uc *PurchaseOrderUseCase) UpdateStatus(ctx context.Context, companyID, purchaseOrderID, status string) error {
 	if companyID == "" || purchaseOrderID == "" {
 		return domain.ErrInvalidInput

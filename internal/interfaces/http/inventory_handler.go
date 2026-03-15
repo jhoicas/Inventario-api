@@ -10,6 +10,7 @@ import (
 	"github.com/jhoicas/Inventario-api/internal/application/dto"
 	appinventory "github.com/jhoicas/Inventario-api/internal/application/inventory"
 	"github.com/jhoicas/Inventario-api/internal/domain"
+	"github.com/jhoicas/Inventario-api/internal/domain/entity"
 )
 
 // RegisterMovementUseCase interfaz local para registrar movimientos de inventario.
@@ -48,6 +49,7 @@ type ReorderConfigUseCase interface {
 // PurchaseOrderUseCase interfaz local para órdenes de compra.
 type PurchaseOrderUseCase interface {
 	Create(ctx context.Context, companyID string, in appinventory.CreatePurchaseOrderInput) (string, error)
+	ListByCompany(ctx context.Context, companyID string, limit, offset int) ([]*entity.PurchaseOrder, int64, error)
 	UpdateStatus(ctx context.Context, companyID, purchaseOrderID, status string) error
 	Receive(ctx context.Context, companyID, userID, purchaseOrderID, warehouseID string) error
 }
@@ -100,6 +102,65 @@ func NewInventoryHandler(uc RegisterMovementUseCase, replenishment Replenishment
 
 type receivePurchaseOrderRequest struct {
 	WarehouseID string `json:"warehouse_id"`
+}
+
+// GetPurchaseOrders godoc
+// @Summary      Listar órdenes de compra
+// @Description  Lista órdenes de compra por empresa con paginación.
+// @Tags         inventory
+// @Security     Bearer
+// @Produce      json
+// @Param        limit   query  int  false  "Límite" default(20)
+// @Param        offset  query  int  false  "Offset" default(0)
+// @Success      200     {object}  map[string]interface{}
+// @Failure      401     {object}  dto.ErrorResponse
+// @Failure      503     {object}  dto.ErrorResponse
+// @Failure      500     {object}  dto.ErrorResponse
+// @Router       /api/purchase-orders [get]
+func (h *InventoryHandler) GetPurchaseOrders(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	if companyID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if h.purchaseOrder == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "purchase_order no configurado"})
+	}
+
+	limit := c.QueryInt("limit", 20)
+	offset := c.QueryInt("offset", 0)
+
+	items, total, err := h.purchaseOrder.ListByCompany(c.Context(), companyID, limit, offset)
+	if err != nil {
+		if errors.Is(err, domain.ErrInvalidInput) {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "datos inválidos"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+
+	outItems := make([]fiber.Map, 0, len(items))
+	for _, po := range items {
+		if po == nil {
+			continue
+		}
+		outItems = append(outItems, fiber.Map{
+			"id":            po.ID,
+			"company_id":    po.CompanyID,
+			"supplier_id":   po.SupplierID,
+			"supplier_name": po.SupplierName,
+			"number":        po.Number,
+			"date":          po.Date,
+			"status":        po.Status,
+			"created_at":    po.CreatedAt,
+			"updated_at":    po.UpdatedAt,
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"items":  outItems,
+		"total":  total,
+		"limit":  limit,
+		"offset": offset,
+	})
 }
 
 // CreatePurchaseOrder godoc

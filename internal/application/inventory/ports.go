@@ -36,5 +36,6 @@ type StocktakeRepository interface {
 type PurchaseOrderRepository interface {
 	Create(ctx context.Context, po *entity.PurchaseOrder) error
 	GetByID(ctx context.Context, id string) (*entity.PurchaseOrder, error)
+	ListByCompany(ctx context.Context, companyID string, limit, offset int) ([]*entity.PurchaseOrder, int64, error)
 	UpdateStatus(ctx context.Context, id, status string, updatedAt time.Time) error
 }

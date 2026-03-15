@@ -124,6 +124,10 @@ func Router(app *fiber.App, deps RouterDeps) {
 	// ── Inventario (módulo 'inventory' + roles) ────────────────────────────────
 	inventoryHandler := NewInventoryHandler(deps.RegisterMovement, deps.Replenishment, deps.GetStock, deps.ListMovements, deps.ReorderConfig, deps.Stocktake, deps.PurchaseOrder)
 	po := protected.Group("/purchase-orders", RequireModule(entity.ModuleInventory, deps.ModuleService))
+	po.Get("/",
+		RequireRole(entity.RoleAdmin, entity.RoleBodeguero),
+		inventoryHandler.GetPurchaseOrders,
+	)
 	po.Post("/",
 		RequireRole(entity.RoleAdmin, entity.RoleBodeguero),
 		inventoryHandler.CreatePurchaseOrder,

@@ -130,6 +130,53 @@ func (r *PurchaseOrderRepo) GetByID(ctx context.Context, id string) (*entity.Pur
 	return &po, nil
 }
 
+func (r *PurchaseOrderRepo) ListByCompany(ctx context.Context, companyID string, limit, offset int) ([]*entity.PurchaseOrder, int64, error) {
+	const countQ = `SELECT COUNT(1) FROM purchase_orders WHERE company_id = $1`
+	var total int64
+	if err := r.q.QueryRow(ctx, countQ, companyID).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("count purchase orders: %w", err)
+	}
+
+	const dataQ = `
+		SELECT po.id, po.company_id, po.supplier_id, COALESCE(s.name, ''),
+		       po.number, po.date, po.status, po.created_at, po.updated_at
+		FROM purchase_orders po
+		LEFT JOIN suppliers s ON s.id = po.supplier_id
+		WHERE po.company_id = $1
+		ORDER BY date DESC, created_at DESC
+		LIMIT $2 OFFSET $3`
+
+	rows, err := r.q.Query(ctx, dataQ, companyID, limit, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list purchase orders: %w", err)
+	}
+	defer rows.Close()
+
+	list := make([]*entity.PurchaseOrder, 0)
+	for rows.Next() {
+		var po entity.PurchaseOrder
+		if err := rows.Scan(
+			&po.ID,
+			&po.CompanyID,
+			&po.SupplierID,
+			&po.SupplierName,
+			&po.Number,
+			&po.Date,
+			&po.Status,
+			&po.CreatedAt,
+			&po.UpdatedAt,
+		); err != nil {
+			return nil, 0, fmt.Errorf("scan purchase order: %w", err)
+		}
+		list = append(list, &po)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("iterate purchase orders: %w", err)
+	}
+
+	return list, total, nil
+}
+
 func (r *PurchaseOrderRepo) UpdateStatus(ctx context.Context, id, status string, updatedAt time.Time) error {
 	const query = `
 		UPDATE purchase_orders
