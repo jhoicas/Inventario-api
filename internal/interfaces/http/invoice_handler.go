@@ -192,6 +192,47 @@ func (h *InvoiceHandler) GetCreditNotes(c *fiber.Ctx) error {
 	return c.JSON(out)
 }
 
+// GetDebitNotes godoc
+// @Summary      Listar notas débito
+// @Description  Devuelve notas débito paginadas filtradas por fecha, cliente, estado DIAN y prefijo
+// @Tags         billing
+// @Security     Bearer
+// @Produce      json
+// @Param        start_date   query     string  false  "Fecha inicio (YYYY-MM-DD)"
+// @Param        end_date     query     string  false  "Fecha fin (YYYY-MM-DD)"
+// @Param        customer_id  query     string  false  "ID del cliente"
+// @Param        dian_status  query     string  false  "Estado DIAN"
+// @Param        prefix       query     string  false  "Prefijo de la nota débito"
+// @Param        limit        query     int     false  "Límite de resultados"   default(20)
+// @Param        offset       query     int     false  "Desplazamiento"         default(0)
+// @Success      200  {object}  dto.InvoiceListResponse
+// @Failure      401  {object}  dto.ErrorResponse
+// @Failure      500  {object}  dto.ErrorResponse
+// @Router       /api/invoices/debit-notes [get]
+func (h *InvoiceHandler) GetDebitNotes(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	if companyID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+
+	filter := dto.InvoiceFilter{
+		StartDate:    c.Query("start_date"),
+		EndDate:      c.Query("end_date"),
+		CustomerID:   c.Query("customer_id"),
+		DIANStatus:   c.Query("dian_status"),
+		DocumentType: "DEBIT_NOTE",
+		Prefix:       c.Query("prefix"),
+		Limit:        c.QueryInt("limit", 20),
+		Offset:       c.QueryInt("offset", 0),
+	}
+
+	out, err := h.uc.ListInvoices(c.Context(), companyID, filter)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.JSON(out)
+}
+
 // GetDIANSummary godoc
 // @Summary      Resumen de estado DIAN
 // @Description  Devuelve contadores para tablero DIAN: enviados hoy, pendientes y rechazados
