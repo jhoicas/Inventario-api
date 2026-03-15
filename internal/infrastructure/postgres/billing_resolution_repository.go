@@ -90,9 +90,9 @@ func (r *BillingResolutionRepo) ListByCompany(ctx context.Context, companyID str
 				 AND i.number::bigint BETWEEN br.range_from AND br.range_to
 		   ), 0) AS used_numbers,
 		       br.is_active, br.created_at, br.updated_at
-		FROM billing_resolutions
+		FROM billing_resolutions br
 		WHERE br.company_id = $1
-		ORDER BY date_from DESC`
+		ORDER BY br.date_from DESC`
 	rows, err := r.pool.Query(ctx, q, companyID)
 	if err != nil {
 		return nil, fmt.Errorf("list billing_resolutions: %w", err)
