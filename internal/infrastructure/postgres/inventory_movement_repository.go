@@ -33,6 +33,9 @@ func (r *InventoryMovementRepo) Create(movement *entity.InventoryMovement) error
 	query := `
 		INSERT INTO inventory_movements (id, transaction_id, product_id, warehouse_id, type, quantity, unit_cost, total_cost, notes, date, created_at, created_by)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`
+	legacyQuery := `
+		INSERT INTO inventory_movements (id, transaction_id, product_id, warehouse_id, type, quantity, unit_cost, total_cost, date, created_at, created_by)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`
 	createdBy := (*string)(nil)
 	if movement.CreatedBy != "" {
 		createdBy = &movement.CreatedBy
@@ -47,6 +50,17 @@ func (r *InventoryMovementRepo) Create(movement *entity.InventoryMovement) error
 		notes, movement.Date, movement.CreatedAt, createdBy,
 	)
 	if err != nil {
+		if isUndefinedColumn(err) {
+			_, legacyErr := r.q.Exec(context.Background(), legacyQuery,
+				movement.ID, movement.TransactionID, movement.ProductID, movement.WarehouseID,
+				movement.Type, movement.Quantity, movement.UnitCost, movement.TotalCost,
+				movement.Date, movement.CreatedAt, createdBy,
+			)
+			if legacyErr != nil {
+				return fmt.Errorf("create inventory movement (legacy): %w", legacyErr)
+			}
+			return nil
+		}
 		return fmt.Errorf("create inventory movement: %w", err)
 	}
 	return nil
@@ -57,6 +71,9 @@ func (r *InventoryMovementRepo) GetByID(id string) (*entity.InventoryMovement, e
 	query := `
 		SELECT id, transaction_id, product_id, warehouse_id, type, quantity, unit_cost, total_cost, notes, date, created_at, created_by
 		FROM inventory_movements WHERE id = $1`
+	legacyQuery := `
+		SELECT id, transaction_id, product_id, warehouse_id, type, quantity, unit_cost, total_cost, ''::text AS notes, date, created_at, created_by
+		FROM inventory_movements WHERE id = $1`
 	var m entity.InventoryMovement
 	var createdBy *string
 	var notes *string
@@ -64,6 +81,12 @@ func (r *InventoryMovementRepo) GetByID(id string) (*entity.InventoryMovement, e
 		&m.ID, &m.TransactionID, &m.ProductID, &m.WarehouseID, &m.Type,
 		&m.Quantity, &m.UnitCost, &m.TotalCost, &notes, &m.Date, &m.CreatedAt, &createdBy,
 	)
+	if err != nil && isUndefinedColumn(err) {
+		err = r.q.QueryRow(context.Background(), legacyQuery, id).Scan(
+			&m.ID, &m.TransactionID, &m.ProductID, &m.WarehouseID, &m.Type,
+			&m.Quantity, &m.UnitCost, &m.TotalCost, &notes, &m.Date, &m.CreatedAt, &createdBy,
+		)
+	}
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
@@ -141,11 +164,25 @@ func (r *InventoryMovementRepo) List(companyID string, f repository.MovementFilt
 		WHERE %s
 		ORDER BY im.date ASC, im.created_at ASC
 		LIMIT $%d OFFSET $%d`, where, pos, pos+1)
+	legacyDataQuery := fmt.Sprintf(`
+		SELECT im.id, im.transaction_id, im.product_id, im.warehouse_id,
+		       im.type, im.quantity, im.unit_cost, im.total_cost, ''::text AS notes, im.date, im.created_at, im.created_by
+		FROM inventory_movements im
+		WHERE %s
+		ORDER BY im.date ASC, im.created_at ASC
+		LIMIT $%d OFFSET $%d`, where, pos, pos+1)
 
 	dataArgs := append(args, limit, offset)
 	rows, err := r.q.Query(context.Background(), dataQuery, dataArgs...)
 	if err != nil {
-		return nil, 0, fmt.Errorf("list movements: %w", err)
+		if isUndefinedColumn(err) {
+			rows, err = r.q.Query(context.Background(), legacyDataQuery, dataArgs...)
+			if err != nil {
+				return nil, 0, fmt.Errorf("list movements: %w", err)
+			}
+		} else {
+			return nil, 0, fmt.Errorf("list movements: %w", err)
+		}
 	}
 	defer rows.Close()
 

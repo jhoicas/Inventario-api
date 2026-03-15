@@ -15,3 +15,12 @@ func isUniqueViolation(err error) bool {
 	}
 	return strings.Contains(err.Error(), "23505")
 }
+
+// isUndefinedColumn verifica error por columna inexistente (42703).
+func isUndefinedColumn(err error) bool {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return pgErr.Code == "42703" // undefined_column
+	}
+	return strings.Contains(err.Error(), "42703")
+}
