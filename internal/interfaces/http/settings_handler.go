@@ -115,7 +115,7 @@ func (h *SettingsHandler) UpdateDIANSettings(c *fiber.Ctx) error {
 		case domain.ErrNotFound:
 			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "empresa no encontrada"})
 		default:
-			return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: "no se pudo guardar configuración DIAN"})
+			return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 		}
 	}
 
@@ -160,7 +160,7 @@ func (h *SettingsHandler) GetDIANSettings(c *fiber.Ctx) error {
 		case domain.ErrNotFound:
 			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "configuración DIAN no encontrada"})
 		default:
-			return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: "no se pudo consultar configuración DIAN"})
+			return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 		}
 	}
 
