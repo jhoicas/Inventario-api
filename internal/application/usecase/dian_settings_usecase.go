@@ -97,7 +97,9 @@ func (uc *DIANSettingsUseCase) Save(companyID string, in dto.UpsertDIANSettingsR
 	}
 	company.UpdatedAt = now
 	if err := uc.companyRepo.Update(company); err != nil {
-		return nil, err
+		if !isLegacyCompanyUpdateColumnError(err) {
+			return nil, err
+		}
 	}
 
 	return &dto.DIANSettingsResponse{
@@ -160,4 +162,15 @@ func normalizeDIANEnvironment(environment string) (string, bool) {
 	default:
 		return "", false
 	}
+}
+
+func isLegacyCompanyUpdateColumnError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	if !strings.Contains(msg, "sqlstate 42703") {
+		return false
+	}
+	return strings.Contains(msg, "cert_hab") || strings.Contains(msg, "cert_prod") || strings.Contains(msg, "environment")
 }

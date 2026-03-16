@@ -16,7 +16,8 @@ import (
 type fakeCompanyRepoForDIANSettings struct {
 	company *entity.Company
 
-	updated *entity.Company
+	updated   *entity.Company
+	updateErr error
 }
 
 func (f *fakeCompanyRepoForDIANSettings) Create(company *entity.Company) error { return nil }
@@ -31,6 +32,9 @@ func (f *fakeCompanyRepoForDIANSettings) GetByNIT(nit string) (*entity.Company, 
 	return nil, nil
 }
 func (f *fakeCompanyRepoForDIANSettings) Update(company *entity.Company) error {
+	if f.updateErr != nil {
+		return f.updateErr
+	}
 	clone := *company
 	f.updated = &clone
 	return nil
@@ -194,4 +198,52 @@ func TestDIANSettingsUseCase_Get_ByExplicitEnvironment(t *testing.T) {
 	// ambiente invalido → errInvalidInput
 	_, err = uc.Get("company-1", "unknown")
 	require.ErrorIs(t, err, domain.ErrInvalidInput)
+}
+
+func TestDIANSettingsUseCase_Save_IgnoresLegacyCompanyUpdateColumnError(t *testing.T) {
+	companyRepo := &fakeCompanyRepoForDIANSettings{
+		company:   &entity.Company{ID: "company-1"},
+		updateErr: errors.New("update company: ERROR: column cert_hab does not exist (SQLSTATE 42703)"),
+	}
+	settingsRepo := &fakeDIANSettingsRepoForUseCase{}
+	uc := NewDIANSettingsUseCase(
+		companyRepo,
+		settingsRepo,
+		&fakeDIANCertificateStore{},
+		&fakeSecretEncryptor{},
+	)
+
+	out, err := uc.Save("company-1", dto.UpsertDIANSettingsRequest{
+		Environment:         "testing",
+		CertificateFileName: "certificado_prueba.p12",
+		CertificateData:     []byte("dummy-p12"),
+		CertificatePassword: "123456",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, out)
+	require.NotNil(t, settingsRepo.upserted)
+	assert.Equal(t, "test", out.Environment)
+}
+
+func TestDIANSettingsUseCase_Save_FailsOnNonLegacyCompanyUpdateError(t *testing.T) {
+	companyRepo := &fakeCompanyRepoForDIANSettings{
+		company:   &entity.Company{ID: "company-1"},
+		updateErr: errors.New("update company: deadlock detected"),
+	}
+	settingsRepo := &fakeDIANSettingsRepoForUseCase{}
+	uc := NewDIANSettingsUseCase(
+		companyRepo,
+		settingsRepo,
+		&fakeDIANCertificateStore{},
+		&fakeSecretEncryptor{},
+	)
+
+	_, err := uc.Save("company-1", dto.UpsertDIANSettingsRequest{
+		Environment:         "testing",
+		CertificateFileName: "certificado_prueba.p12",
+		CertificateData:     []byte("dummy-p12"),
+		CertificatePassword: "123456",
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "deadlock")
 }
