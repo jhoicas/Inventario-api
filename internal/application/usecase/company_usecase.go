@@ -79,7 +79,12 @@ func (uc *CompanyUseCase) CreateResolution(companyID string, in dto.CreateResolu
 	if companyID == "" || in.Prefix == "" || in.ResolutionNumber == "" || in.FromNumber <= 0 || in.ToNumber <= 0 || in.ToNumber < in.FromNumber {
 		return nil, domain.ErrInvalidInput
 	}
-	if in.Environment != "test" && in.Environment != "prod" {
+	// environment opcional: si no viene, usar "test" por defecto para compatibilidad.
+	env := in.Environment
+	if env == "" {
+		env = "test"
+	}
+	if env != "test" && env != "prod" {
 		return nil, domain.ErrInvalidInput
 	}
 	company, err := uc.repo.GetByID(companyID)
@@ -112,7 +117,7 @@ func (uc *CompanyUseCase) CreateResolution(companyID string, in dto.CreateResolu
 		RangeTo:          in.ToNumber,
 		DateFrom:         validFrom,
 		DateTo:           validUntil,
-		Environment:      in.Environment,
+		Environment:      env,
 		IsActive:         true,
 		CreatedAt:        now,
 		UpdatedAt:        now,
