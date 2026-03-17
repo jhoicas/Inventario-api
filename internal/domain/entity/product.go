@@ -17,7 +17,7 @@ type Product struct {
 	Description  string
 	Price        decimal.Decimal // precio de venta
 	Cost         decimal.Decimal // costo promedio ponderado (inicia en 0)
-	TaxRate      decimal.Decimal // IVA Colombia: 0, 0.05 (5%), 0.19 (19%)
+	TaxRate      decimal.Decimal // Porcentaje (ej: 19, 5, 0, 7.5). Se normaliza a fracción en cálculos.
 	UNSPSC_Code  string
 	UnitMeasure  string
 	Attributes   json.RawMessage

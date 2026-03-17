@@ -27,10 +27,9 @@ func (uc *ProductUseCase) Create(companyID string, in dto.CreateProductRequest) 
 	if existing != nil {
 		return nil, domain.ErrDuplicate
 	}
-	taxZero := decimal.Zero
-	tax5 := decimal.NewFromInt(5)
-	tax19 := decimal.NewFromInt(19)
-	if !in.TaxRate.Equal(taxZero) && !in.TaxRate.Equal(tax5) && !in.TaxRate.Equal(tax19) {
+	// tax_rate se guarda como porcentaje (ej: 19, 5, 0, 7.5). En cálculos se normaliza.
+	// Permitimos cualquier porcentaje entre 0 y 100 (inclusive).
+	if in.TaxRate.LessThan(decimal.Zero) || in.TaxRate.GreaterThan(decimal.NewFromInt(100)) {
 		return nil, domain.ErrInvalidInput
 	}
 	// UnitMeasure e información DIAN provienen exclusivamente del DTO (parametrización manual).
@@ -87,10 +86,7 @@ func (uc *ProductUseCase) Update(id string, in dto.UpdateProductRequest) (*dto.P
 		product.Price = *in.Price
 	}
 	if in.TaxRate != nil {
-		taxZero := decimal.Zero
-		tax5 := decimal.NewFromInt(5)
-		tax19 := decimal.NewFromInt(19)
-		if !in.TaxRate.Equal(taxZero) && !in.TaxRate.Equal(tax5) && !in.TaxRate.Equal(tax19) {
+		if in.TaxRate.LessThan(decimal.Zero) || in.TaxRate.GreaterThan(decimal.NewFromInt(100)) {
 			return nil, domain.ErrInvalidInput
 		}
 		product.TaxRate = *in.TaxRate

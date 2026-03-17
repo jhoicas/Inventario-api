@@ -172,13 +172,35 @@ func TestProductUseCase_Create(t *testing.T) {
 			validateOut: nil,
 		},
 		{
-			name:      "InvalidInput_InvalidTaxRate",
+			name:      "Success_CustomTaxRate",
 			companyID: testCompanyID,
 			in: dto.CreateProductRequest{
 				SKU:         "SKU-002",
 				Name:        "Otro",
 				Price:       decimal.Zero,
-				TaxRate:     decimal.NewFromInt(10), // solo 0, 5, 19 válidos
+				TaxRate:     decimal.NewFromInt(10),
+				UnitMeasure: "94",
+			},
+			repoSetup: func() *fakeProductRepository {
+				return &fakeProductRepository{
+					getByCompanyAndSKUFunc: func(_, _ string) (*entity.Product, error) { return nil, nil },
+					createFunc:             func(_ *entity.Product) error { return nil },
+				}
+			},
+			wantErr: nil,
+			validateOut: func(t *testing.T, out *dto.ProductResponse) {
+				require.NotNil(t, out)
+				assert.True(t, out.TaxRate.Equal(decimal.NewFromInt(10)))
+			},
+		},
+		{
+			name:      "InvalidInput_TaxRateAbove100",
+			companyID: testCompanyID,
+			in: dto.CreateProductRequest{
+				SKU:         "SKU-003",
+				Name:        "Otro 2",
+				Price:       decimal.Zero,
+				TaxRate:     decimal.NewFromInt(101),
 				UnitMeasure: "94",
 			},
 			repoSetup: func() *fakeProductRepository {
@@ -466,10 +488,34 @@ func TestProductUseCase_Update(t *testing.T) {
 			validateOut: nil,
 		},
 		{
-			name: "InvalidInput_InvalidTaxRate",
+			name: "Success_CustomTaxRate",
 			id:   "prod-123",
 			in: dto.UpdateProductRequest{
 				TaxRate: func() *decimal.Decimal { d := decimal.NewFromInt(7); return &d }(),
+			},
+			repoSetup: func() *fakeProductRepository {
+				return &fakeProductRepository{
+					getByIDFunc: func(_ string) (*entity.Product, error) {
+						return validProductEntity("prod-123", testCompanyID), nil
+					},
+					updateFunc: func(p *entity.Product) error {
+						assert.True(t, p.TaxRate.Equal(decimal.NewFromInt(7)))
+						return nil
+					},
+				}
+			},
+			wantNil: false,
+			wantErr: false,
+			validateOut: func(t *testing.T, out *dto.ProductResponse) {
+				require.NotNil(t, out)
+				assert.True(t, out.TaxRate.Equal(decimal.NewFromInt(7)))
+			},
+		},
+		{
+			name: "InvalidInput_TaxRateNegative",
+			id:   "prod-123",
+			in: dto.UpdateProductRequest{
+				TaxRate: func() *decimal.Decimal { d := decimal.NewFromInt(-1); return &d }(),
 			},
 			repoSetup: func() *fakeProductRepository {
 				return &fakeProductRepository{
