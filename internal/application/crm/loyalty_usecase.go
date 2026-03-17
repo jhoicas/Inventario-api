@@ -233,6 +233,68 @@ func (uc *LoyaltyUseCase) RedeemPoints(ctx context.Context, customerID string, p
 	})
 }
 
+// ResolveCampaignRecipients genera una lista de destinatarios para campañas en base
+// a estrategias simples (ej. categoría Oro). Por ahora solo implementa category_gold.
+func (uc *LoyaltyUseCase) ResolveCampaignRecipients(ctx context.Context, companyID string, req dto.ResolveCampaignRecipientsRequest) (*dto.ResolveCampaignRecipientsResponse, error) {
+	if companyID == "" || len(req.Strategies) == 0 {
+		return nil, domain.ErrInvalidInput
+	}
+
+	recipients := make(map[string]dto.CampaignRecipientDTO)
+
+	for _, s := range req.Strategies {
+		switch s.Type {
+		case "category_gold":
+			cats, err := uc.categoryRepo.ListByCompany(companyID, 200, 0)
+			if err != nil {
+				return nil, err
+			}
+			gold := make(map[string]struct{})
+			for _, c := range cats {
+				name := strings.ToLower(strings.TrimSpace(c.Name))
+				if name == "oro" || strings.Contains(name, "gold") {
+					gold[c.ID] = struct{}{}
+				}
+			}
+			if len(gold) == 0 {
+				continue
+			}
+			profiles, err := uc.profileRepo.ListByCompany(companyID, 2000, 0)
+			if err != nil {
+				return nil, err
+			}
+			for _, p := range profiles {
+				if _, ok := gold[p.CategoryID]; !ok {
+					continue
+				}
+				cust, err := uc.customerRepo.GetByID(p.CustomerID)
+				if err != nil || cust == nil || cust.CompanyID != companyID {
+					continue
+				}
+				recipients[cust.ID] = dto.CampaignRecipientDTO{
+					CustomerID: cust.ID,
+					Name:       cust.Name,
+					Email:      cust.Email,
+					Segment:    "Categoría Oro",
+				}
+			}
+		case "reorder_product":
+			// pendiente de implementar cuando exista soporte por producto en InvoiceRepository
+			continue
+		default:
+			continue
+		}
+	}
+
+	out := &dto.ResolveCampaignRecipientsResponse{
+		Recipients: make([]dto.CampaignRecipientDTO, 0, len(recipients)),
+	}
+	for _, r := range recipients {
+		out.Recipients = append(out.Recipients, r)
+	}
+	return out, nil
+}
+
 // GetProfile360 devuelve la vista 360 del cliente (datos base + perfil CRM + categoría y beneficios si aplica).
 func (uc *LoyaltyUseCase) GetProfile360(ctx context.Context, companyID, customerID string) (*dto.Profile360Response, error) {
 	p360, err := uc.profileRepo.GetProfile360(ctx, companyID, customerID)

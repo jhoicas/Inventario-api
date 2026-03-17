@@ -1093,6 +1093,40 @@ func (h *CRMHandler) GetCampaignMetrics(c *fiber.Ctx) error {
 	return c.JSON(out)
 }
 
+// ResolveCampaignRecipients resuelve destinatarios potenciales para una campaña
+// en base a estrategias simples (ej. categoría Oro).
+// @Summary      Resolver destinatarios de campaña
+// @Tags         crm
+// @Security     Bearer
+// @Accept       json
+// @Produce      json
+// @Param        body  body  dto.ResolveCampaignRecipientsRequest  true  "Estrategias de destinatarios"
+// @Success      200   {object} dto.ResolveCampaignRecipientsResponse
+// @Failure      400   {object} dto.ErrorResponse
+// @Failure      401   {object} dto.ErrorResponse
+// @Router       /api/crm/campaigns/recipients/resolve [post]
+func (h *CRMHandler) ResolveCampaignRecipients(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	if companyID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if h.LoyaltyUC == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "loyalty no configurado"})
+	}
+	var in dto.ResolveCampaignRecipientsRequest
+	if err := c.BodyParser(&in); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
+	}
+	out, err := h.LoyaltyUC.ResolveCampaignRecipients(c.Context(), companyID, in)
+	if err != nil {
+		if err == domain.ErrInvalidInput {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "estrategias inválidas"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.JSON(out)
+}
+
 // EscalateTicket escala un ticket PQR y registra la razón.
 // @Summary      Escalar ticket PQR
 // @Description  Marca el ticket como ESCALATED, persiste la razón y genera una entrada de auditoría

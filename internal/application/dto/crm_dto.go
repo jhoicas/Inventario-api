@@ -262,3 +262,28 @@ type CampaignMetricsResponse struct {
 	Converted  int             `json:"converted"`
 	Revenue    decimal.Decimal `json:"revenue"`
 }
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Campaign recipient resolution
+// ──────────────────────────────────────────────────────────────────────────────
+
+type CampaignRecipientStrategy struct {
+	Type      string `json:"type"`                 // "category_gold" | "reorder_product"
+	ProductID string `json:"product_id,omitempty"` // usado si type == "reorder_product"
+	MonthsAgo int    `json:"months_ago,omitempty"` // ej. 6 (por defecto 6)
+}
+
+type ResolveCampaignRecipientsRequest struct {
+	Strategies []CampaignRecipientStrategy `json:"strategies"`
+}
+
+type CampaignRecipientDTO struct {
+	CustomerID string `json:"customer_id"`
+	Name       string `json:"name"`
+	Email      string `json:"email"`
+	Segment    string `json:"segment"`
+}
+
+type ResolveCampaignRecipientsResponse struct {
+	Recipients []CampaignRecipientDTO `json:"recipients"`
+}
