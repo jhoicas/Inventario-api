@@ -24,6 +24,7 @@ import (
 	infraai "github.com/jhoicas/Inventario-api/internal/infrastructure/ai"
 	infradian "github.com/jhoicas/Inventario-api/internal/infrastructure/dian"
 	"github.com/jhoicas/Inventario-api/internal/infrastructure/dian/signer"
+	inframail "github.com/jhoicas/Inventario-api/internal/infrastructure/mail"
 	infrapdf "github.com/jhoicas/Inventario-api/internal/infrastructure/pdf"
 	"github.com/jhoicas/Inventario-api/internal/infrastructure/postgres"
 	infrasecurity "github.com/jhoicas/Inventario-api/internal/infrastructure/security"
@@ -188,7 +189,11 @@ func main() {
 	taskUC := crm.NewTaskUseCase(crmTaskRepo)
 	aiCRMUC := crm.NewAICRMUseCase(anthropicSvc)
 	pqrUC := crm.NewPQRUseCase(crmTicketRepo, customerRepo, aiCRMUC, crmInteractionRepo)
-	campaignUC := crm.NewCampaignUseCase(crmCampaignRepo)
+	mailSender, err := inframail.NewSMTPSenderFromEnv()
+	if err != nil {
+		log.Error().Err(err).Msg("configurar SMTPSender para campañas CRM (usando net/smtp)")
+	}
+	campaignUC := crm.NewCampaignUseCase(crmCampaignRepo, customerRepo, crmProfileRepo, crmInteractionRepo, mailSender)
 	opportunityUC := crm.NewOpportunityUseCase(crmOpportunityRepo)
 	crmHandler := httpRouter.NewCRMHandler(loyaltyUC, taskUC, pqrUC, aiCRMUC, crmInteractionRepo, opportunityUC, invoiceRepo, campaignUC)
 

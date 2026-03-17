@@ -287,3 +287,10 @@ type CampaignRecipientDTO struct {
 type ResolveCampaignRecipientsResponse struct {
 	Recipients []CampaignRecipientDTO `json:"recipients"`
 }
+
+// SendCampaignRequest body para enviar una campaña de email masiva.
+type SendCampaignRequest struct {
+	Subject    string `json:"subject"`               // requerido
+	Body       string `json:"body"`                  // requerido (texto generado por IA o HTML simple)
+	CategoryID string `json:"category_id,omitempty"` // opcional: filtrar por categoría CRM
+}

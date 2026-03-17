@@ -1127,6 +1127,46 @@ func (h *CRMHandler) ResolveCampaignRecipients(c *fiber.Ctx) error {
 	return c.JSON(out)
 }
 
+// SendCampaign envía una campaña de email masiva a los clientes filtrados.
+// @Summary      Enviar campaña de email
+// @Description  Envía el contenido de la campaña por correo a los clientes filtrados por categoría (opcional)
+// @Tags         crm
+// @Security     Bearer
+// @Accept       json
+// @Produce      json
+// @Param        body  body  dto.SendCampaignRequest  true  "Datos de la campaña a enviar"
+// @Success      200   {object} map[string]string
+// @Failure      400   {object} dto.ErrorResponse
+// @Failure      401   {object} dto.ErrorResponse
+// @Failure      409   {object} dto.ErrorResponse
+// @Failure      503   {object} dto.ErrorResponse
+// @Router       /api/crm/campaigns/send [post]
+func (h *CRMHandler) SendCampaign(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	userID := GetUserID(c)
+	if companyID == "" || userID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if h.CampaignUC == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "campaigns no configurado"})
+	}
+	var in dto.SendCampaignRequest
+	if err := c.BodyParser(&in); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
+	}
+	if err := h.CampaignUC.SendCampaign(c.Context(), companyID, userID, in); err != nil {
+		switch err {
+		case domain.ErrInvalidInput:
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "subject y body son requeridos"})
+		case domain.ErrConflict:
+			return c.Status(fiber.StatusConflict).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "servicio de correo no configurado"})
+		default:
+			return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+		}
+	}
+	return c.JSON(fiber.Map{"status": "sent"})
+}
+
 // EscalateTicket escala un ticket PQR y registra la razón.
 // @Summary      Escalar ticket PQR
 // @Description  Marca el ticket como ESCALATED, persiste la razón y genera una entrada de auditoría

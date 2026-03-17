@@ -2,6 +2,7 @@ package crm
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -9,16 +10,33 @@ import (
 	"github.com/jhoicas/Inventario-api/internal/domain"
 	"github.com/jhoicas/Inventario-api/internal/domain/entity"
 	"github.com/jhoicas/Inventario-api/internal/domain/repository"
+	inframail "github.com/jhoicas/Inventario-api/internal/infrastructure/mail"
 )
 
 // CampaignUseCase gestión de campañas de marketing CRM.
 type CampaignUseCase struct {
-	repo repository.CRMCampaignRepository
+	repo           repository.CRMCampaignRepository
+	customerRepo   repository.CustomerRepository
+	profileRepo    repository.CRMProfileRepository
+	interactionRepo repository.CRMInteractionRepository
+	mailSender     inframail.Sender
 }
 
 // NewCampaignUseCase construye el caso de uso.
-func NewCampaignUseCase(repo repository.CRMCampaignRepository) *CampaignUseCase {
-	return &CampaignUseCase{repo: repo}
+func NewCampaignUseCase(
+	repo repository.CRMCampaignRepository,
+	customerRepo repository.CustomerRepository,
+	profileRepo repository.CRMProfileRepository,
+	interactionRepo repository.CRMInteractionRepository,
+	mailSender inframail.Sender,
+) *CampaignUseCase {
+	return &CampaignUseCase{
+		repo:            repo,
+		customerRepo:    customerRepo,
+		profileRepo:     profileRepo,
+		interactionRepo: interactionRepo,
+		mailSender:      mailSender,
+	}
 }
 
 // Create crea una campaña en estado BORRADOR.
@@ -68,6 +86,89 @@ func (uc *CampaignUseCase) GetMetrics(ctx context.Context, campaignID string) (*
 		Converted:  m.Converted,
 		Revenue:    m.Revenue,
 	}, nil
+}
+
+// SendCampaign envía una campaña de email a los clientes filtrados por categoría (opcional)
+// y registra una interacción de tipo "email" por cada envío exitoso.
+func (uc *CampaignUseCase) SendCampaign(ctx context.Context, companyID, userID string, req dto.SendCampaignRequest) error {
+	if strings.TrimSpace(req.Subject) == "" || strings.TrimSpace(req.Body) == "" {
+		return domain.ErrInvalidInput
+	}
+	if uc.mailSender == nil {
+		return domain.ErrConflict
+	}
+
+	// Resolver destinatarios
+	var customerIDs []string
+
+	if req.CategoryID != "" {
+		// Filtrar por categoría CRM: buscar perfiles con esa CategoryID.
+		profiles, err := uc.profileRepo.ListByCompany(companyID, 2000, 0)
+		if err != nil {
+			return err
+		}
+		for _, p := range profiles {
+			if p.CategoryID == req.CategoryID {
+				customerIDs = append(customerIDs, p.CustomerID)
+			}
+		}
+	} else {
+		// Sin filtro: enviar a todos los clientes de la empresa (paginando).
+		offset := 0
+		limit := 200
+		for {
+			customers, err := uc.customerRepo.ListByCompany(companyID, "", limit, offset)
+			if err != nil {
+				return err
+			}
+			if len(customers) == 0 {
+				break
+			}
+			for _, c := range customers {
+				customerIDs = append(customerIDs, c.ID)
+			}
+			if len(customers) < limit {
+				break
+			}
+			offset += limit
+		}
+	}
+
+	now := time.Now()
+
+	for _, cid := range customerIDs {
+		cust, err := uc.customerRepo.GetByID(cid)
+		if err != nil || cust == nil || cust.CompanyID != companyID {
+			continue
+		}
+		email := strings.TrimSpace(cust.Email)
+		if email == "" {
+			continue
+		}
+
+		// Intentar enviar email; si falla uno, continuar con el siguiente.
+		if err := uc.mailSender.Send(email, req.Subject, req.Body); err != nil {
+			continue
+		}
+
+		if uc.interactionRepo == nil {
+			continue
+		}
+
+		interaction := &entity.CRMInteraction{
+			ID:         uuid.New().String(),
+			CompanyID:  companyID,
+			CustomerID: cust.ID,
+			Type:       entity.InteractionTypeEmail,
+			Subject:    req.Subject,
+			Body:       "Campaña enviada",
+			CreatedBy:  userID,
+			CreatedAt:  now,
+		}
+		_ = uc.interactionRepo.Create(interaction)
+	}
+
+	return nil
 }
 
 func toCampaignResponse(c *entity.Campaign) *dto.CampaignResponse {
