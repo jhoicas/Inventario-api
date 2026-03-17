@@ -17,6 +17,7 @@ import (
 	"github.com/jhoicas/Inventario-api/internal/application/auth"
 	"github.com/jhoicas/Inventario-api/internal/application/billing"
 	"github.com/jhoicas/Inventario-api/internal/application/crm"
+	"github.com/jhoicas/Inventario-api/internal/application/dto"
 	"github.com/jhoicas/Inventario-api/internal/application/inventory"
 	"github.com/jhoicas/Inventario-api/internal/application/usecase"
 	dianws "github.com/jhoicas/Inventario-api/internal/billing"
@@ -190,6 +191,80 @@ func main() {
 	campaignUC := crm.NewCampaignUseCase(crmCampaignRepo)
 	opportunityUC := crm.NewOpportunityUseCase(crmOpportunityRepo)
 	crmHandler := httpRouter.NewCRMHandler(loyaltyUC, taskUC, pqrUC, aiCRMUC, crmInteractionRepo, opportunityUC, invoiceRepo, campaignUC)
+
+	// Worker diario de reposición crítica → crea tareas CRM de reabastecimiento.
+	go func() {
+		ticker := time.NewTicker(24 * time.Hour)
+		defer ticker.Stop()
+
+		run := func() {
+			ctx := context.Background()
+
+			companies, err := companyRepo.List(1000, 0)
+			if err != nil {
+				log.Error().Err(err).Msg("daily_replenishment_worker: listar compañías")
+				return
+			}
+
+			for _, c := range companies {
+				list, err := replenishmentUC.GenerateReplenishmentList(ctx, c.ID, "")
+				if err != nil {
+					log.Error().Err(err).
+						Str("company_id", c.ID).
+						Msg("daily_replenishment_worker: GenerateReplenishmentList")
+					continue
+				}
+
+				for _, item := range list {
+					if item.Priority != 1 {
+						continue
+					}
+
+					hasOpen, err := taskUC.HasOpenReplenishmentTask(ctx, c.ID, item.ProductName)
+					if err != nil {
+						log.Error().Err(err).
+							Str("company_id", c.ID).
+							Str("product_id", item.ProductID).
+							Msg("daily_replenishment_worker: HasOpenReplenishmentTask")
+						continue
+					}
+					if hasOpen {
+						continue
+					}
+
+					leadDays := 3
+					due := time.Now().AddDate(0, 0, leadDays)
+					dueAt := due
+
+					_, err = taskUC.Create(ctx, c.ID, "system", dto.CreateTaskRequest{
+						CustomerID:  "",
+						Title:       "Reabastecer " + item.ProductName,
+						Description: "Producto crítico en lista de reposición automática",
+						DueAt:       &dueAt,
+					})
+					if err != nil {
+						log.Error().Err(err).
+							Str("company_id", c.ID).
+							Str("product_id", item.ProductID).
+							Msg("daily_replenishment_worker: Create task")
+						continue
+					}
+				}
+			}
+		}
+
+		// primera ejecución inmediata al iniciar la app
+		run()
+
+		for {
+			select {
+			case <-workerCtx.Done():
+				return
+			case <-ticker.C:
+				run()
+			}
+		}
+	}()
 
 	// PDF: representación gráfica de la factura electrónica DIAN
 	pdfGenerator := infrapdf.NewMarotoPDFGenerator()

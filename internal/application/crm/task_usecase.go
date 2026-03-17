@@ -111,6 +111,26 @@ func (uc *TaskUseCase) ListByCompany(ctx context.Context, companyID, status stri
 	return &dto.TaskResponseList{Items: items, Limit: limit, Offset: offset}, nil
 }
 
+// HasOpenReplenishmentTask devuelve true si ya existe una tarea pendiente de reabastecimiento
+// para el producto indicado (heurística: título exacto "Reabastecer <nombre>").
+func (uc *TaskUseCase) HasOpenReplenishmentTask(ctx context.Context, companyID, productName string) (bool, error) {
+	if companyID == "" || productName == "" {
+		return false, domain.ErrInvalidInput
+	}
+	// Limitamos a las primeras 200 tareas pendientes por eficiencia.
+	list, err := uc.taskRepo.ListByCompany(companyID, string(entity.TaskStatusPending), 200, 0)
+	if err != nil {
+		return false, err
+	}
+	targetTitle := "Reabastecer " + productName
+	for _, t := range list {
+		if t.Title == targetTitle {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // GenerateReorderAlerts devuelve sugerencias de tareas de recompra. Sin integración con inventario retorna lista vacía.
 func (uc *TaskUseCase) GenerateReorderAlerts(ctx context.Context, companyID string) ([]dto.TaskAlert, error) {
 	return nil, nil
