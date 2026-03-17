@@ -122,11 +122,12 @@ func Router(app *fiber.App, deps RouterDeps) {
 	usersGroup.Post("/", userHandler.Create)
 	usersGroup.Put("/:id", userHandler.Update)
 
-	protected.Get("/resolutions",
+	resolutionsGroup := protected.Group("/resolutions",
 		RequireModule(entity.ModuleBilling, deps.ModuleService),
 		RequireRole(entity.RoleAdmin),
-		companyHandler.ListMyResolutions,
 	)
+	resolutionsGroup.Get("/", companyHandler.ListMyResolutions)
+	resolutionsGroup.Post("/", companyHandler.CreateMyResolution)
 
 	if deps.DIANSettingsUC != nil {
 		settingsHandler := NewSettingsHandler(deps.DIANSettingsUC)

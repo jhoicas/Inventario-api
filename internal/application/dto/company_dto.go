@@ -45,9 +45,11 @@ type CreateResolutionRequest struct {
 	ResolutionNumber string `json:"resolution_number"`
 	FromNumber       int64  `json:"from_number"`
 	ToNumber         int64  `json:"to_number"`
-	ValidFrom        string `json:"valid_from"`  // formato YYYY-MM-DD
-	ValidUntil       string `json:"valid_until"` // formato YYYY-MM-DD
-	Environment      string `json:"environment"` // test|prod
+	CurrentNumber    int64  `json:"current_number,omitempty"`  // no usado por ahora; solo para compatibilidad de payload
+	ValidFrom        string `json:"valid_from"`                // formato YYYY-MM-DD
+	ValidUntil       string `json:"valid_to"`                  // formato YYYY-MM-DD (respetar nombre del frontend)
+	AlertThreshold   int    `json:"alert_threshold,omitempty"` // porcentaje; por ahora solo compatibilidad, cálculo interno sigue siendo 10%
+	Environment      string `json:"environment,omitempty"`     // test|prod; opcional en este payload
 }
 
 // ResolutionResponse salida de resolución con alerta de umbral.
