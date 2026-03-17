@@ -264,6 +264,26 @@ type CampaignMetricsResponse struct {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
+// Campaign Templates
+// ──────────────────────────────────────────────────────────────────────────────
+
+type CreateCampaignTemplateRequest struct {
+	Name    string `json:"name" validate:"required"`
+	Subject string `json:"subject" validate:"required"`
+	Body    string `json:"body" validate:"required"`
+}
+
+type CampaignTemplateResponse struct {
+	ID        string    `json:"id"`
+	CompanyID string    `json:"company_id"`
+	Name      string    `json:"name"`
+	Subject   string    `json:"subject"`
+	Body      string    `json:"body"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
 // Campaign recipient resolution
 // ──────────────────────────────────────────────────────────────────────────────
 

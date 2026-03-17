@@ -27,6 +27,7 @@ type CRMHandler struct {
 	AICRMUC         *crm.AICRMUseCase
 	OpportunityUC   *crm.OpportunityUseCase
 	CampaignUC      *crm.CampaignUseCase
+	TemplateUC      *crm.CampaignTemplateUseCase
 	InvoiceHistory  invoiceHistoryRepo
 	InteractionRepo interface {
 		Create(interaction *entity.CRMInteraction) error
@@ -49,6 +50,7 @@ func NewCRMHandler(
 	opportunityUC *crm.OpportunityUseCase,
 	invoiceHistory invoiceHistoryRepo,
 	campaignUC *crm.CampaignUseCase,
+	templateUC *crm.CampaignTemplateUseCase,
 ) *CRMHandler {
 	return &CRMHandler{
 		LoyaltyUC:       loyaltyUC,
@@ -57,6 +59,7 @@ func NewCRMHandler(
 		AICRMUC:         aiCRMUC,
 		OpportunityUC:   opportunityUC,
 		CampaignUC:      campaignUC,
+		TemplateUC:      templateUC,
 		InvoiceHistory:  invoiceHistory,
 		InteractionRepo: interactionRepo,
 	}
@@ -1091,6 +1094,93 @@ func (h *CRMHandler) GetCampaignMetrics(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}
 	return c.JSON(out)
+}
+
+// CreateCampaignTemplate godoc
+// @Summary      Crear plantilla de campaña
+// @Tags         crm
+// @Security     Bearer
+// @Accept       json
+// @Produce      json
+// @Param        body  body  dto.CreateCampaignTemplateRequest  true  "Datos de la plantilla"
+// @Success      201   {object} dto.CampaignTemplateResponse
+// @Failure      400   {object} dto.ErrorResponse
+// @Failure      401   {object} dto.ErrorResponse
+// @Failure      503   {object} dto.ErrorResponse
+// @Router       /api/crm/campaign-templates [post]
+func (h *CRMHandler) CreateCampaignTemplate(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	if companyID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if h.TemplateUC == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "templates no configurado"})
+	}
+	var in dto.CreateCampaignTemplateRequest
+	if err := c.BodyParser(&in); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
+	}
+	out, err := h.TemplateUC.CreateTemplate(c.Context(), companyID, in)
+	if err != nil {
+		if err == domain.ErrInvalidInput {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "name, subject y body son requeridos"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.Status(fiber.StatusCreated).JSON(out)
+}
+
+// ListCampaignTemplates godoc
+// @Summary      Listar plantillas de campaña
+// @Tags         crm
+// @Security     Bearer
+// @Produce      json
+// @Success      200  {array} dto.CampaignTemplateResponse
+// @Failure      401  {object} dto.ErrorResponse
+// @Failure      503  {object} dto.ErrorResponse
+// @Router       /api/crm/campaign-templates [get]
+func (h *CRMHandler) ListCampaignTemplates(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	if companyID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if h.TemplateUC == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "templates no configurado"})
+	}
+	out, err := h.TemplateUC.GetTemplates(c.Context(), companyID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.JSON(out)
+}
+
+// DeleteCampaignTemplate godoc
+// @Summary      Eliminar plantilla de campaña
+// @Tags         crm
+// @Security     Bearer
+// @Produce      json
+// @Param        id  path  string  true  "Template ID"
+// @Success      204  "No Content"
+// @Failure      400  {object} dto.ErrorResponse
+// @Failure      401  {object} dto.ErrorResponse
+// @Failure      503  {object} dto.ErrorResponse
+// @Router       /api/crm/campaign-templates/{id} [delete]
+func (h *CRMHandler) DeleteCampaignTemplate(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	id := c.Params("id")
+	if companyID == "" || id == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if h.TemplateUC == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "templates no configurado"})
+	}
+	if err := h.TemplateUC.DeleteTemplate(c.Context(), companyID, id); err != nil {
+		if err == domain.ErrInvalidInput {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "parámetros inválidos"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.SendStatus(fiber.StatusNoContent)
 }
 
 // ResolveCampaignRecipients resuelve destinatarios potenciales para una campaña

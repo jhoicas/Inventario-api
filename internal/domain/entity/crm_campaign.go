@@ -38,3 +38,14 @@ type CampaignMetrics struct {
 	Converted  int
 	Revenue    decimal.Decimal
 }
+
+// CampaignTemplate representa una plantilla de campaña de email CRM.
+type CampaignTemplate struct {
+	ID        string
+	CompanyID string
+	Name      string
+	Subject   string
+	Body      string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}

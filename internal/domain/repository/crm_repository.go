@@ -103,3 +103,10 @@ type CRMCampaignRepository interface {
 	GetByID(ctx context.Context, id string) (*entity.Campaign, error)
 	GetMetrics(ctx context.Context, campaignID string) (*entity.CampaignMetrics, error)
 }
+
+// CRMCampaignTemplateRepository puerto de persistencia para plantillas de campañas.
+type CRMCampaignTemplateRepository interface {
+	Create(ctx context.Context, t *entity.CampaignTemplate) error
+	FindAllByCompany(ctx context.Context, companyID string) ([]*entity.CampaignTemplate, error)
+	Delete(ctx context.Context, id, companyID string) error
+}

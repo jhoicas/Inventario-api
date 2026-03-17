@@ -180,6 +180,7 @@ func main() {
 	crmTaskRepo := postgres.NewCRMTaskRepository(pool)
 	crmTicketRepo := postgres.NewCRMTicketRepository(pool)
 	crmCampaignRepo := postgres.NewCRMCampaignRepository(pool)
+	crmTemplateRepo := postgres.NewCRMCampaignTemplateRepository(pool)
 	crmOpportunityRepo := postgres.NewCRMOpportunityRepository(pool)
 	slaConfigRepo := postgres.NewSLAConfigRepository(pool)
 	_ = slaConfigRepo // disponible para futuros endpoints
@@ -194,8 +195,9 @@ func main() {
 		log.Error().Err(err).Msg("configurar SMTPSender para campañas CRM (usando net/smtp)")
 	}
 	campaignUC := crm.NewCampaignUseCase(crmCampaignRepo, customerRepo, crmProfileRepo, crmInteractionRepo, mailSender)
+	templateUC := crm.NewCampaignTemplateUseCase(crmTemplateRepo)
 	opportunityUC := crm.NewOpportunityUseCase(crmOpportunityRepo)
-	crmHandler := httpRouter.NewCRMHandler(loyaltyUC, taskUC, pqrUC, aiCRMUC, crmInteractionRepo, opportunityUC, invoiceRepo, campaignUC)
+	crmHandler := httpRouter.NewCRMHandler(loyaltyUC, taskUC, pqrUC, aiCRMUC, crmInteractionRepo, opportunityUC, invoiceRepo, campaignUC, templateUC)
 
 	// Worker diario de reposición crítica → crea tareas CRM de reabastecimiento.
 	go func() {

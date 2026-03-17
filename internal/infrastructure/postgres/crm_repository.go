@@ -454,6 +454,56 @@ func (r *CRMTaskRepo) ListByCompany(companyID string, status string, limit, offs
 	return list, rows.Err()
 }
 
+// CRMCampaignTemplateRepo implementación de CRMCampaignTemplateRepository.
+type CRMCampaignTemplateRepo struct{ q Querier }
+
+func NewCRMCampaignTemplateRepository(q Querier) *CRMCampaignTemplateRepo {
+	return &CRMCampaignTemplateRepo{q: q}
+}
+
+func (r *CRMCampaignTemplateRepo) Create(ctx context.Context, t *entity.CampaignTemplate) error {
+	if t.ID == "" {
+		t.ID = uuid.New().String()
+	}
+	_, err := r.q.Exec(ctx, `
+		INSERT INTO crm_campaign_templates (id, company_id, name, subject, body, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		t.ID, t.CompanyID, t.Name, t.Subject, t.Body, t.CreatedAt, t.UpdatedAt,
+	)
+	return err
+}
+
+func (r *CRMCampaignTemplateRepo) FindAllByCompany(ctx context.Context, companyID string) ([]*entity.CampaignTemplate, error) {
+	rows, err := r.q.Query(ctx, `
+		SELECT id, company_id, name, subject, body, created_at, updated_at
+		FROM crm_campaign_templates
+		WHERE company_id = $1
+		ORDER BY updated_at DESC`, companyID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []*entity.CampaignTemplate
+	for rows.Next() {
+		var t entity.CampaignTemplate
+		if err := rows.Scan(&t.ID, &t.CompanyID, &t.Name, &t.Subject, &t.Body, &t.CreatedAt, &t.UpdatedAt); err != nil {
+			return nil, err
+		}
+		list = append(list, &t)
+	}
+	return list, rows.Err()
+}
+
+func (r *CRMCampaignTemplateRepo) Delete(ctx context.Context, id, companyID string) error {
+	_, err := r.q.Exec(ctx, `
+		DELETE FROM crm_campaign_templates WHERE id = $1 AND company_id = $2`,
+		id, companyID,
+	)
+	return err
+}
+
 // CRMTicketRepo implementación de CRMTicketRepository.
 type CRMTicketRepo struct{ q Querier }
 

@@ -333,8 +333,12 @@ func Router(app *fiber.App, deps RouterDeps) {
 		crmGroup.Put("/opportunities/:id/stage", h.UpdateOpportunityStage)
 		crmGroup.Get("/opportunities/funnel", h.GetOpportunityFunnel)
 		// Campaigns
-		crmGroup.Post("/campaigns", RequireRole(entity.RoleAdmin), h.CreateCampaign)
+		crmGroup.Post("/campaigns", RequireRole(entity.RoleAdmin, entity.RoleMarketing), h.CreateCampaign)
 		crmGroup.Get("/campaigns/:id/metrics", h.GetCampaignMetrics)
+		// Campaign templates
+		crmGroup.Post("/campaign-templates", RequireRole(entity.RoleAdmin, entity.RoleMarketing), h.CreateCampaignTemplate)
+		crmGroup.Get("/campaign-templates", RequireRole(entity.RoleAdmin, entity.RoleMarketing), h.ListCampaignTemplates)
+		crmGroup.Delete("/campaign-templates/:id", RequireRole(entity.RoleAdmin, entity.RoleMarketing), h.DeleteCampaignTemplate)
 		// Historial de compras: requiere módulo billing activo además de crm
 		crmGroup.Get("/customers/:id/purchase-history",
 			RequireModule(entity.ModuleBilling, deps.ModuleService),
