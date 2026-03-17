@@ -7,21 +7,20 @@ services:
     ports:
       - "8080:8080"
     environment:
-      # App
       - APP_ENV=production
       - APP_NAME=inventory-pro
-      
-      # Database: connection string de Supabase (password URL-encoded: # %23, * %2A, & %26, % %25)
+ # DIAN: usar SIEMPRE /app/certificates dentro del contenedor
+      - DIAN_CERT_STORAGE_PATH=/tmp/dian-certs
+      - DIAN_CERT_PATH=/tmp/dian-certs/certificado_prueba.p12
+      - DIAN_CERT_PASSWORD=123456
       - DATABASE_URL=postgresql://postgres:xF%23%2AW3%26%25mDceWPL@db.ghewngonrvknaqdvigkp.supabase.co:5432/postgres?sslmode=require
-      
-      # HTTP
       - HTTP_HOST=0.0.0.0
       - HTTP_PORT=8080
-      
-      # JWT
-      - JWT_SECRET=${JWT_SECRET:-cambiar-este-secret-en-produccion}
+      - JWT_SECRET=f96d5f1b11a1d8e018960ab3e4385bb6
       - JWT_EXPIRATION_MINUTES=60
       - JWT_ISSUER=inventory-pro
+    volumes:
+      - /mnt/invorya-certificados:/mnt/invorya-certificados
     restart: unless-stopped
     networks:
       - inventory-network
