@@ -397,6 +397,71 @@ func (uc *LoyaltyUseCase) ListCategories(ctx context.Context, companyID string, 
 	return out, nil
 }
 
+// CreateCategory crea una categoría de fidelización (solo admin).
+func (uc *LoyaltyUseCase) CreateCategory(ctx context.Context, companyID string, in dto.CreateCategoryRequest) (*dto.CategoryResponse, error) {
+	if companyID == "" || strings.TrimSpace(in.Name) == "" {
+		return nil, domain.ErrInvalidInput
+	}
+	now := time.Now()
+	cat := &entity.CRMCategory{
+		ID:        uuid.New().String(),
+		CompanyID: companyID,
+		Name:      in.Name,
+		MinLTV:    in.MinLTV,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	if err := uc.categoryRepo.Create(cat); err != nil {
+		return nil, err
+	}
+	return &dto.CategoryResponse{
+		ID:        cat.ID,
+		CompanyID: cat.CompanyID,
+		Name:      cat.Name,
+		MinLTV:    cat.MinLTV,
+		CreatedAt: cat.CreatedAt,
+		UpdatedAt: cat.UpdatedAt,
+	}, nil
+}
+
+// UpdateCategory actualiza una categoría de fidelización existente (solo admin).
+func (uc *LoyaltyUseCase) UpdateCategory(ctx context.Context, companyID, categoryID string, in dto.UpdateCategoryRequest) (*dto.CategoryResponse, error) {
+	if companyID == "" || categoryID == "" {
+		return nil, domain.ErrInvalidInput
+	}
+	cat, err := uc.categoryRepo.GetByID(categoryID)
+	if err != nil {
+		return nil, err
+	}
+	if cat == nil {
+		return nil, domain.ErrNotFound
+	}
+	if cat.CompanyID != companyID {
+		return nil, domain.ErrForbidden
+	}
+	if in.Name != nil {
+		if strings.TrimSpace(*in.Name) == "" {
+			return nil, domain.ErrInvalidInput
+		}
+		cat.Name = *in.Name
+	}
+	if in.MinLTV != nil {
+		cat.MinLTV = *in.MinLTV
+	}
+	cat.UpdatedAt = time.Now()
+	if err := uc.categoryRepo.Update(cat); err != nil {
+		return nil, err
+	}
+	return &dto.CategoryResponse{
+		ID:        cat.ID,
+		CompanyID: cat.CompanyID,
+		Name:      cat.Name,
+		MinLTV:    cat.MinLTV,
+		CreatedAt: cat.CreatedAt,
+		UpdatedAt: cat.UpdatedAt,
+	}, nil
+}
+
 // ListBenefitsByCategory lista beneficios de una categoría.
 func (uc *LoyaltyUseCase) ListBenefitsByCategory(ctx context.Context, categoryID string, limit, offset int) ([]dto.BenefitResponse, error) {
 	list, err := uc.benefitRepo.ListByCategory(categoryID, limit, offset)

@@ -175,6 +175,18 @@ type CategoryResponse struct {
 	UpdatedAt time.Time       `json:"updated_at"`
 }
 
+// CreateCategoryRequest body para crear una categoría CRM (solo admin).
+type CreateCategoryRequest struct {
+	Name   string          `json:"name" validate:"required"`
+	MinLTV decimal.Decimal `json:"min_ltv"`
+}
+
+// UpdateCategoryRequest body para actualizar una categoría CRM (solo admin).
+type UpdateCategoryRequest struct {
+	Name   *string          `json:"name,omitempty"`
+	MinLTV *decimal.Decimal `json:"min_ltv,omitempty"`
+}
+
 // BenefitResponse beneficio por categoría.
 type BenefitResponse struct {
 	ID          string    `json:"id"`

@@ -265,6 +265,81 @@ func (h *CRMHandler) ListCategories(c *fiber.Ctx) error {
 	return c.JSON(list)
 }
 
+// CreateCategory crea una categoría CRM (solo admin).
+// @Summary      Crear categoría CRM
+// @Description  Crea una categoría de fidelización (solo admin)
+// @Tags         crm
+// @Security     Bearer
+// @Accept       json
+// @Produce      json
+// @Param        body  body  dto.CreateCategoryRequest  true  "Category"
+// @Success      201   {object}  dto.CategoryResponse
+// @Failure      400   {object}  dto.ErrorResponse
+// @Failure      401   {object}  dto.ErrorResponse
+// @Failure      403   {object}  dto.ErrorResponse
+// @Router       /api/crm/categories [post]
+func (h *CRMHandler) CreateCategory(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	if companyID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	var in dto.CreateCategoryRequest
+	if err := c.BodyParser(&in); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
+	}
+	out, err := h.LoyaltyUC.CreateCategory(c.Context(), companyID, in)
+	if err != nil {
+		switch err {
+		case domain.ErrInvalidInput:
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "name requerido"})
+		case domain.ErrForbidden:
+			return c.Status(fiber.StatusForbidden).JSON(dto.ErrorResponse{Code: "FORBIDDEN", Message: "acceso denegado"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.Status(fiber.StatusCreated).JSON(out)
+}
+
+// UpdateCategory actualiza una categoría CRM (solo admin).
+// @Summary      Actualizar categoría CRM
+// @Description  Actualiza una categoría de fidelización (solo admin)
+// @Tags         crm
+// @Security     Bearer
+// @Accept       json
+// @Produce      json
+// @Param        id    path  string  true  "Category ID"
+// @Param        body  body  dto.UpdateCategoryRequest  true  "Category"
+// @Success      200   {object}  dto.CategoryResponse
+// @Failure      400   {object}  dto.ErrorResponse
+// @Failure      401   {object}  dto.ErrorResponse
+// @Failure      403   {object}  dto.ErrorResponse
+// @Failure      404   {object}  dto.ErrorResponse
+// @Router       /api/crm/categories/{id} [put]
+func (h *CRMHandler) UpdateCategory(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	id := c.Params("id")
+	if companyID == "" || id == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	var in dto.UpdateCategoryRequest
+	if err := c.BodyParser(&in); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
+	}
+	out, err := h.LoyaltyUC.UpdateCategory(c.Context(), companyID, id, in)
+	if err != nil {
+		switch err {
+		case domain.ErrInvalidInput:
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "datos inválidos"})
+		case domain.ErrForbidden:
+			return c.Status(fiber.StatusForbidden).JSON(dto.ErrorResponse{Code: "FORBIDDEN", Message: "acceso denegado"})
+		case domain.ErrNotFound:
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "categoría no encontrada"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.JSON(out)
+}
+
 // ListBenefitsByCategory lista beneficios de una categoría.
 // @Summary      Listar beneficios por categoría
 // @Description  Lista los beneficios asociados a una categoría de fidelización
