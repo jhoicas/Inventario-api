@@ -1,3 +1,6 @@
+//go:build ignore
+// +build ignore
+
 // main.go integration example
 
 package main

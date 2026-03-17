@@ -12,6 +12,7 @@ type SupplierUseCase interface {
 	GetByID(id string) (*dto.SupplierResponse, error)
 	List(companyID string, filters dto.SupplierFilters) (*dto.SupplierListResponse, error)
 	Update(id string, in dto.UpdateSupplierRequest) (*dto.SupplierResponse, error)
+	Deactivate(companyID, supplierID string) error
 }
 
 // SupplierHandler maneja las peticiones HTTP para Supplier (protegido).
@@ -159,4 +160,38 @@ func (h *SupplierHandler) Update(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(out)
+}
+
+// Deactivate godoc
+// @Summary      Desactivar proveedor
+// @Description  Desactiva (soft delete) un proveedor asociado a la empresa autenticada (solo admin)
+// @Tags         suppliers
+// @Security     Bearer
+// @Produce      json
+// @Param        id   path  string  true  "ID del proveedor"
+// @Success      204
+// @Failure      400  {object}  dto.ErrorResponse
+// @Failure      401  {object}  dto.ErrorResponse
+// @Failure      403  {object}  dto.ErrorResponse
+// @Failure      404  {object}  dto.ErrorResponse
+// @Failure      500  {object}  dto.ErrorResponse
+// @Router       /api/suppliers/{id}/deactivate [put]
+func (h *SupplierHandler) Deactivate(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	id := c.Params("id")
+	if companyID == "" || id == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "id requerido"})
+	}
+	if err := h.uc.Deactivate(companyID, id); err != nil {
+		switch err {
+		case domain.ErrInvalidInput:
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "id inválido"})
+		case domain.ErrNotFound:
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "proveedor no encontrado"})
+		case domain.ErrForbidden:
+			return c.Status(fiber.StatusForbidden).JSON(dto.ErrorResponse{Code: "FORBIDDEN", Message: "acceso denegado"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.SendStatus(fiber.StatusNoContent)
 }

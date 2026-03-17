@@ -44,6 +44,7 @@ func (uc *SupplierUseCase) Create(companyID string, in dto.CreateSupplierRequest
 		Phone:           in.Phone,
 		PaymentTermDays: in.PaymentTermDays,
 		LeadTimeDays:    in.LeadTimeDays,
+		IsActive:        true,
 		CreatedAt:       now,
 		UpdatedAt:       now,
 	}
@@ -53,6 +54,24 @@ func (uc *SupplierUseCase) Create(companyID string, in dto.CreateSupplierRequest
 	}
 
 	return toSupplierResponse(supplier), nil
+}
+
+// Deactivate desactiva un proveedor (soft delete).
+func (uc *SupplierUseCase) Deactivate(companyID, supplierID string) error {
+	if companyID == "" || supplierID == "" {
+		return domain.ErrInvalidInput
+	}
+	current, err := uc.repo.GetByID(supplierID)
+	if err != nil {
+		return err
+	}
+	if current == nil {
+		return domain.ErrNotFound
+	}
+	if current.CompanyID != companyID {
+		return domain.ErrForbidden
+	}
+	return uc.repo.SetActive(companyID, supplierID, false)
 }
 
 // GetByID obtiene un proveedor por ID.

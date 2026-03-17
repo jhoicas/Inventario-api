@@ -37,6 +37,7 @@ func (uc *CustomerUseCase) Create(companyID string, in dto.CreateCustomerRequest
 		TaxID:     in.TaxID,
 		Email:     in.Email,
 		Phone:     in.Phone,
+		IsActive:  true,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
@@ -51,6 +52,24 @@ func (uc *CustomerUseCase) Create(companyID string, in dto.CreateCustomerRequest
 		Email:     customer.Email,
 		Phone:     customer.Phone,
 	}, nil
+}
+
+// Deactivate desactiva un cliente (soft delete).
+func (uc *CustomerUseCase) Deactivate(companyID, customerID string) error {
+	if companyID == "" || customerID == "" {
+		return domain.ErrInvalidInput
+	}
+	current, err := uc.repo.GetByID(customerID)
+	if err != nil {
+		return err
+	}
+	if current == nil {
+		return domain.ErrNotFound
+	}
+	if current.CompanyID != companyID {
+		return domain.ErrForbidden
+	}
+	return uc.repo.SetActive(companyID, customerID, false)
 }
 
 // List lista clientes de la empresa.

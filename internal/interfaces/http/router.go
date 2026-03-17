@@ -99,6 +99,7 @@ func Router(app *fiber.App, deps RouterDeps) {
 	sup.Get("/:id", supplierHandler.GetByID)
 	sup.Post("/", RequireRole(entity.RoleAdmin, entity.RoleBodeguero), supplierHandler.Create)
 	sup.Put("/:id", RequireRole(entity.RoleAdmin, entity.RoleBodeguero), supplierHandler.Update)
+	sup.Put("/:id/deactivate", RequireRole(entity.RoleAdmin), supplierHandler.Deactivate)
 
 	customerHandler := NewCustomerHandler(deps.CustomerUC)
 	cust := protected.Group("/customers")
@@ -106,6 +107,7 @@ func Router(app *fiber.App, deps RouterDeps) {
 	// Creación de clientes: admin y vendedor
 	cust.Post("/", RequireRole(entity.RoleAdmin, entity.RoleVendedor), customerHandler.Create)
 	cust.Put("/:id", RequireRole(entity.RoleAdmin, entity.RoleVendedor), customerHandler.Update)
+	cust.Put("/:id/deactivate", RequireRole(entity.RoleAdmin), customerHandler.Deactivate)
 	// Consulta DIAN por documento: JWT + RequireModule(billing) + DIANConfigMiddleware
 	if deps.CustomerLookup != nil && deps.CompanyRepo != nil {
 		cust.Get("/lookup",
@@ -311,6 +313,7 @@ func Router(app *fiber.App, deps RouterDeps) {
 		crmGroup.Get("/categories", h.ListCategories)
 		crmGroup.Post("/categories", RequireRole(entity.RoleAdmin), h.CreateCategory)
 		crmGroup.Put("/categories/:id", RequireRole(entity.RoleAdmin), h.UpdateCategory)
+		crmGroup.Put("/categories/:id/deactivate", RequireRole(entity.RoleAdmin), h.DeactivateCategory)
 		crmGroup.Get("/categories/:id/benefits", h.ListBenefitsByCategory)
 		// Beneficios: escritura solo admin
 		crmGroup.Post("/categories/:categoryId/benefits", RequireRole(entity.RoleAdmin), h.CreateBenefit)

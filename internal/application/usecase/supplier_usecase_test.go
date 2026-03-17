@@ -19,6 +19,7 @@ type fakeSupplierRepository struct {
 	getByCompanyAndNITFun func(companyID, nit string) (*entity.Supplier, error)
 	updateFunc            func(supplier *entity.Supplier) error
 	listByCompanyFunc     func(companyID, search string, limit, offset int) ([]*entity.Supplier, error)
+	setActiveFunc         func(companyID, id string, isActive bool) error
 }
 
 func (f *fakeSupplierRepository) Create(supplier *entity.Supplier) error {
@@ -54,6 +55,13 @@ func (f *fakeSupplierRepository) ListByCompany(companyID, search string, limit, 
 		return f.listByCompanyFunc(companyID, search, limit, offset)
 	}
 	return nil, nil
+}
+
+func (f *fakeSupplierRepository) SetActive(companyID, id string, isActive bool) error {
+	if f.setActiveFunc != nil {
+		return f.setActiveFunc(companyID, id, isActive)
+	}
+	return nil
 }
 
 var _ repository.SupplierRepository = (*fakeSupplierRepository)(nil)

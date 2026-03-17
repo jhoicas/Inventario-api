@@ -59,6 +59,8 @@ func (f *loyaltyCustomerRepoFake) Update(customer *entity.Customer) error { retu
 
 func (f *loyaltyCustomerRepoFake) Delete(id string) error { return nil }
 
+func (f *loyaltyCustomerRepoFake) SetActive(companyID, id string, isActive bool) error { return nil }
+
 type loyaltyCategoryRepoFake struct{}
 
 func (f *loyaltyCategoryRepoFake) Create(category *entity.CRMCategory) error { return nil }
@@ -72,6 +74,10 @@ func (f *loyaltyCategoryRepoFake) ListByCompany(companyID string, limit, offset 
 func (f *loyaltyCategoryRepoFake) Update(category *entity.CRMCategory) error { return nil }
 
 func (f *loyaltyCategoryRepoFake) Delete(id string) error { return nil }
+
+func (f *loyaltyCategoryRepoFake) SetActive(companyID, id string, isActive bool, updatedAt time.Time) error {
+	return nil
+}
 
 type loyaltyBenefitRepoFake struct{}
 

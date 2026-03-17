@@ -11,4 +11,5 @@ type CustomerRepository interface {
 	ListByCompany(companyID string, search string, limit, offset int) ([]*entity.Customer, error)
 	Update(customer *entity.Customer) error
 	Delete(id string) error
+	SetActive(companyID, id string, isActive bool) error
 }

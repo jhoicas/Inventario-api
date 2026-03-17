@@ -10,6 +10,7 @@ type Customer struct {
 	TaxID     string // NIT o Cédula (Colombia)
 	Email     string
 	Phone     string
+	IsActive  bool
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }

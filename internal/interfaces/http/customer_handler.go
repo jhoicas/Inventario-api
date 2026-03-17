@@ -13,6 +13,7 @@ type CustomerUseCase interface {
 	Create(companyID string, in dto.CreateCustomerRequest) (*dto.CustomerResponse, error)
 	List(companyID string, search string, limit, offset int) ([]*dto.CustomerResponse, error)
 	Update(companyID, customerID string, in dto.UpdateCustomerRequest) (*dto.CustomerResponse, error)
+	Deactivate(companyID, customerID string) error
 }
 
 // CustomerHandler maneja las peticiones HTTP de clientes (facturación, protegido).
@@ -132,4 +133,38 @@ func (h *CustomerHandler) Update(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}
 	return c.JSON(customer)
+}
+
+// Deactivate godoc
+// @Summary      Desactivar cliente
+// @Description  Desactiva (soft delete) un cliente asociado a la empresa autenticada (solo admin)
+// @Tags         customers
+// @Security     Bearer
+// @Produce      json
+// @Param        id   path  string  true  "Customer ID"
+// @Success      204
+// @Failure      400  {object}  dto.ErrorResponse
+// @Failure      401  {object}  dto.ErrorResponse
+// @Failure      403  {object}  dto.ErrorResponse
+// @Failure      404  {object}  dto.ErrorResponse
+// @Failure      500  {object}  dto.ErrorResponse
+// @Router       /api/customers/{id}/deactivate [put]
+func (h *CustomerHandler) Deactivate(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	id := c.Params("id")
+	if companyID == "" || id == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "id requerido"})
+	}
+	if err := h.uc.Deactivate(companyID, id); err != nil {
+		switch err {
+		case domain.ErrInvalidInput:
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "id inválido"})
+		case domain.ErrNotFound:
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "cliente no encontrado"})
+		case domain.ErrForbidden:
+			return c.Status(fiber.StatusForbidden).JSON(dto.ErrorResponse{Code: "FORBIDDEN", Message: "acceso denegado"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.SendStatus(fiber.StatusNoContent)
 }

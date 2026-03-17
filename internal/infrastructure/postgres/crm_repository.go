@@ -34,9 +34,9 @@ func (r *CRMCategoryRepo) Create(c *entity.CRMCategory) error {
 		c.ID = uuid.New().String()
 	}
 	_, err := r.q.Exec(context.Background(), `
-		INSERT INTO crm_categories (id, company_id, name, min_ltv, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6)`,
-		c.ID, c.CompanyID, c.Name, c.MinLTV, c.CreatedAt, c.UpdatedAt,
+		INSERT INTO crm_categories (id, company_id, name, min_ltv, is_active, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		c.ID, c.CompanyID, c.Name, c.MinLTV, c.IsActive, c.CreatedAt, c.UpdatedAt,
 	)
 	return err
 }
@@ -45,8 +45,8 @@ func (r *CRMCategoryRepo) GetByID(id string) (*entity.CRMCategory, error) {
 	var c entity.CRMCategory
 	var minLtv pgtype.Numeric
 	err := r.q.QueryRow(context.Background(), `
-		SELECT id, company_id, name, min_ltv, created_at, updated_at FROM crm_categories WHERE id = $1`, id,
-	).Scan(&c.ID, &c.CompanyID, &c.Name, &minLtv, &c.CreatedAt, &c.UpdatedAt)
+		SELECT id, company_id, name, min_ltv, is_active, created_at, updated_at FROM crm_categories WHERE id = $1`, id,
+	).Scan(&c.ID, &c.CompanyID, &c.Name, &minLtv, &c.IsActive, &c.CreatedAt, &c.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
@@ -61,7 +61,10 @@ func (r *CRMCategoryRepo) GetByID(id string) (*entity.CRMCategory, error) {
 
 func (r *CRMCategoryRepo) ListByCompany(companyID string, limit, offset int) ([]*entity.CRMCategory, error) {
 	rows, err := r.q.Query(context.Background(), `
-		SELECT id, company_id, name, min_ltv, created_at, updated_at FROM crm_categories WHERE company_id = $1 ORDER BY name LIMIT $2 OFFSET $3`,
+		SELECT id, company_id, name, min_ltv, is_active, created_at, updated_at
+		FROM crm_categories
+		WHERE company_id = $1 AND is_active = true
+		ORDER BY name LIMIT $2 OFFSET $3`,
 		companyID, limit, offset,
 	)
 	if err != nil {
@@ -72,7 +75,7 @@ func (r *CRMCategoryRepo) ListByCompany(companyID string, limit, offset int) ([]
 	for rows.Next() {
 		var c entity.CRMCategory
 		var minLtv pgtype.Numeric
-		if err := rows.Scan(&c.ID, &c.CompanyID, &c.Name, &minLtv, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.CompanyID, &c.Name, &minLtv, &c.IsActive, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, err
 		}
 		if minLtv.Valid && minLtv.Int != nil {
@@ -93,6 +96,14 @@ func (r *CRMCategoryRepo) Update(c *entity.CRMCategory) error {
 
 func (r *CRMCategoryRepo) Delete(id string) error {
 	_, err := r.q.Exec(context.Background(), `DELETE FROM crm_categories WHERE id = $1`, id)
+	return err
+}
+
+func (r *CRMCategoryRepo) SetActive(companyID, id string, isActive bool, updatedAt time.Time) error {
+	_, err := r.q.Exec(context.Background(),
+		`UPDATE crm_categories SET is_active = $3, updated_at = $4 WHERE id = $1 AND company_id = $2`,
+		id, companyID, isActive, updatedAt,
+	)
 	return err
 }
 

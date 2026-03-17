@@ -408,6 +408,7 @@ func (uc *LoyaltyUseCase) CreateCategory(ctx context.Context, companyID string, 
 		CompanyID: companyID,
 		Name:      in.Name,
 		MinLTV:    in.MinLTV,
+		IsActive:  true,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
@@ -460,6 +461,24 @@ func (uc *LoyaltyUseCase) UpdateCategory(ctx context.Context, companyID, categor
 		CreatedAt: cat.CreatedAt,
 		UpdatedAt: cat.UpdatedAt,
 	}, nil
+}
+
+// DeactivateCategory desactiva una categoría (soft delete, solo admin).
+func (uc *LoyaltyUseCase) DeactivateCategory(ctx context.Context, companyID, categoryID string) error {
+	if companyID == "" || categoryID == "" {
+		return domain.ErrInvalidInput
+	}
+	cat, err := uc.categoryRepo.GetByID(categoryID)
+	if err != nil {
+		return err
+	}
+	if cat == nil {
+		return domain.ErrNotFound
+	}
+	if cat.CompanyID != companyID {
+		return domain.ErrForbidden
+	}
+	return uc.categoryRepo.SetActive(companyID, categoryID, false, time.Now())
 }
 
 // ListBenefitsByCategory lista beneficios de una categoría.

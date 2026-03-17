@@ -106,6 +106,7 @@ type fakeCustomerRepo struct {
 	listByCompanyFunc        func(companyID string, limit, offset int) ([]*entity.Customer, error)
 	updateFunc               func(customer *entity.Customer) error
 	deleteFunc               func(id string) error
+	setActiveFunc            func(companyID, id string, isActive bool) error
 }
 
 func (f *fakeCustomerRepo) Create(customer *entity.Customer) error {
@@ -142,6 +143,13 @@ func (f *fakeCustomerRepo) Update(customer *entity.Customer) error {
 func (f *fakeCustomerRepo) Delete(id string) error {
 	if f.deleteFunc != nil {
 		return f.deleteFunc(id)
+	}
+	return nil
+}
+
+func (f *fakeCustomerRepo) SetActive(companyID, id string, isActive bool) error {
+	if f.setActiveFunc != nil {
+		return f.setActiveFunc(companyID, id, isActive)
 	}
 	return nil
 }
@@ -314,6 +322,7 @@ type fakeInvoiceRepo struct {
 	getByIDFunc               func(id string) (*entity.Invoice, error)
 	getDetailsByInvoiceIDFunc func(invoiceID string) ([]*entity.InvoiceDetail, error)
 	getDIANStatusFunc         func(id string) (*entity.Invoice, error)
+	getDIANSummaryFunc        func(companyID string) (*repository.DIANSummary, error)
 	updateReturnStatusFunc    func(invoiceID string, status string) error
 	listFunc                  func(filter repository.InvoiceListFilter) ([]*entity.Invoice, int, error)
 }
@@ -353,6 +362,13 @@ func (f *fakeInvoiceRepo) GetDIANStatus(id string) (*entity.Invoice, error) {
 		return f.getDIANStatusFunc(id)
 	}
 	return nil, nil
+}
+
+func (f *fakeInvoiceRepo) GetDIANSummary(companyID string) (*repository.DIANSummary, error) {
+	if f.getDIANSummaryFunc != nil {
+		return f.getDIANSummaryFunc(companyID)
+	}
+	return &repository.DIANSummary{}, nil
 }
 func (f *fakeInvoiceRepo) UpdateReturnStatus(invoiceID string, status string) error {
 	if f.updateReturnStatusFunc != nil {

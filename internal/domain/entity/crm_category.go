@@ -12,6 +12,7 @@ type CRMCategory struct {
 	CompanyID string
 	Name      string          // ej. Oro, Plata, Bronce
 	MinLTV    decimal.Decimal // LTV mínimo para pertenecer (opcional)
+	IsActive  bool
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }

@@ -22,6 +22,7 @@ type fakeCustomerUseCase struct {
 	createFunc func(companyID string, in dto.CreateCustomerRequest) (*dto.CustomerResponse, error)
 	listFunc   func(companyID string, search string, limit, offset int) ([]*dto.CustomerResponse, error)
 	updateFunc func(companyID, customerID string, in dto.UpdateCustomerRequest) (*dto.CustomerResponse, error)
+	deactivateFunc func(companyID, customerID string) error
 }
 
 func (f *fakeCustomerUseCase) Create(companyID string, in dto.CreateCustomerRequest) (*dto.CustomerResponse, error) {
@@ -43,6 +44,13 @@ func (f *fakeCustomerUseCase) Update(companyID, customerID string, in dto.Update
 		return f.updateFunc(companyID, customerID, in)
 	}
 	return nil, errors.New("update not configured")
+}
+
+func (f *fakeCustomerUseCase) Deactivate(companyID, customerID string) error {
+	if f.deactivateFunc != nil {
+		return f.deactivateFunc(companyID, customerID)
+	}
+	return errors.New("deactivate not configured")
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────

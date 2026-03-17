@@ -340,6 +340,40 @@ func (h *CRMHandler) UpdateCategory(c *fiber.Ctx) error {
 	return c.JSON(out)
 }
 
+// DeactivateCategory desactiva una categoría CRM (solo admin).
+// @Summary      Desactivar categoría CRM
+// @Description  Desactiva (soft delete) una categoría de fidelización (solo admin)
+// @Tags         crm
+// @Security     Bearer
+// @Produce      json
+// @Param        id    path  string  true  "Category ID"
+// @Success      204
+// @Failure      400   {object}  dto.ErrorResponse
+// @Failure      401   {object}  dto.ErrorResponse
+// @Failure      403   {object}  dto.ErrorResponse
+// @Failure      404   {object}  dto.ErrorResponse
+// @Failure      500   {object}  dto.ErrorResponse
+// @Router       /api/crm/categories/{id}/deactivate [put]
+func (h *CRMHandler) DeactivateCategory(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	id := c.Params("id")
+	if companyID == "" || id == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "id requerido"})
+	}
+	if err := h.LoyaltyUC.DeactivateCategory(c.Context(), companyID, id); err != nil {
+		switch err {
+		case domain.ErrInvalidInput:
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "id inválido"})
+		case domain.ErrForbidden:
+			return c.Status(fiber.StatusForbidden).JSON(dto.ErrorResponse{Code: "FORBIDDEN", Message: "acceso denegado"})
+		case domain.ErrNotFound:
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "categoría no encontrada"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.SendStatus(fiber.StatusNoContent)
+}
+
 // ListBenefitsByCategory lista beneficios de una categoría.
 // @Summary      Listar beneficios por categoría
 // @Description  Lista los beneficios asociados a una categoría de fidelización

@@ -14,6 +14,7 @@ type CRMCategoryRepository interface {
 	ListByCompany(companyID string, limit, offset int) ([]*entity.CRMCategory, error)
 	Update(category *entity.CRMCategory) error
 	Delete(id string) error
+	SetActive(companyID, id string, isActive bool, updatedAt time.Time) error
 }
 
 // CRMBenefitRepository puerto de persistencia para beneficios por categoría.

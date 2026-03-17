@@ -26,8 +26,8 @@ func NewSupplierRepository(q Querier) *SupplierRepo {
 // Create persiste un nuevo proveedor.
 func (r *SupplierRepo) Create(supplier *entity.Supplier) error {
 	const query = `
-		INSERT INTO suppliers (id, company_id, name, nit, email, phone, payment_term_days, lead_time_days, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`
+		INSERT INTO suppliers (id, company_id, name, nit, email, phone, payment_term_days, lead_time_days, is_active, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`
 
 	_, err := r.q.Exec(context.Background(), query,
 		supplier.ID,
@@ -38,6 +38,7 @@ func (r *SupplierRepo) Create(supplier *entity.Supplier) error {
 		supplier.Phone,
 		supplier.PaymentTermDays,
 		supplier.LeadTimeDays,
+		supplier.IsActive,
 		supplier.CreatedAt,
 		supplier.UpdatedAt,
 	)
@@ -54,7 +55,7 @@ func (r *SupplierRepo) Create(supplier *entity.Supplier) error {
 // GetByID obtiene un proveedor por ID.
 func (r *SupplierRepo) GetByID(id string) (*entity.Supplier, error) {
 	const query = `
-		SELECT id, company_id, name, nit, email, phone, payment_term_days, lead_time_days, created_at, updated_at
+		SELECT id, company_id, name, nit, email, phone, payment_term_days, lead_time_days, is_active, created_at, updated_at
 		FROM suppliers
 		WHERE id = $1`
 
@@ -68,6 +69,7 @@ func (r *SupplierRepo) GetByID(id string) (*entity.Supplier, error) {
 		&s.Phone,
 		&s.PaymentTermDays,
 		&s.LeadTimeDays,
+		&s.IsActive,
 		&s.CreatedAt,
 		&s.UpdatedAt,
 	)
@@ -84,7 +86,7 @@ func (r *SupplierRepo) GetByID(id string) (*entity.Supplier, error) {
 // GetByCompanyAndNIT obtiene un proveedor por empresa y NIT.
 func (r *SupplierRepo) GetByCompanyAndNIT(companyID, nit string) (*entity.Supplier, error) {
 	const query = `
-		SELECT id, company_id, name, nit, email, phone, payment_term_days, lead_time_days, created_at, updated_at
+		SELECT id, company_id, name, nit, email, phone, payment_term_days, lead_time_days, is_active, created_at, updated_at
 		FROM suppliers
 		WHERE company_id = $1 AND nit = $2`
 
@@ -98,6 +100,7 @@ func (r *SupplierRepo) GetByCompanyAndNIT(companyID, nit string) (*entity.Suppli
 		&s.Phone,
 		&s.PaymentTermDays,
 		&s.LeadTimeDays,
+		&s.IsActive,
 		&s.CreatedAt,
 		&s.UpdatedAt,
 	)
@@ -147,9 +150,10 @@ func (r *SupplierRepo) Update(supplier *entity.Supplier) error {
 // ListByCompany lista proveedores por empresa con búsqueda y paginación.
 func (r *SupplierRepo) ListByCompany(companyID, search string, limit, offset int) ([]*entity.Supplier, error) {
 	const query = `
-		SELECT id, company_id, name, nit, email, phone, payment_term_days, lead_time_days, created_at, updated_at
+		SELECT id, company_id, name, nit, email, phone, payment_term_days, lead_time_days, is_active, created_at, updated_at
 		FROM suppliers
 		WHERE company_id = $1
+		  AND is_active = true
 		  AND (
 			$2 = ''
 			OR name ILIKE '%' || $2 || '%'
@@ -176,6 +180,7 @@ func (r *SupplierRepo) ListByCompany(companyID, search string, limit, offset int
 			&s.Phone,
 			&s.PaymentTermDays,
 			&s.LeadTimeDays,
+			&s.IsActive,
 			&s.CreatedAt,
 			&s.UpdatedAt,
 		); err != nil {
@@ -189,4 +194,15 @@ func (r *SupplierRepo) ListByCompany(companyID, search string, limit, offset int
 	}
 
 	return list, nil
+}
+
+func (r *SupplierRepo) SetActive(companyID, id string, isActive bool) error {
+	_, err := r.q.Exec(context.Background(),
+		`UPDATE suppliers SET is_active = $3, updated_at = now() WHERE id = $1 AND company_id = $2`,
+		id, companyID, isActive,
+	)
+	if err != nil {
+		return fmt.Errorf("set supplier active: %w", err)
+	}
+	return nil
 }

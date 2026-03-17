@@ -12,6 +12,7 @@ type Supplier struct {
 	Phone           string
 	PaymentTermDays int
 	LeadTimeDays    int
+	IsActive        bool
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 }

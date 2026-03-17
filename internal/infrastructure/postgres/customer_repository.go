@@ -26,10 +26,11 @@ func NewCustomerRepository(q Querier) *CustomerRepo {
 // Create persiste un nuevo cliente.
 func (r *CustomerRepo) Create(customer *entity.Customer) error {
 	query := `
-		INSERT INTO customers (id, company_id, name, tax_id, email, phone, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`
+		INSERT INTO customers (id, company_id, name, tax_id, email, phone, is_active, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`
 	_, err := r.q.Exec(context.Background(), query,
 		customer.ID, customer.CompanyID, customer.Name, customer.TaxID, customer.Email, customer.Phone,
+		customer.IsActive,
 		customer.CreatedAt, customer.UpdatedAt,
 	)
 	if err != nil {
@@ -44,11 +45,11 @@ func (r *CustomerRepo) Create(customer *entity.Customer) error {
 // GetByID obtiene un cliente por ID.
 func (r *CustomerRepo) GetByID(id string) (*entity.Customer, error) {
 	query := `
-		SELECT id, company_id, name, tax_id, COALESCE(email, ''), COALESCE(phone, ''), created_at, updated_at
+		SELECT id, company_id, name, tax_id, COALESCE(email, ''), COALESCE(phone, ''), is_active, created_at, updated_at
 		FROM customers WHERE id = $1`
 	var c entity.Customer
 	err := r.q.QueryRow(context.Background(), query, id).Scan(
-		&c.ID, &c.CompanyID, &c.Name, &c.TaxID, &c.Email, &c.Phone, &c.CreatedAt, &c.UpdatedAt,
+		&c.ID, &c.CompanyID, &c.Name, &c.TaxID, &c.Email, &c.Phone, &c.IsActive, &c.CreatedAt, &c.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -62,11 +63,11 @@ func (r *CustomerRepo) GetByID(id string) (*entity.Customer, error) {
 // GetByCompanyAndTaxID obtiene un cliente por empresa y NIT/cédula.
 func (r *CustomerRepo) GetByCompanyAndTaxID(companyID, taxID string) (*entity.Customer, error) {
 	query := `
-		SELECT id, company_id, name, tax_id, COALESCE(email, ''), COALESCE(phone, ''), created_at, updated_at
+		SELECT id, company_id, name, tax_id, COALESCE(email, ''), COALESCE(phone, ''), is_active, created_at, updated_at
 		FROM customers WHERE company_id = $1 AND tax_id = $2`
 	var c entity.Customer
 	err := r.q.QueryRow(context.Background(), query, companyID, taxID).Scan(
-		&c.ID, &c.CompanyID, &c.Name, &c.TaxID, &c.Email, &c.Phone, &c.CreatedAt, &c.UpdatedAt,
+		&c.ID, &c.CompanyID, &c.Name, &c.TaxID, &c.Email, &c.Phone, &c.IsActive, &c.CreatedAt, &c.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -80,9 +81,9 @@ func (r *CustomerRepo) GetByCompanyAndTaxID(companyID, taxID string) (*entity.Cu
 // ListByCompany lista clientes de la empresa con paginación.
 func (r *CustomerRepo) ListByCompany(companyID string, search string, limit, offset int) ([]*entity.Customer, error) {
 	base := `
-		SELECT id, company_id, name, tax_id, COALESCE(email, ''), COALESCE(phone, ''), created_at, updated_at
+		SELECT id, company_id, name, tax_id, COALESCE(email, ''), COALESCE(phone, ''), is_active, created_at, updated_at
 		FROM customers
-		WHERE company_id = $1`
+		WHERE company_id = $1 AND is_active = true`
 	args := []any{companyID}
 	argIdx := 2
 	if search != "" {
@@ -101,7 +102,7 @@ func (r *CustomerRepo) ListByCompany(companyID string, search string, limit, off
 	var list []*entity.Customer
 	for rows.Next() {
 		var c entity.Customer
-		if err := rows.Scan(&c.ID, &c.CompanyID, &c.Name, &c.TaxID, &c.Email, &c.Phone, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.CompanyID, &c.Name, &c.TaxID, &c.Email, &c.Phone, &c.IsActive, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan customer: %w", err)
 		}
 		list = append(list, &c)
@@ -131,6 +132,17 @@ func (r *CustomerRepo) Delete(id string) error {
 	_, err := r.q.Exec(context.Background(), `DELETE FROM customers WHERE id = $1`, id)
 	if err != nil {
 		return fmt.Errorf("delete customer: %w", err)
+	}
+	return nil
+}
+
+func (r *CustomerRepo) SetActive(companyID, id string, isActive bool) error {
+	_, err := r.q.Exec(context.Background(),
+		`UPDATE customers SET is_active = $3, updated_at = now() WHERE id = $1 AND company_id = $2`,
+		id, companyID, isActive,
+	)
+	if err != nil {
+		return fmt.Errorf("set customer active: %w", err)
 	}
 	return nil
 }
