@@ -39,12 +39,13 @@ type SMTPConfig struct {
 
 // DIANConfig configuración para factura electrónica DIAN (Colombia).
 type DIANConfig struct {
-	TechnicalKey string // Clave técnica de la resolución de facturación (obligatoria para CUFE)
-	Environment  string // "1" = Producción, "2" = Pruebas — TipoAmb en CUFE y XML
-	AppEnv       string // "dev" | "test" | "prod" — controla si se envía al WS DIAN
-	CertPath     string // Ruta al certificado .pem o .p12 (vacío = no firmar, simulado)
-	CertKeyPath  string // Ruta a la llave privada .pem (si CertPath es solo el certificado)
-	CertPassword string // Contraseña del .p12 (si CertPath es .p12)
+	TechnicalKey    string // Clave técnica de la resolución de facturación (obligatoria para CUFE)
+	Environment     string // "1" = Producción, "2" = Pruebas — TipoAmb en CUFE y XML
+	AppEnv          string // "dev" | "test" | "prod" — controla si se envía al WS DIAN
+	CertPath        string // Ruta al certificado .pem o .p12 (vacío = no firmar, simulado)
+	CertKeyPath     string // Ruta a la llave privada .pem (si CertPath es solo el certificado)
+	CertPassword    string // Contraseña del .p12 (si CertPath es .p12)
+	CertStoragePath string // Ruta donde guardar certificados subidos por PUT /settings/dian (vacío = storage/private/dian). En servidor usar ruta con permisos de escritura (ej. /tmp/dian-certs).
 }
 
 // AppConfig configuración general de la aplicación.
@@ -156,12 +157,13 @@ func Load() (*Config, error) {
 			Port: getInt(v, "HTTP_PORT", 8080),
 		},
 		DIAN: DIANConfig{
-			TechnicalKey: getString(v, "DIAN_TECHNICAL_KEY", ""),
-			Environment:  getString(v, "DIAN_ENVIRONMENT", "2"),
-			AppEnv:       getString(v, "DIAN_ENV", "dev"),
-			CertPath:     getString(v, "DIAN_CERT_PATH", ""),
-			CertKeyPath:  getString(v, "DIAN_CERT_KEY_PATH", ""),
-			CertPassword: getString(v, "DIAN_CERT_PASSWORD", ""),
+			TechnicalKey:    getString(v, "DIAN_TECHNICAL_KEY", ""),
+			Environment:     getString(v, "DIAN_ENVIRONMENT", "2"),
+			AppEnv:          getString(v, "DIAN_ENV", "dev"),
+			CertPath:        getString(v, "DIAN_CERT_PATH", ""),
+			CertKeyPath:     getString(v, "DIAN_CERT_KEY_PATH", ""),
+			CertPassword:    getString(v, "DIAN_CERT_PASSWORD", ""),
+			CertStoragePath: getString(v, "DIAN_CERT_STORAGE_PATH", ""),
 		},
 		AI: AIConfig{
 			AnthropicAPIKey: getString(v, "ANTHROPIC_API_KEY", ""),

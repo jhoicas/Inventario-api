@@ -157,7 +157,7 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("configurar cifrado para DIAN settings")
 	}
-	certStore := infrasecurity.NewDIANCertificateFileStore("")
+	certStore := infrasecurity.NewDIANCertificateFileStore(cfg.DIAN.CertStoragePath)
 	dianSettingsUC := usecase.NewDIANSettingsUseCase(companyRepo, dianSettingsRepo, certStore, encryptor)
 	moduleSvc := usecase.NewModuleService(companyRepo)
 	analyticsUC := usecase.NewAnalyticsUseCase(analyticsRepo)
