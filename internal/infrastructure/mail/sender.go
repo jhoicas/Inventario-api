@@ -29,10 +29,14 @@ func NewSMTPSenderFromEnv() (*SMTPSender, error) {
 	portStr := strings.TrimSpace(os.Getenv("SMTP_PORT"))
 	user := strings.TrimSpace(os.Getenv("SMTP_USER"))
 	pass := strings.TrimSpace(os.Getenv("SMTP_PASS"))
+	// Compatibilidad: en algunos entornos se configura como SMTP_PASSWORD.
+	if pass == "" {
+		pass = strings.TrimSpace(os.Getenv("SMTP_PASSWORD"))
+	}
 	from := strings.TrimSpace(os.Getenv("SMTP_FROM"))
 
 	if host == "" || portStr == "" || user == "" || pass == "" || from == "" {
-		return nil, fmt.Errorf("smtp: variables de entorno incompletas (requeridas: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM)")
+		return nil, fmt.Errorf("smtp: variables de entorno incompletas (requeridas: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS|SMTP_PASSWORD, SMTP_FROM)")
 	}
 
 	port, err := strconv.Atoi(portStr)
