@@ -171,6 +171,45 @@ func (uc *CampaignUseCase) SendCampaign(ctx context.Context, companyID, userID s
 	return nil
 }
 
+// SendTest envía un correo de prueba a una dirección específica.
+func (uc *CampaignUseCase) SendTest(ctx context.Context, companyID, userID string, req dto.SendTestCampaignRequest) error {
+	if strings.TrimSpace(req.Subject) == "" || strings.TrimSpace(req.Body) == "" {
+		return domain.ErrInvalidInput
+	}
+	if uc.mailSender == nil {
+		return domain.ErrConflict
+	}
+
+	toEmail := strings.TrimSpace(req.Email)
+	body := req.Body
+
+	if strings.TrimSpace(req.CustomerID) != "" {
+		cust, err := uc.customerRepo.GetByID(req.CustomerID)
+		if err != nil {
+			return err
+		}
+		if cust == nil {
+			return domain.ErrNotFound
+		}
+		if cust.CompanyID != companyID {
+			return domain.ErrForbidden
+		}
+		toEmail = strings.TrimSpace(cust.Email)
+		if toEmail == "" {
+			return domain.ErrInvalidInput
+		}
+		name := strings.TrimSpace(cust.Name)
+		if name != "" {
+			body = strings.ReplaceAll(body, "[Nombre]", name)
+		}
+	}
+
+	if toEmail == "" {
+		return domain.ErrInvalidInput
+	}
+	return uc.mailSender.Send(toEmail, req.Subject, body)
+}
+
 func toCampaignResponse(c *entity.Campaign) *dto.CampaignResponse {
 	resp := &dto.CampaignResponse{
 		ID:          c.ID,

@@ -1565,6 +1565,50 @@ func (h *CRMHandler) SendCampaign(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"status": "sent"})
 }
 
+// SendTestCampaign envía un correo de prueba a una dirección específica.
+// @Summary      Enviar campaña de prueba
+// @Description  Envía el subject/body a un email específico (solo prueba)
+// @Tags         crm
+// @Security     Bearer
+// @Accept       json
+// @Produce      json
+// @Param        body  body  dto.SendTestCampaignRequest  true  "Email de destino + contenido"
+// @Success      200   {object} map[string]string
+// @Failure      400   {object} dto.ErrorResponse
+// @Failure      401   {object} dto.ErrorResponse
+// @Failure      409   {object} dto.ErrorResponse
+// @Failure      503   {object} dto.ErrorResponse
+// @Router       /api/crm/campaigns/send-test [post]
+func (h *CRMHandler) SendTestCampaign(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	userID := GetUserID(c)
+	if companyID == "" || userID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if h.CampaignUC == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "campaigns no configurado"})
+	}
+	var in dto.SendTestCampaignRequest
+	if err := c.BodyParser(&in); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
+	}
+	if err := h.CampaignUC.SendTest(c.Context(), companyID, userID, in); err != nil {
+		switch err {
+		case domain.ErrInvalidInput:
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "subject y body son requeridos; y debes enviar email o customer_id"})
+		case domain.ErrNotFound:
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "cliente no encontrado"})
+		case domain.ErrForbidden:
+			return c.Status(fiber.StatusForbidden).JSON(dto.ErrorResponse{Code: "FORBIDDEN", Message: "acceso denegado"})
+		case domain.ErrConflict:
+			return c.Status(fiber.StatusConflict).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "servicio de correo no configurado"})
+		default:
+			return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+		}
+	}
+	return c.JSON(fiber.Map{"status": "sent"})
+}
+
 // EscalateTicket escala un ticket PQR y registra la razón.
 // @Summary      Escalar ticket PQR
 // @Description  Marca el ticket como ESCALATED, persiste la razón y genera una entrada de auditoría

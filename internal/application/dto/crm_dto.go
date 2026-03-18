@@ -326,3 +326,11 @@ type SendCampaignRequest struct {
 	Body       string `json:"body"`                  // requerido (texto generado por IA o HTML simple)
 	CategoryID string `json:"category_id,omitempty"` // opcional: filtrar por categoría CRM
 }
+
+// SendTestCampaignRequest body para enviar un correo de prueba (una sola dirección).
+type SendTestCampaignRequest struct {
+	Subject    string `json:"subject"`
+	Body       string `json:"body"`
+	Email      string `json:"email,omitempty"`
+	CustomerID string `json:"customer_id,omitempty"`
+}
