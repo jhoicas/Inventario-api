@@ -1,11 +1,14 @@
 package mail
 
 import (
+	"crypto/tls"
 	"fmt"
+	"net"
 	"net/smtp"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Sender define el contrato mínimo para enviar correos electrónicos.
@@ -78,9 +81,65 @@ func (s *SMTPSender) Send(to string, subject string, body string) error {
 
 	msg := []byte(msgBuilder.String())
 
-	if err := smtp.SendMail(addr, auth, s.from, []string{to}, msg); err != nil {
-		return fmt.Errorf("smtp: enviar correo: %w", err)
+	// net/smtp no expone context; aquí ponemos timeouts a nivel de conexión
+	// para evitar que el endpoint se quede "colgado" en redes lentas o caídas.
+	dialer := &net.Dialer{Timeout: 10 * time.Second, KeepAlive: 10 * time.Second}
+	conn, err := dialer.Dial("tcp", addr)
+	if err != nil {
+		return fmt.Errorf("smtp: dial %s: %w", addr, err)
 	}
+	defer func() { _ = conn.Close() }()
+
+	_ = conn.SetDeadline(time.Now().Add(20 * time.Second))
+
+	// 465 suele ser SMTP sobre TLS implícito.
+	if s.port == 465 {
+		tlsConn := tls.Client(conn, &tls.Config{ServerName: s.host})
+		if err := tlsConn.Handshake(); err != nil {
+			return fmt.Errorf("smtp: TLS handshake: %w", err)
+		}
+		conn = tlsConn
+		_ = conn.SetDeadline(time.Now().Add(20 * time.Second))
+	}
+
+	client, err := smtp.NewClient(conn, s.host)
+	if err != nil {
+		return fmt.Errorf("smtp: new client: %w", err)
+	}
+	defer func() { _ = client.Close() }()
+
+	// 587 suele usar STARTTLS.
+	if s.port == 587 {
+		if ok, _ := client.Extension("STARTTLS"); ok {
+			// Reintento de deadline posterior.
+			_ = conn.SetDeadline(time.Now().Add(20 * time.Second))
+			if err := client.StartTLS(&tls.Config{ServerName: s.host}); err != nil {
+				return fmt.Errorf("smtp: starttls: %w", err)
+			}
+		}
+	}
+
+	if err := client.Auth(auth); err != nil {
+		return fmt.Errorf("smtp: auth: %w", err)
+	}
+	if err := client.Mail(s.from); err != nil {
+		return fmt.Errorf("smtp: mail from: %w", err)
+	}
+	if err := client.Rcpt(to); err != nil {
+		return fmt.Errorf("smtp: rcpt: %w", err)
+	}
+	w, err := client.Data()
+	if err != nil {
+		return fmt.Errorf("smtp: data: %w", err)
+	}
+	if _, err := w.Write(msg); err != nil {
+		_ = w.Close()
+		return fmt.Errorf("smtp: write: %w", err)
+	}
+	if err := w.Close(); err != nil {
+		return fmt.Errorf("smtp: close data: %w", err)
+	}
+	_ = client.Quit()
 	return nil
 }
 
