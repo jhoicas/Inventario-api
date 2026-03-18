@@ -1,14 +1,13 @@
 package mail
 
 import (
-	"crypto/tls"
 	"fmt"
-	"net"
-	"net/smtp"
 	"os"
 	"strconv"
 	"strings"
-	"time"
+	"crypto/tls"
+
+	"gopkg.in/gomail.v2"
 )
 
 // Sender define el contrato mínimo para enviar correos electrónicos.
@@ -62,84 +61,21 @@ func (s *SMTPSender) Send(to string, subject string, body string) error {
 		return fmt.Errorf("smtp: destinatario vacío")
 	}
 
-	addr := fmt.Sprintf("%s:%d", s.host, s.port)
-	auth := smtp.PlainAuth("", s.user, s.pass, s.host)
+	msg := gomail.NewMessage()
+	msg.SetHeader("From", s.from)
+	msg.SetHeader("To", to)
+	msg.SetHeader("Subject", subject)
+	msg.SetBody("text/plain", body)
 
-	headers := make(map[string]string)
-	headers["From"] = s.from
-	headers["To"] = to
-	headers["Subject"] = subject
-	headers["MIME-Version"] = "1.0"
-	headers["Content-Type"] = "text/plain; charset=\"UTF-8\""
-
-	var msgBuilder strings.Builder
-	for k, v := range headers {
-		msgBuilder.WriteString(fmt.Sprintf("%s: %s\r\n", k, v))
-	}
-	msgBuilder.WriteString("\r\n")
-	msgBuilder.WriteString(body)
-
-	msg := []byte(msgBuilder.String())
-
-	// net/smtp no expone context; aquí ponemos timeouts a nivel de conexión
-	// para evitar que el endpoint se quede "colgado" en redes lentas o caídas.
-	dialer := &net.Dialer{Timeout: 10 * time.Second, KeepAlive: 10 * time.Second}
-	conn, err := dialer.Dial("tcp", addr)
-	if err != nil {
-		return fmt.Errorf("smtp: dial %s: %w", addr, err)
-	}
-	defer func() { _ = conn.Close() }()
-
-	_ = conn.SetDeadline(time.Now().Add(20 * time.Second))
-
-	// 465 suele ser SMTP sobre TLS implícito.
-	if s.port == 465 {
-		tlsConn := tls.Client(conn, &tls.Config{ServerName: s.host})
-		if err := tlsConn.Handshake(); err != nil {
-			return fmt.Errorf("smtp: TLS handshake: %w", err)
-		}
-		conn = tlsConn
-		_ = conn.SetDeadline(time.Now().Add(20 * time.Second))
+	dialer := gomail.NewDialer(s.host, s.port, s.user, s.pass)
+	dialer.TLSConfig = &tls.Config{
+		InsecureSkipVerify: false,
+		ServerName:         s.host,
 	}
 
-	client, err := smtp.NewClient(conn, s.host)
-	if err != nil {
-		return fmt.Errorf("smtp: new client: %w", err)
+	if err := dialer.DialAndSend(msg); err != nil {
+		return fmt.Errorf("smtp: enviar correo: %w", err)
 	}
-	defer func() { _ = client.Close() }()
-
-	// 587 suele usar STARTTLS.
-	if s.port == 587 {
-		if ok, _ := client.Extension("STARTTLS"); ok {
-			// Reintento de deadline posterior.
-			_ = conn.SetDeadline(time.Now().Add(20 * time.Second))
-			if err := client.StartTLS(&tls.Config{ServerName: s.host}); err != nil {
-				return fmt.Errorf("smtp: starttls: %w", err)
-			}
-		}
-	}
-
-	if err := client.Auth(auth); err != nil {
-		return fmt.Errorf("smtp: auth: %w", err)
-	}
-	if err := client.Mail(s.from); err != nil {
-		return fmt.Errorf("smtp: mail from: %w", err)
-	}
-	if err := client.Rcpt(to); err != nil {
-		return fmt.Errorf("smtp: rcpt: %w", err)
-	}
-	w, err := client.Data()
-	if err != nil {
-		return fmt.Errorf("smtp: data: %w", err)
-	}
-	if _, err := w.Write(msg); err != nil {
-		_ = w.Close()
-		return fmt.Errorf("smtp: write: %w", err)
-	}
-	if err := w.Close(); err != nil {
-		return fmt.Errorf("smtp: close data: %w", err)
-	}
-	_ = client.Quit()
 	return nil
 }
 
