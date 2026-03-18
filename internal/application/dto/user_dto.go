@@ -40,6 +40,8 @@ type LoginRequest struct {
 
 // LoginResponse salida con token JWT (se implementará cuando tengamos JWT).
 type LoginResponse struct {
-	Token string       `json:"token"`
-	User  UserResponse `json:"user"`
+	Token   string       `json:"token"`
+	User    UserResponse `json:"user"`
+	RoleID  string       `json:"role_id,omitempty"`
+	RoleKey string       `json:"role_key,omitempty"`
 }

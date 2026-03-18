@@ -67,6 +67,7 @@ func main() {
 	defer pool.Close()
 
 	companyRepo := postgres.NewCompanyRepository(pool)
+	rbacRepo := postgres.NewRBACRepository(pool)
 	userRepo := postgres.NewUserRepository(pool)
 	warehouseRepo := postgres.NewWarehouseRepository(pool)
 	productRepo := postgres.NewProductRepository(pool)
@@ -282,7 +283,8 @@ func main() {
 		invoiceRepo, companyRepo, customerRepo, productRepo, pdfGenerator, smtpCfg,
 	)
 	dianOrchestrator.SetMailer(invoiceMailer)
-	authUC := auth.NewAuthUseCase(userRepo, companyRepo, auth.JWTConfig{
+	rbacUC := usecase.NewRBACUseCase(rbacRepo, rbacRepo)
+	authUC := auth.NewAuthUseCase(userRepo, companyRepo, rbacRepo, auth.JWTConfig{
 		Secret:     cfg.JWT.Secret,
 		ExpMinutes: cfg.JWT.Expiration,
 		Issuer:     cfg.JWT.Issuer,
@@ -346,6 +348,7 @@ func main() {
 		InvoicePDF:             invoicePDFUC,
 		AuthUC:                 authUC,
 		ModuleService:          moduleSvc,
+		RBACUC:                 rbacUC,
 		AnalyticsUC:            analyticsUC,
 		RawMaterialAnalyticsUC: rawMaterialAnalyticsUC,
 		DashboardUC:            dashboardUC,

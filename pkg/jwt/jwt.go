@@ -13,6 +13,7 @@ type Claims struct {
 	jwt.RegisteredClaims
 	UserID    string   `json:"user_id"`
 	CompanyID string   `json:"company_id"`
+	RoleID    string   `json:"role_id,omitempty"`
 	Roles     []string `json:"roles,omitempty"` // lista de roles
 	// Role legacy se mantiene para tokens antiguos / compatibilidad.
 	Role string `json:"role,omitempty"`
@@ -20,6 +21,11 @@ type Claims struct {
 
 // Generate genera un token JWT firmado que incluye userID, companyID y roles.
 func Generate(secret, userID, companyID string, roles []string, issuer string, expMinutes int) (string, error) {
+	return GenerateWithRoleID(secret, userID, companyID, "", roles, issuer, expMinutes)
+}
+
+// GenerateWithRoleID genera un token JWT firmado incluyendo el rol activo por ID.
+func GenerateWithRoleID(secret, userID, companyID, roleID string, roles []string, issuer string, expMinutes int) (string, error) {
 	if secret == "" {
 		return "", fmt.Errorf("jwt: secret vacío")
 	}
@@ -33,6 +39,7 @@ func Generate(secret, userID, companyID string, roles []string, issuer string, e
 		},
 		UserID:    userID,
 		CompanyID: companyID,
+		RoleID:    roleID,
 		Roles:     roles,
 	}
 	// Para compatibilidad con código antiguo que lea solo "role", si hay un único rol lo exponemos también.
@@ -43,11 +50,10 @@ func Generate(secret, userID, companyID string, roles []string, issuer string, e
 	return token.SignedString([]byte(secret))
 }
 
-// Parse valida el token y devuelve userID, companyID y lista de roles.
-// Retorna error si el token es inválido, expirado o tiene firma incorrecta.
-func Parse(secret, tokenString string) (userID, companyID string, roles []string, err error) {
+// ParseClaims valida el token y devuelve las claims completas.
+func ParseClaims(secret, tokenString string) (*Claims, error) {
 	if secret == "" {
-		return "", "", nil, fmt.Errorf("jwt: secret vacío")
+		return nil, fmt.Errorf("jwt: secret vacío")
 	}
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -56,16 +62,24 @@ func Parse(secret, tokenString string) (userID, companyID string, roles []string
 		return []byte(secret), nil
 	})
 	if err != nil {
-		return "", "", nil, err
+		return nil, err
 	}
 	claims, ok := token.Claims.(*Claims)
 	if !ok || !token.Valid {
-		return "", "", nil, fmt.Errorf("claims inválidos")
+		return nil, fmt.Errorf("claims inválidos")
 	}
-	rs := claims.Roles
-	// Compatibilidad con tokens antiguos que solo tenían "role".
-	if len(rs) == 0 && claims.Role != "" {
-		rs = []string{claims.Role}
+	if len(claims.Roles) == 0 && claims.Role != "" {
+		claims.Roles = []string{claims.Role}
 	}
-	return claims.UserID, claims.CompanyID, rs, nil
+	return claims, nil
+}
+
+// Parse valida el token y devuelve userID, companyID y lista de roles.
+// Retorna error si el token es inválido, expirado o tiene firma incorrecta.
+func Parse(secret, tokenString string) (userID, companyID string, roles []string, err error) {
+	claims, err := ParseClaims(secret, tokenString)
+	if err != nil {
+		return "", "", nil, err
+	}
+	return claims.UserID, claims.CompanyID, claims.Roles, nil
 }

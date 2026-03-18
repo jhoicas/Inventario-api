@@ -23,12 +23,13 @@ type JWTConfig struct {
 type AuthUseCase struct {
 	userRepo    repository.UserRepository
 	companyRepo repository.CompanyRepository
+	roleRepo    repository.RoleRepository
 	jwtCfg      JWTConfig
 }
 
 // NewAuthUseCase construye el caso de uso de auth.
-func NewAuthUseCase(userRepo repository.UserRepository, companyRepo repository.CompanyRepository, jwtCfg JWTConfig) *AuthUseCase {
-	return &AuthUseCase{userRepo: userRepo, companyRepo: companyRepo, jwtCfg: jwtCfg}
+func NewAuthUseCase(userRepo repository.UserRepository, companyRepo repository.CompanyRepository, roleRepo repository.RoleRepository, jwtCfg JWTConfig) *AuthUseCase {
+	return &AuthUseCase{userRepo: userRepo, companyRepo: companyRepo, roleRepo: roleRepo, jwtCfg: jwtCfg}
 }
 
 // RegisterUser crea un usuario: hashea password con bcrypt y persiste. Devuelve ErrEmailAlreadyExists si el email ya existe en esa company.
@@ -90,13 +91,25 @@ func (uc *AuthUseCase) Login(in dto.LoginRequest) (*dto.LoginResponse, error) {
 	if user.Status != "active" {
 		return nil, domain.ErrForbidden
 	}
-	token, err := jwt.Generate(uc.jwtCfg.Secret, user.ID, user.CompanyID, user.Roles, uc.jwtCfg.Issuer, uc.jwtCfg.ExpMinutes)
+	activeRoleKey := ""
+	if len(user.Roles) > 0 {
+		activeRoleKey = user.Roles[0]
+	}
+	activeRoleID := ""
+	if uc.roleRepo != nil && activeRoleKey != "" {
+		if role, err := uc.roleRepo.GetByKey(activeRoleKey); err == nil && role != nil {
+			activeRoleID = role.ID
+		}
+	}
+	token, err := jwt.GenerateWithRoleID(uc.jwtCfg.Secret, user.ID, user.CompanyID, activeRoleID, user.Roles, uc.jwtCfg.Issuer, uc.jwtCfg.ExpMinutes)
 	if err != nil {
 		return nil, err
 	}
 	return &dto.LoginResponse{
 		Token: token,
 		User:  *toUserResponse(user),
+		RoleID: activeRoleID,
+		RoleKey: activeRoleKey,
 	}, nil
 }
 

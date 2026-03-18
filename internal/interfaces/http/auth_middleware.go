@@ -15,6 +15,7 @@ import (
 const (
 	LocalUserID    = "user_id"
 	LocalCompanyID = "company_id"
+	LocalRoleID    = "role_id"
 	LocalRole      = "role"  // compatibilidad: primer rol
 	LocalRoles     = "roles" // slice completo de roles
 )
@@ -44,19 +45,20 @@ func AuthMiddleware(jwtSecret string) fiber.Handler {
 			})
 		}
 
-		userID, companyID, roles, err := jwt.Parse(jwtSecret, tokenString)
+		claims, err := jwt.ParseClaims(jwtSecret, tokenString)
 		if err != nil {
 			return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{
 				Code: "INVALID_TOKEN", Message: "token inválido o expirado",
 			})
 		}
 
-		c.Locals(LocalUserID, userID)
-		c.Locals(LocalCompanyID, companyID)
-		c.Locals(LocalRoles, roles)
-		if len(roles) > 0 {
+		c.Locals(LocalUserID, claims.UserID)
+		c.Locals(LocalCompanyID, claims.CompanyID)
+		c.Locals(LocalRoles, claims.Roles)
+		c.Locals(LocalRoleID, claims.RoleID)
+		if len(claims.Roles) > 0 {
 			// Para compatibilidad con código que solo lee un rol:
-			c.Locals(LocalRole, roles[0])
+			c.Locals(LocalRole, claims.Roles[0])
 		}
 		return c.Next()
 	}
@@ -142,6 +144,20 @@ func GetRole(c *fiber.Ctx) string {
 		return ""
 	}
 	return roles[0]
+}
+
+// GetRoleID devuelve el role_id almacenado por AuthMiddleware si existe.
+func GetRoleID(c *fiber.Ctx) string {
+	v, _ := c.Locals(LocalRoleID).(string)
+	return v
+}
+
+// GetRoleRef devuelve el identificador más útil para RBAC: role_id si existe, si no el primer role.
+func GetRoleRef(c *fiber.Ctx) string {
+	if roleID := GetRoleID(c); roleID != "" {
+		return roleID
+	}
+	return GetRole(c)
 }
 
 // IsAdmin es un helper semántico para comprobar si el usuario tiene rol admin.

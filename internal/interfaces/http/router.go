@@ -36,6 +36,7 @@ type RouterDeps struct {
 	InvoicePDF             *billing.PDFUseCase
 	AuthUC                 *auth.AuthUseCase
 	ModuleService          *usecase.ModuleService
+	RBACUC                 *usecase.RBACUseCase
 	AnalyticsUC            *usecase.AnalyticsUseCase
 	RawMaterialAnalyticsUC *usecase.RawMaterialAnalyticsUseCase
 	DashboardUC            *appanalytics.DashboardUseCase
@@ -75,43 +76,53 @@ func Router(app *fiber.App, deps RouterDeps) {
 	// ── Rutas protegidas (JWT obligatorio) ────────────────────────────────────
 	// Todos los grupos siguientes heredan AuthMiddleware.
 	protected := api.Group("/", AuthMiddleware(deps.JWTSecret))
+	screenAccess := fiber.Handler(func(c *fiber.Ctx) error { return c.Next() })
+	if deps.RBACUC != nil {
+		screenAccess = RequirePermission(deps.RBACUC)
+	}
+
+	if deps.RBACUC != nil {
+		rbacHandler := NewRBACHandler(deps.RBACUC)
+		rbacGroup := protected.Group("/rbac")
+		rbacGroup.Get("/menu", rbacHandler.GetCurrentMenu)
+		rbacGroup.Get("/roles", RequireRole(entity.RoleAdmin), rbacHandler.ListRoles)
+		rbacGroup.Get("/modules", RequireRole(entity.RoleAdmin), rbacHandler.GetCatalog)
+		rbacGroup.Get("/roles/:role_id/menu", RequireRole(entity.RoleAdmin), rbacHandler.GetRoleMenu)
+		rbacGroup.Put("/roles/:role_id/screens", RequireRole(entity.RoleAdmin), rbacHandler.UpdateRoleScreens)
+	}
 
 	// ── Catálogos de lectura (JWT solo — todos los roles pueden leer para armar la UI) ──
 
 	warehouseHandler := NewWarehouseHandler(deps.WarehouseUC)
-	wh := protected.Group("/warehouses")
+	wh := protected.Group("/warehouses", RequireModule(entity.ModuleInventory, deps.ModuleService), screenAccess)
 	wh.Get("/", warehouseHandler.List)
 	wh.Get("/:id", warehouseHandler.GetByID)
-	// Creación de bodegas: solo admin
-	wh.Post("/", RequireRole(entity.RoleAdmin), warehouseHandler.Create)
+	wh.Post("/", warehouseHandler.Create)
 
 	productHandler := NewProductHandler(deps.ProductUC)
-	prod := protected.Group("/products")
+	prod := protected.Group("/products", RequireModule(entity.ModuleInventory, deps.ModuleService), screenAccess)
 	prod.Get("/", productHandler.List)
 	prod.Get("/:id", productHandler.GetByID)
-	// Escritura de productos: admin y bodeguero
-	prod.Post("/", RequireRole(entity.RoleAdmin, entity.RoleBodeguero), productHandler.Create)
-	prod.Put("/:id", RequireRole(entity.RoleAdmin, entity.RoleBodeguero), productHandler.Update)
+	prod.Post("/", productHandler.Create)
+	prod.Put("/:id", productHandler.Update)
 
 	supplierHandler := NewSupplierHandler(deps.SupplierUC)
-	sup := protected.Group("/suppliers")
+	sup := protected.Group("/suppliers", RequireModule(entity.ModuleInventory, deps.ModuleService), screenAccess)
 	sup.Get("/", supplierHandler.List)
 	sup.Get("/:id", supplierHandler.GetByID)
-	sup.Post("/", RequireRole(entity.RoleAdmin, entity.RoleBodeguero), supplierHandler.Create)
-	sup.Put("/:id", RequireRole(entity.RoleAdmin, entity.RoleBodeguero), supplierHandler.Update)
-	sup.Put("/:id/deactivate", RequireRole(entity.RoleAdmin), supplierHandler.Deactivate)
+	sup.Post("/", supplierHandler.Create)
+	sup.Put("/:id", supplierHandler.Update)
+	sup.Put("/:id/deactivate", supplierHandler.Deactivate)
 
 	customerHandler := NewCustomerHandler(deps.CustomerUC)
-	cust := protected.Group("/customers")
+	cust := protected.Group("/customers", RequireModule(entity.ModuleBilling, deps.ModuleService), screenAccess)
 	cust.Get("/", customerHandler.List)
-	// Creación de clientes: admin y vendedor
-	cust.Post("/", RequireRole(entity.RoleAdmin, entity.RoleVendedor), customerHandler.Create)
-	cust.Put("/:id", RequireRole(entity.RoleAdmin, entity.RoleVendedor), customerHandler.Update)
-	cust.Put("/:id/deactivate", RequireRole(entity.RoleAdmin), customerHandler.Deactivate)
+	cust.Post("/", customerHandler.Create)
+	cust.Put("/:id", customerHandler.Update)
+	cust.Put("/:id/deactivate", customerHandler.Deactivate)
 	// Consulta DIAN por documento: JWT + RequireModule(billing) + DIANConfigMiddleware
 	if deps.CustomerLookup != nil && deps.CompanyRepo != nil {
 		cust.Get("/lookup",
-			RequireModule(entity.ModuleBilling, deps.ModuleService),
 			dianws.DIANConfigMiddleware(deps.CompanyRepo),
 			deps.CustomerLookup.Lookup,
 		)
@@ -126,7 +137,7 @@ func Router(app *fiber.App, deps RouterDeps) {
 
 	resolutionsGroup := protected.Group("/resolutions",
 		RequireModule(entity.ModuleBilling, deps.ModuleService),
-		RequireRole(entity.RoleAdmin),
+		screenAccess,
 	)
 	resolutionsGroup.Get("/", companyHandler.ListMyResolutions)
 	resolutionsGroup.Post("/", companyHandler.CreateMyResolution)
@@ -135,155 +146,119 @@ func Router(app *fiber.App, deps RouterDeps) {
 		settingsHandler := NewSettingsHandler(deps.DIANSettingsUC)
 		protected.Get("/settings/dian",
 			RequireModule(entity.ModuleBilling, deps.ModuleService),
-			RequireRole(entity.RoleAdmin),
+			screenAccess,
 			settingsHandler.GetDIANSettings,
 		)
 		protected.Put("/settings/dian",
 			RequireModule(entity.ModuleBilling, deps.ModuleService),
-			RequireRole(entity.RoleAdmin),
+			screenAccess,
 			settingsHandler.UpdateDIANSettings,
 		)
 		protected.Get("/dian/settings",
 			RequireModule(entity.ModuleBilling, deps.ModuleService),
-			RequireRole(entity.RoleAdmin),
+			screenAccess,
 			settingsHandler.GetDIANSettings,
 		)
 		protected.Put("/dian/settings",
 			RequireModule(entity.ModuleBilling, deps.ModuleService),
-			RequireRole(entity.RoleAdmin),
+			screenAccess,
 			settingsHandler.UpdateDIANSettings,
 		)
 		protected.Get("/dian/configuration",
 			RequireModule(entity.ModuleBilling, deps.ModuleService),
-			RequireRole(entity.RoleAdmin),
+			screenAccess,
 			settingsHandler.GetDIANSettings,
 		)
 		protected.Put("/dian/configuration",
 			RequireModule(entity.ModuleBilling, deps.ModuleService),
-			RequireRole(entity.RoleAdmin),
+			screenAccess,
 			settingsHandler.UpdateDIANSettings,
 		)
 	}
 
 	// ── Inventario (módulo 'inventory' + roles) ────────────────────────────────
 	inventoryHandler := NewInventoryHandler(deps.RegisterMovement, deps.Replenishment, deps.GetStock, deps.ListMovements, deps.ReorderConfig, deps.Stocktake, deps.PurchaseOrder)
-	po := protected.Group("/purchase-orders", RequireModule(entity.ModuleInventory, deps.ModuleService))
+	po := protected.Group("/purchase-orders", RequireModule(entity.ModuleInventory, deps.ModuleService), screenAccess)
 	po.Get("/",
-		RequireRole(entity.RoleAdmin, entity.RoleBodeguero),
 		inventoryHandler.GetPurchaseOrders,
 	)
 	po.Post("/",
-		RequireRole(entity.RoleAdmin, entity.RoleBodeguero),
 		inventoryHandler.CreatePurchaseOrder,
 	)
 	po.Put("/:id/receive",
-		RequireRole(entity.RoleAdmin, entity.RoleBodeguero),
 		inventoryHandler.ReceivePurchaseOrder,
 	)
 
 	prod.Put("/:id/reorder-config",
-		RequireModule(entity.ModuleInventory, deps.ModuleService),
-		RequireRole(entity.RoleAdmin, entity.RoleBodeguero),
 		inventoryHandler.UpdateReorderConfig,
 	)
-	invGroup := protected.Group("/inventory", RequireModule(entity.ModuleInventory, deps.ModuleService))
-	// GET /inventory/movements — admin y bodeguero
+	invGroup := protected.Group("/inventory", RequireModule(entity.ModuleInventory, deps.ModuleService), screenAccess)
 	invGroup.Get("/movements",
-		RequireRole(entity.RoleAdmin, entity.RoleBodeguero),
 		inventoryHandler.ListMovements,
 	)
 
-	// POST /inventory/movements — admin y bodeguero
 	invGroup.Post("/movements",
-		RequireRole(entity.RoleAdmin, entity.RoleBodeguero),
 		inventoryHandler.RegisterMovement,
 	)
-	// GET /inventory/replenishment-list — admin y bodeguero
 	invGroup.Get("/replenishment-list",
-		RequireRole(entity.RoleAdmin, entity.RoleBodeguero),
 		inventoryHandler.GetReplenishmentList,
 	)
-	// GET /inventory/stock — admin y bodeguero
 	invGroup.Get("/stock",
-		RequireRole(entity.RoleAdmin, entity.RoleBodeguero),
 		inventoryHandler.GetStock,
 	)
-	// Stocktake (conteo físico) — admin y bodeguero
 	invGroup.Post("/stocktake",
-		RequireRole(entity.RoleAdmin, entity.RoleBodeguero),
 		inventoryHandler.CreateStocktakeSnapshot,
 	)
 	invGroup.Put("/stocktake/:id",
-		RequireRole(entity.RoleAdmin, entity.RoleBodeguero),
 		inventoryHandler.UpdateStocktakeCounts,
 	)
 	invGroup.Post("/stocktake/:id/close",
-		RequireRole(entity.RoleAdmin, entity.RoleBodeguero),
 		inventoryHandler.CloseStocktake,
 	)
 
 	// ── Facturación (módulo 'billing' + roles) ─────────────────────────────────
 	invoiceHandler := NewInvoiceHandlerWithBillingOps(deps.CreateInvoice, deps.ReturnInvoice, deps.DebitNote, deps.VoidInvoice, deps.InvoicePDF, deps.InvoiceMailer)
-	invGroup2 := protected.Group("/invoices", RequireModule(entity.ModuleBilling, deps.ModuleService))
+	invGroup2 := protected.Group("/invoices", RequireModule(entity.ModuleBilling, deps.ModuleService), screenAccess)
 
-	// GET — listar facturas con filtros y paginación: admin y vendedor
 	invGroup2.Get("/",
-		RequireRole(entity.RoleAdmin, entity.RoleVendedor),
 		invoiceHandler.GetInvoices,
 	)
 	invGroup2.Get("/credit-notes",
-		RequireRole(entity.RoleAdmin, entity.RoleVendedor),
 		invoiceHandler.GetCreditNotes,
 	)
 	invGroup2.Get("/debit-notes",
-		RequireRole(entity.RoleAdmin, entity.RoleVendedor),
 		invoiceHandler.GetDebitNotes,
 	)
-	// POST — emitir factura: admin y vendedor
 	invGroup2.Post("/",
-		RequireRole(entity.RoleAdmin, entity.RoleVendedor),
 		invoiceHandler.Create,
 	)
-	// POST — registrar devolución (Nota Crédito): admin y vendedor
 	invGroup2.Post("/:id/return",
-		RequireRole(entity.RoleAdmin, entity.RoleVendedor),
 		invoiceHandler.HandleReturn,
 	)
-	// POST — registrar Nota Débito: admin y vendedor
 	invGroup2.Post("/:id/debit-note",
-		RequireRole(entity.RoleAdmin, entity.RoleVendedor),
 		invoiceHandler.HandleDebitNote,
 	)
-	// POST — anular factura (Nota Crédito total): admin y vendedor
 	invGroup2.Post("/:id/void",
-		RequireRole(entity.RoleAdmin, entity.RoleVendedor),
 		invoiceHandler.HandleVoidInvoice,
 	)
-	// POST — enviar factura por correo al cliente: admin y vendedor
 	invGroup2.Post("/:id/send-email",
-		RequireRole(entity.RoleAdmin, entity.RoleVendedor),
 		invoiceHandler.SendEmail,
 	)
-	// POST — reintentar envío DIAN de factura en contingencia: admin y vendedor
 	invGroup2.Post("/:id/retry-dian",
-		RequireRole(entity.RoleAdmin, entity.RoleVendedor),
 		invoiceHandler.RetryDIAN,
 	)
-	// GET (consultas y descarga) — todos los roles con billing activo
 	invGroup2.Get("/:id/status", invoiceHandler.GetDIANStatus)
 	invGroup2.Get("/:id/pdf", invoiceHandler.DownloadPDF)
 	invGroup2.Get("/:id", invoiceHandler.GetByID)
 
-	billingGroup := protected.Group("/billing", RequireModule(entity.ModuleBilling, deps.ModuleService))
+	billingGroup := protected.Group("/billing", RequireModule(entity.ModuleBilling, deps.ModuleService), screenAccess)
 	billingGroup.Get("/dian/summary",
-		RequireRole(entity.RoleAdmin, entity.RoleVendedor),
 		invoiceHandler.GetDIANSummary,
 	)
 
 	// ── Correos manuales (módulo 'billing' + roles) ───────────────────────────
-	emailGroup := protected.Group("/emails", RequireModule(entity.ModuleBilling, deps.ModuleService))
+	emailGroup := protected.Group("/emails", RequireModule(entity.ModuleBilling, deps.ModuleService), screenAccess)
 	emailGroup.Post("/send",
-		RequireRole(entity.RoleAdmin, entity.RoleVendedor),
 		invoiceHandler.SendCustomEmail,
 	)
 
@@ -303,7 +278,7 @@ func Router(app *fiber.App, deps RouterDeps) {
 
 	// ── CRM (módulo 'crm') ─────────────────────────────────────────────────────
 	if deps.CRMHandler != nil {
-		crmGroup := protected.Group("/crm", RequireModule(entity.ModuleCRM, deps.ModuleService))
+		crmGroup := protected.Group("/crm", RequireModule(entity.ModuleCRM, deps.ModuleService), screenAccess)
 		h := deps.CRMHandler
 		crmGroup.Get("/customers/:id/profile360", h.GetProfile360)
 		crmGroup.Put("/customers/:id/category", h.AssignCategory)
@@ -311,13 +286,12 @@ func Router(app *fiber.App, deps RouterDeps) {
 		crmGroup.Get("/customers/:id/loyalty", h.GetLoyalty)
 		crmGroup.Post("/loyalty/redeem", h.RedeemPoints)
 		crmGroup.Get("/categories", h.ListCategories)
-		crmGroup.Post("/categories", RequireRole(entity.RoleAdmin), h.CreateCategory)
-		crmGroup.Put("/categories/:id", RequireRole(entity.RoleAdmin), h.UpdateCategory)
-		crmGroup.Put("/categories/:id/deactivate", RequireRole(entity.RoleAdmin), h.DeactivateCategory)
+		crmGroup.Post("/categories", h.CreateCategory)
+		crmGroup.Put("/categories/:id", h.UpdateCategory)
+		crmGroup.Put("/categories/:id/deactivate", h.DeactivateCategory)
 		crmGroup.Get("/categories/:id/benefits", h.ListBenefitsByCategory)
-		// Beneficios: escritura solo admin
-		crmGroup.Post("/categories/:categoryId/benefits", RequireRole(entity.RoleAdmin), h.CreateBenefit)
-		crmGroup.Put("/benefits/:benefitId", RequireRole(entity.RoleAdmin), h.UpdateBenefit)
+		crmGroup.Post("/categories/:categoryId/benefits", h.CreateBenefit)
+		crmGroup.Put("/benefits/:benefitId", h.UpdateBenefit)
 		crmGroup.Post("/tasks", h.CreateTask)
 		crmGroup.Get("/tasks", h.ListTasks)
 		crmGroup.Get("/tasks/:id", h.GetTask)
@@ -332,19 +306,15 @@ func Router(app *fiber.App, deps RouterDeps) {
 		crmGroup.Put("/tickets/:id/escalate", h.EscalateTicket)
 		crmGroup.Post("/ai/campaign-copy", h.GenerateCampaignCopy)
 		crmGroup.Post("/ai/summarize-timeline", h.SummarizeTimeline)
-		// Opportunities (embudo de ventas)
 		crmGroup.Post("/opportunities", h.CreateOpportunity)
 		crmGroup.Get("/opportunities", h.ListOpportunities)
 		crmGroup.Put("/opportunities/:id/stage", h.UpdateOpportunityStage)
 		crmGroup.Get("/opportunities/funnel", h.GetOpportunityFunnel)
-		// Campaigns
-		crmGroup.Post("/campaigns", RequireRole(entity.RoleAdmin, entity.RoleMarketing), h.CreateCampaign)
+		crmGroup.Post("/campaigns", h.CreateCampaign)
 		crmGroup.Get("/campaigns/:id/metrics", h.GetCampaignMetrics)
-		// Campaign templates
-		crmGroup.Post("/campaign-templates", RequireRole(entity.RoleAdmin, entity.RoleMarketing), h.CreateCampaignTemplate)
-		crmGroup.Get("/campaign-templates", RequireRole(entity.RoleAdmin, entity.RoleMarketing), h.ListCampaignTemplates)
-		crmGroup.Delete("/campaign-templates/:id", RequireRole(entity.RoleAdmin, entity.RoleMarketing), h.DeleteCampaignTemplate)
-		// Historial de compras: requiere módulo billing activo además de crm
+		crmGroup.Post("/campaign-templates", h.CreateCampaignTemplate)
+		crmGroup.Get("/campaign-templates", h.ListCampaignTemplates)
+		crmGroup.Delete("/campaign-templates/:id", h.DeleteCampaignTemplate)
 		crmGroup.Get("/customers/:id/purchase-history",
 			RequireModule(entity.ModuleBilling, deps.ModuleService),
 			h.GetPurchaseHistory,
