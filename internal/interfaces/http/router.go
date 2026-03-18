@@ -219,6 +219,18 @@ func Router(app *fiber.App, deps RouterDeps) {
 
 	// ── Facturación (módulo 'billing' + roles) ─────────────────────────────────
 	invoiceHandler := NewInvoiceHandlerWithBillingOps(deps.CreateInvoice, deps.ReturnInvoice, deps.DebitNote, deps.VoidInvoice, deps.InvoicePDF, deps.InvoiceMailer)
+
+	// ── Envío de correos (independiente de módulos) ───────────────────────────
+	// Nota: estas rutas requieren JWT y RBAC, pero NO dependen de ModuleBilling.
+	protected.Post("/invoices/:id/send-email",
+		screenAccess,
+		invoiceHandler.SendEmail,
+	)
+	protected.Post("/emails/send",
+		screenAccess,
+		invoiceHandler.SendCustomEmail,
+	)
+
 	invGroup2 := protected.Group("/invoices", RequireModule(entity.ModuleBilling, deps.ModuleService), screenAccess)
 
 	invGroup2.Get("/",
@@ -242,9 +254,6 @@ func Router(app *fiber.App, deps RouterDeps) {
 	invGroup2.Post("/:id/void",
 		invoiceHandler.HandleVoidInvoice,
 	)
-	invGroup2.Post("/:id/send-email",
-		invoiceHandler.SendEmail,
-	)
 	invGroup2.Post("/:id/retry-dian",
 		invoiceHandler.RetryDIAN,
 	)
@@ -255,12 +264,6 @@ func Router(app *fiber.App, deps RouterDeps) {
 	billingGroup := protected.Group("/billing", RequireModule(entity.ModuleBilling, deps.ModuleService), screenAccess)
 	billingGroup.Get("/dian/summary",
 		invoiceHandler.GetDIANSummary,
-	)
-
-	// ── Correos manuales (módulo 'billing' + roles) ───────────────────────────
-	emailGroup := protected.Group("/emails", RequireModule(entity.ModuleBilling, deps.ModuleService), screenAccess)
-	emailGroup.Post("/send",
-		invoiceHandler.SendCustomEmail,
 	)
 
 	// ── Analytics (módulo 'analytics' + solo admin) ────────────────────────────

@@ -2,6 +2,7 @@ package crm
 
 import (
 	"context"
+	"reflect"
 	"strings"
 	"time"
 
@@ -94,7 +95,7 @@ func (uc *CampaignUseCase) SendCampaign(ctx context.Context, companyID, userID s
 	if strings.TrimSpace(req.Subject) == "" || strings.TrimSpace(req.Body) == "" {
 		return domain.ErrInvalidInput
 	}
-	if uc.mailSender == nil {
+	if isNil(uc.mailSender) {
 		return domain.ErrConflict
 	}
 
@@ -176,7 +177,7 @@ func (uc *CampaignUseCase) SendTest(ctx context.Context, companyID, userID strin
 	if strings.TrimSpace(req.Subject) == "" || strings.TrimSpace(req.Body) == "" {
 		return domain.ErrInvalidInput
 	}
-	if uc.mailSender == nil {
+	if isNil(uc.mailSender) {
 		return domain.ErrConflict
 	}
 
@@ -208,6 +209,20 @@ func (uc *CampaignUseCase) SendTest(ctx context.Context, companyID, userID strin
 		return domain.ErrInvalidInput
 	}
 	return uc.mailSender.Send(toEmail, req.Subject, body)
+}
+
+// isNil detecta interfaces con puntero interno nil (evita panics).
+func isNil(v any) bool {
+	if v == nil {
+		return true
+	}
+	rv := reflect.ValueOf(v)
+	switch rv.Kind() {
+	case reflect.Ptr, reflect.Interface, reflect.Slice, reflect.Map, reflect.Func, reflect.Chan:
+		return rv.IsNil()
+	default:
+		return false
+	}
 }
 
 func toCampaignResponse(c *entity.Campaign) *dto.CampaignResponse {
