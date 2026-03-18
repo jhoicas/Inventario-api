@@ -283,6 +283,7 @@ func Router(app *fiber.App, deps RouterDeps) {
 		h := deps.CRMHandler
 		crmGroup.Get("/customers", h.ListCustomers)
 		crmGroup.Post("/customers", h.CreateCustomer)
+		crmGroup.Put("/customers/:id", h.UpdateCustomer)
 		crmGroup.Put("/customers/:id/deactivate", h.DeactivateCustomer)
 		crmGroup.Get("/customers/:id/profile360", h.GetProfile360)
 		crmGroup.Put("/customers/:id/category", h.AssignCategory)
