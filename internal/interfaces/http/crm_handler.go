@@ -19,12 +19,18 @@ type invoiceHistoryRepo interface {
 	GetCustomerStats(customerID string) (*repository.CustomerPurchaseStats, error)
 }
 
+// customerListUseCase define el listado de clientes reutilizando el caso de uso de facturación.
+type customerListUseCase interface {
+	List(companyID string, search string, limit, offset int) ([]*dto.CustomerResponse, error)
+}
+
 // CRMHandler maneja las peticiones HTTP del módulo CRM (protegido + RequireModule crm).
 type CRMHandler struct {
 	LoyaltyUC       *crm.LoyaltyUseCase
 	TaskUC          *crm.TaskUseCase
 	PQRUC           *crm.PQRUseCase
 	AICRMUC         *crm.AICRMUseCase
+	CustomerUC      customerListUseCase
 	OpportunityUC   *crm.OpportunityUseCase
 	CampaignUC      *crm.CampaignUseCase
 	TemplateUC      *crm.CampaignTemplateUseCase
@@ -42,6 +48,7 @@ func NewCRMHandler(
 	taskUC *crm.TaskUseCase,
 	pqrUC *crm.PQRUseCase,
 	aiCRMUC *crm.AICRMUseCase,
+	customerUC customerListUseCase,
 	interactionRepo interface {
 		Create(interaction *entity.CRMInteraction) error
 		ListByCustomer(customerID string, limit, offset int) ([]*entity.CRMInteraction, error)
@@ -57,12 +64,45 @@ func NewCRMHandler(
 		TaskUC:          taskUC,
 		PQRUC:           pqrUC,
 		AICRMUC:         aiCRMUC,
+		CustomerUC:      customerUC,
 		OpportunityUC:   opportunityUC,
 		CampaignUC:      campaignUC,
 		TemplateUC:      templateUC,
 		InvoiceHistory:  invoiceHistory,
 		InteractionRepo: interactionRepo,
 	}
+}
+
+// ListCustomers lista los clientes disponibles en CRM.
+// @Summary      Listar clientes CRM
+// @Description  Lista los clientes de la empresa autenticada para uso en CRM
+// @Tags         crm
+// @Security     Bearer
+// @Accept       json
+// @Produce      json
+// @Param        search  query     string  false  "Buscar por nombre o NIT (tax_id)"
+// @Param        limit   query     int     false  "Límite de resultados"
+// @Param        offset  query     int     false  "Desplazamiento"
+// @Success      200     {array}   dto.CustomerResponse
+// @Failure      401     {object}  dto.ErrorResponse
+// @Failure      500     {object}  dto.ErrorResponse
+// @Router       /api/crm/customers [get]
+func (h *CRMHandler) ListCustomers(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	if companyID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if h.CustomerUC == nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: "customer use case no configurado"})
+	}
+	search := c.Query("search")
+	limit, _ := strconv.Atoi(c.Query("limit", "20"))
+	offset, _ := strconv.Atoi(c.Query("offset", "0"))
+	list, err := h.CustomerUC.List(companyID, search, limit, offset)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.JSON(list)
 }
 
 // GetProfile360 obtiene la vista 360 del cliente.
