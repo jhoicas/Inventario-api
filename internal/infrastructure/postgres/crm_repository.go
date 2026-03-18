@@ -117,9 +117,9 @@ func (r *CRMBenefitRepo) Create(b *entity.CRMBenefit) error {
 		b.ID = uuid.New().String()
 	}
 	_, err := r.q.Exec(context.Background(), `
-		INSERT INTO crm_benefits (id, company_id, category_id, name, description, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-		b.ID, b.CompanyID, b.CategoryID, b.Name, b.Description, b.CreatedAt, b.UpdatedAt,
+		INSERT INTO crm_benefits (id, company_id, category_id, name, description, is_active, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+		b.ID, b.CompanyID, b.CategoryID, b.Name, b.Description, b.IsActive, b.CreatedAt, b.UpdatedAt,
 	)
 	return err
 }
@@ -127,8 +127,9 @@ func (r *CRMBenefitRepo) Create(b *entity.CRMBenefit) error {
 func (r *CRMBenefitRepo) GetByID(id string) (*entity.CRMBenefit, error) {
 	var b entity.CRMBenefit
 	err := r.q.QueryRow(context.Background(), `
-		SELECT id, company_id, category_id, name, description, created_at, updated_at FROM crm_benefits WHERE id = $1`, id,
-	).Scan(&b.ID, &b.CompanyID, &b.CategoryID, &b.Name, &b.Description, &b.CreatedAt, &b.UpdatedAt)
+		SELECT id, company_id, category_id, name, description, is_active, created_at, updated_at
+		FROM crm_benefits WHERE id = $1`, id,
+	).Scan(&b.ID, &b.CompanyID, &b.CategoryID, &b.Name, &b.Description, &b.IsActive, &b.CreatedAt, &b.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
@@ -140,7 +141,10 @@ func (r *CRMBenefitRepo) GetByID(id string) (*entity.CRMBenefit, error) {
 
 func (r *CRMBenefitRepo) ListByCategory(categoryID string, limit, offset int) ([]*entity.CRMBenefit, error) {
 	rows, err := r.q.Query(context.Background(), `
-		SELECT id, company_id, category_id, name, description, created_at, updated_at FROM crm_benefits WHERE category_id = $1 ORDER BY name LIMIT $2 OFFSET $3`,
+		SELECT id, company_id, category_id, name, description, is_active, created_at, updated_at
+		FROM crm_benefits
+		WHERE category_id = $1 AND is_active = true
+		ORDER BY name LIMIT $2 OFFSET $3`,
 		categoryID, limit, offset,
 	)
 	if err != nil {
@@ -150,7 +154,7 @@ func (r *CRMBenefitRepo) ListByCategory(categoryID string, limit, offset int) ([
 	var list []*entity.CRMBenefit
 	for rows.Next() {
 		var b entity.CRMBenefit
-		if err := rows.Scan(&b.ID, &b.CompanyID, &b.CategoryID, &b.Name, &b.Description, &b.CreatedAt, &b.UpdatedAt); err != nil {
+		if err := rows.Scan(&b.ID, &b.CompanyID, &b.CategoryID, &b.Name, &b.Description, &b.IsActive, &b.CreatedAt, &b.UpdatedAt); err != nil {
 			return nil, err
 		}
 		list = append(list, &b)
@@ -166,8 +170,11 @@ func (r *CRMBenefitRepo) Update(b *entity.CRMBenefit) error {
 	return err
 }
 
-func (r *CRMBenefitRepo) Delete(id string) error {
-	_, err := r.q.Exec(context.Background(), `DELETE FROM crm_benefits WHERE id = $1`, id)
+func (r *CRMBenefitRepo) SetActive(companyID, id string, isActive bool) error {
+	_, err := r.q.Exec(context.Background(),
+		`UPDATE crm_benefits SET is_active = $3, updated_at = now() WHERE id = $1 AND company_id = $2`,
+		id, companyID, isActive,
+	)
 	return err
 }
 

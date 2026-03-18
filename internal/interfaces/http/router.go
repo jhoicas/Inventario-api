@@ -293,6 +293,7 @@ func Router(app *fiber.App, deps RouterDeps) {
 		crmGroup.Get("/categories/:id/benefits", h.ListBenefitsByCategory)
 		crmGroup.Post("/categories/:categoryId/benefits", h.CreateBenefit)
 		crmGroup.Put("/benefits/:benefitId", h.UpdateBenefit)
+		crmGroup.Put("/benefits/:benefitId/deactivate", h.DeactivateBenefit)
 		crmGroup.Post("/tasks", h.CreateTask)
 		crmGroup.Get("/tasks", h.ListTasks)
 		crmGroup.Get("/tasks/:id", h.GetTask)

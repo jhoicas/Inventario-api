@@ -522,6 +522,39 @@ func (h *CRMHandler) UpdateBenefit(c *fiber.Ctx) error {
 	return c.JSON(out)
 }
 
+// DeactivateBenefit desactiva un beneficio (soft delete, solo admin).
+// @Summary      Desactivar beneficio
+// @Description  Desactiva (soft delete) un beneficio de fidelización (solo admin)
+// @Tags         crm
+// @Security     Bearer
+// @Produce      json
+// @Param        benefitId  path      string  true  "Benefit ID"
+// @Success      204
+// @Failure      400        {object}  dto.ErrorResponse
+// @Failure      401        {object}  dto.ErrorResponse
+// @Failure      403        {object}  dto.ErrorResponse
+// @Failure      404        {object}  dto.ErrorResponse
+// @Router       /api/crm/benefits/{benefitId}/deactivate [put]
+func (h *CRMHandler) DeactivateBenefit(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	benefitID := c.Params("benefitId")
+	if companyID == "" || benefitID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "benefitId requerido"})
+	}
+	if err := h.LoyaltyUC.DeactivateBenefit(c.Context(), companyID, benefitID); err != nil {
+		switch err {
+		case domain.ErrInvalidInput:
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "benefitId inválido"})
+		case domain.ErrNotFound:
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "beneficio no encontrado"})
+		case domain.ErrForbidden:
+			return c.Status(fiber.StatusForbidden).JSON(dto.ErrorResponse{Code: "FORBIDDEN", Message: "acceso denegado"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.SendStatus(fiber.StatusNoContent)
+}
+
 // CreateTask crea una tarea.
 // @Summary      Crear tarea CRM
 // @Description  Crea una tarea de seguimiento o gestión comercial para un cliente

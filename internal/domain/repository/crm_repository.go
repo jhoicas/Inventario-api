@@ -23,7 +23,7 @@ type CRMBenefitRepository interface {
 	GetByID(id string) (*entity.CRMBenefit, error)
 	ListByCategory(categoryID string, limit, offset int) ([]*entity.CRMBenefit, error)
 	Update(benefit *entity.CRMBenefit) error
-	Delete(id string) error
+	SetActive(companyID, id string, isActive bool) error
 }
 
 // CRMProfileRepository puerto de persistencia para perfiles CRM (y vista 360).

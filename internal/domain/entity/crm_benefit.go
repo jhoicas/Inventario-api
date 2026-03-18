@@ -9,6 +9,7 @@ type CRMBenefit struct {
 	CategoryID  string
 	Name        string
 	Description string
+	IsActive    bool
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }

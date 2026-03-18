@@ -521,6 +521,7 @@ func (uc *LoyaltyUseCase) CreateBenefit(ctx context.Context, companyID, category
 		CategoryID:  categoryID,
 		Name:        in.Name,
 		Description: in.Description,
+		IsActive:    true,
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
@@ -568,4 +569,22 @@ func (uc *LoyaltyUseCase) UpdateBenefit(ctx context.Context, companyID, benefitI
 		CreatedAt:   b.CreatedAt,
 		UpdatedAt:   b.UpdatedAt,
 	}, nil
+}
+
+// DeactivateBenefit desactiva (soft delete) un beneficio.
+func (uc *LoyaltyUseCase) DeactivateBenefit(ctx context.Context, companyID, benefitID string) error {
+	if companyID == "" || benefitID == "" {
+		return domain.ErrInvalidInput
+	}
+	b, err := uc.benefitRepo.GetByID(benefitID)
+	if err != nil {
+		return err
+	}
+	if b == nil {
+		return domain.ErrNotFound
+	}
+	if b.CompanyID != companyID {
+		return domain.ErrForbidden
+	}
+	return uc.benefitRepo.SetActive(companyID, benefitID, false)
 }
