@@ -17,6 +17,11 @@ type rbacAccessChecker interface {
 // Debe usarse después de AuthMiddleware y de RequireModule en los módulos SaaS.
 func RequirePermission(checker rbacAccessChecker) fiber.Handler {
 	return func(c *fiber.Ctx) error {
+		// Regla: admin siempre pasa (evita bloqueos por desincronización de catálogo RBAC en DB).
+		if IsAdmin(c) {
+			return c.Next()
+		}
+
 		roleRef := GetRoleRef(c)
 		if roleRef == "" {
 			return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{
