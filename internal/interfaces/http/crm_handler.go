@@ -21,7 +21,9 @@ type invoiceHistoryRepo interface {
 
 // customerListUseCase define el listado de clientes reutilizando el caso de uso de facturación.
 type customerListUseCase interface {
+	Create(companyID string, in dto.CreateCustomerRequest) (*dto.CustomerResponse, error)
 	List(companyID string, search string, limit, offset int) ([]*dto.CustomerResponse, error)
+	Deactivate(companyID, customerID string) error
 }
 
 // CRMHandler maneja las peticiones HTTP del módulo CRM (protegido + RequireModule crm).
@@ -103,6 +105,82 @@ func (h *CRMHandler) ListCustomers(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}
 	return c.JSON(list)
+}
+
+// CreateCustomer crea un cliente desde CRM (proxy a customers).
+// @Summary      Crear cliente CRM
+// @Description  Crea un cliente asociado a la empresa autenticada para uso en CRM
+// @Tags         crm
+// @Security     Bearer
+// @Accept       json
+// @Produce      json
+// @Param        body  body      dto.CreateCustomerRequest  true  "Datos del cliente"
+// @Success      201   {object}  dto.CustomerResponse
+// @Failure      400   {object}  dto.ErrorResponse
+// @Failure      401   {object}  dto.ErrorResponse
+// @Failure      409   {object}  dto.ErrorResponse
+// @Failure      500   {object}  dto.ErrorResponse
+// @Router       /api/crm/customers [post]
+func (h *CRMHandler) CreateCustomer(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	if companyID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if h.CustomerUC == nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: "customer use case no configurado"})
+	}
+	var in dto.CreateCustomerRequest
+	if err := c.BodyParser(&in); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
+	}
+	customer, err := h.CustomerUC.Create(companyID, in)
+	if err != nil {
+		if err == domain.ErrInvalidInput {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "name y tax_id son requeridos"})
+		}
+		if err == domain.ErrDuplicate {
+			return c.Status(fiber.StatusConflict).JSON(dto.ErrorResponse{Code: "DUPLICATE", Message: "ya existe un cliente con ese NIT/cédula"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.Status(fiber.StatusCreated).JSON(customer)
+}
+
+// DeactivateCustomer desactiva un cliente desde CRM (soft delete).
+// @Summary      Desactivar cliente CRM
+// @Description  Desactiva (soft delete) un cliente asociado a la empresa autenticada (solo admin)
+// @Tags         crm
+// @Security     Bearer
+// @Produce      json
+// @Param        id   path  string  true  "Customer ID"
+// @Success      204
+// @Failure      400  {object}  dto.ErrorResponse
+// @Failure      401  {object}  dto.ErrorResponse
+// @Failure      403  {object}  dto.ErrorResponse
+// @Failure      404  {object}  dto.ErrorResponse
+// @Failure      500  {object}  dto.ErrorResponse
+// @Router       /api/crm/customers/{id}/deactivate [put]
+func (h *CRMHandler) DeactivateCustomer(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	id := c.Params("id")
+	if companyID == "" || id == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "id requerido"})
+	}
+	if h.CustomerUC == nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: "customer use case no configurado"})
+	}
+	if err := h.CustomerUC.Deactivate(companyID, id); err != nil {
+		switch err {
+		case domain.ErrInvalidInput:
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "id inválido"})
+		case domain.ErrNotFound:
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "cliente no encontrado"})
+		case domain.ErrForbidden:
+			return c.Status(fiber.StatusForbidden).JSON(dto.ErrorResponse{Code: "FORBIDDEN", Message: "acceso denegado"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.SendStatus(fiber.StatusNoContent)
 }
 
 // GetProfile360 obtiene la vista 360 del cliente.
