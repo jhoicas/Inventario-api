@@ -1,6 +1,8 @@
 package http
 
 import (
+	"context"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/jhoicas/Inventario-api/internal/application/dto"
 	"github.com/jhoicas/Inventario-api/internal/domain"
@@ -13,6 +15,7 @@ type CompanyUseCase interface {
 	List(limit, offset int) (*dto.CompanyListResponse, error)
 	CreateResolution(companyID string, in dto.CreateResolutionRequest) (*dto.ResolutionResponse, error)
 	ListResolutions(companyID string) ([]dto.ResolutionResponse, error)
+	ListModules(ctx context.Context, companyID string) (*dto.CompanyModulesResponse, error)
 }
 
 // CompanyHandler maneja las peticiones HTTP para el recurso Company.
@@ -23,6 +26,30 @@ type CompanyHandler struct {
 // NewCompanyHandler construye el handler inyectando el caso de uso.
 func NewCompanyHandler(uc CompanyUseCase) *CompanyHandler {
 	return &CompanyHandler{uc: uc}
+}
+
+// GetModules godoc
+// @Summary      Listar módulos SaaS de una empresa
+// @Tags         companies
+// @Produce      json
+// @Param        id   path  string  true  "ID de la empresa"
+// @Success      200  {object}  dto.CompanyModulesResponse
+// @Failure      400  {object}  dto.ErrorResponse
+// @Failure      500  {object}  dto.ErrorResponse
+// @Router       /api/companies/{id}/modules [get]
+func (h *CompanyHandler) GetModules(c *fiber.Ctx) error {
+	companyID := c.Params("id")
+	if companyID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "MISSING_ID", Message: "id es requerido"})
+	}
+	out, err := h.uc.ListModules(c.Context(), companyID)
+	if err != nil {
+		if err == domain.ErrInvalidInput {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "company_id inválido"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.JSON(out)
 }
 
 // Create godoc

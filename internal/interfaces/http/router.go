@@ -70,6 +70,7 @@ func Router(app *fiber.App, deps RouterDeps) {
 	api.Get("/companies", companyHandler.List)
 	api.Post("/companies", companyHandler.Create)
 	api.Get("/companies/:id", companyHandler.GetByID)
+	api.Get("/companies/:id/modules", companyHandler.GetModules)
 	api.Post("/companies/:id/resolutions", companyHandler.CreateResolution)
 	api.Get("/companies/:id/resolutions", companyHandler.ListResolutions)
 

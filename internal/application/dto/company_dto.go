@@ -67,3 +67,15 @@ type ResolutionResponse struct {
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
 }
+
+// CompanyModuleResponse salida ligera de módulos SaaS por empresa.
+type CompanyModuleResponse struct {
+	ModuleName string `json:"module_name"`
+	IsActive   bool   `json:"is_active"`
+}
+
+// CompanyModulesResponse respuesta de GET /api/companies/{id}/modules.
+type CompanyModulesResponse struct {
+	CompanyID string                  `json:"company_id"`
+	Modules   []CompanyModuleResponse `json:"modules"`
+}

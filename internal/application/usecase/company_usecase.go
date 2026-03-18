@@ -154,6 +154,28 @@ func (uc *CompanyUseCase) ListResolutions(companyID string) ([]dto.ResolutionRes
 	return out, nil
 }
 
+// ListModules devuelve los módulos SaaS contratados por la empresa.
+func (uc *CompanyUseCase) ListModules(ctx context.Context, companyID string) (*dto.CompanyModulesResponse, error) {
+	if companyID == "" {
+		return nil, domain.ErrInvalidInput
+	}
+	list, err := uc.repo.ListModules(ctx, companyID)
+	if err != nil {
+		return nil, err
+	}
+	out := &dto.CompanyModulesResponse{
+		CompanyID: companyID,
+		Modules:   make([]dto.CompanyModuleResponse, 0, len(list)),
+	}
+	for _, m := range list {
+		out.Modules = append(out.Modules, dto.CompanyModuleResponse{
+			ModuleName: m.ModuleName,
+			IsActive:   m.IsActive,
+		})
+	}
+	return out, nil
+}
+
 func entityToCompanyResponse(c *entity.Company) *dto.CompanyResponse {
 	if c == nil {
 		return nil

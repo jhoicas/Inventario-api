@@ -18,4 +18,7 @@ type CompanyRepository interface {
 
 	// HasActiveModule informa si la empresa tiene el módulo activo y no vencido.
 	HasActiveModule(ctx context.Context, companyID, moduleName string) (bool, error)
+
+	// ListModules devuelve los módulos contratados por la empresa.
+	ListModules(ctx context.Context, companyID string) ([]*entity.CompanyModule, error)
 }

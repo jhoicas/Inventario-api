@@ -165,6 +165,30 @@ func (r *CompanyRepo) HasActiveModule(ctx context.Context, companyID, moduleName
 	return active, nil
 }
 
+// ListModules devuelve los módulos contratados por la empresa.
+func (r *CompanyRepo) ListModules(ctx context.Context, companyID string) ([]*entity.CompanyModule, error) {
+	const query = `
+		SELECT id, company_id, module_name, is_active, activated_at, expires_at, created_at, updated_at
+		FROM company_modules
+		WHERE company_id = $1
+		ORDER BY module_name`
+	rows, err := r.pool.Query(ctx, query, companyID)
+	if err != nil {
+		return nil, fmt.Errorf("list company modules: %w", err)
+	}
+	defer rows.Close()
+
+	var list []*entity.CompanyModule
+	for rows.Next() {
+		var m entity.CompanyModule
+		if err := rows.Scan(&m.ID, &m.CompanyID, &m.ModuleName, &m.IsActive, &m.ActivatedAt, &m.ExpiresAt, &m.CreatedAt, &m.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan company module: %w", err)
+		}
+		list = append(list, &m)
+	}
+	return list, rows.Err()
+}
+
 func isNoRows(err error) bool {
 	return errors.Is(err, pgx.ErrNoRows)
 }
