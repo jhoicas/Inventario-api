@@ -7,6 +7,7 @@ import (
 	"io"
 	"mime"
 	"mime/multipart"
+	"net"
 	stdmail "net/mail"
 	"sort"
 	"strings"
@@ -58,7 +59,8 @@ func (uc *EmailUseCase) CreateAccount(companyID string, in dto.CreateEmailAccoun
 	if strings.TrimSpace(companyID) == "" {
 		return nil, domain.ErrUnauthorized
 	}
-	if strings.TrimSpace(in.EmailAddress) == "" || strings.TrimSpace(in.IMAPServer) == "" || in.IMAPPort <= 0 || strings.TrimSpace(in.Password) == "" {
+	imapServer := normalizeIMAPServer(in.IMAPServer)
+	if strings.TrimSpace(in.EmailAddress) == "" || imapServer == "" || in.IMAPPort <= 0 || strings.TrimSpace(in.Password) == "" {
 		return nil, domain.ErrInvalidInput
 	}
 
@@ -76,7 +78,7 @@ func (uc *EmailUseCase) CreateAccount(companyID string, in dto.CreateEmailAccoun
 		ID:           uuid.New().String(),
 		CompanyID:    companyID,
 		EmailAddress: strings.TrimSpace(strings.ToLower(in.EmailAddress)),
-		IMAPServer:   strings.TrimSpace(in.IMAPServer),
+		IMAPServer:   imapServer,
 		IMAPPort:     in.IMAPPort,
 		Password:     encrypted,
 		IsActive:     isActive,
@@ -108,7 +110,7 @@ func (uc *EmailUseCase) UpdateAccount(companyID, id string, in dto.UpdateEmailAc
 		acc.EmailAddress = strings.TrimSpace(strings.ToLower(*in.EmailAddress))
 	}
 	if in.IMAPServer != nil {
-		acc.IMAPServer = strings.TrimSpace(*in.IMAPServer)
+		acc.IMAPServer = normalizeIMAPServer(*in.IMAPServer)
 	}
 	if in.IMAPPort != nil {
 		acc.IMAPPort = *in.IMAPPort
@@ -202,6 +204,21 @@ func (uc *EmailUseCase) TestConnection(companyID, id string) (*dto.TestIMAPConne
 		return nil, domain.ErrNotFound
 	}
 	if err := uc.testIMAPConnection(acc); err != nil {
+		return &dto.TestIMAPConnectionResponse{Success: false, Message: err.Error()}, nil
+	}
+	return &dto.TestIMAPConnectionResponse{Success: true, Message: "conexión IMAP exitosa"}, nil
+}
+
+func (uc *EmailUseCase) TestConnectionBeforeSave(companyID string, in dto.CreateEmailAccountRequest) (*dto.TestIMAPConnectionResponse, error) {
+	if strings.TrimSpace(companyID) == "" {
+		return nil, domain.ErrUnauthorized
+	}
+	imapServer := normalizeIMAPServer(in.IMAPServer)
+	if strings.TrimSpace(in.EmailAddress) == "" || imapServer == "" || in.IMAPPort <= 0 || strings.TrimSpace(in.Password) == "" {
+		return nil, domain.ErrInvalidInput
+	}
+
+	if err := testIMAPCredentials(strings.TrimSpace(strings.ToLower(in.EmailAddress)), strings.TrimSpace(in.Password), imapServer, in.IMAPPort); err != nil {
 		return &dto.TestIMAPConnectionResponse{Success: false, Message: err.Error()}, nil
 	}
 	return &dto.TestIMAPConnectionResponse{Success: true, Message: "conexión IMAP exitosa"}, nil
@@ -316,13 +333,17 @@ func (uc *EmailUseCase) testIMAPConnection(acc *entity.EmailAccount) error {
 	if err != nil {
 		return fmt.Errorf("descifrar credenciales: %w", err)
 	}
-	addr := fmt.Sprintf("%s:%d", acc.IMAPServer, acc.IMAPPort)
+	return testIMAPCredentials(acc.EmailAddress, password, acc.IMAPServer, acc.IMAPPort)
+}
+
+func testIMAPCredentials(emailAddress, password, imapServer string, imapPort int) error {
+	addr := net.JoinHostPort(normalizeIMAPServer(imapServer), fmt.Sprintf("%d", imapPort))
 	c, err := client.DialTLS(addr, nil)
 	if err != nil {
 		return fmt.Errorf("dial IMAP: %w", err)
 	}
 	defer c.Logout()
-	if err := c.Login(acc.EmailAddress, password); err != nil {
+	if err := c.Login(strings.TrimSpace(strings.ToLower(emailAddress)), password); err != nil {
 		return fmt.Errorf("login IMAP: %w", err)
 	}
 	if _, err := c.Select("INBOX", false); err != nil {
@@ -336,7 +357,7 @@ func (uc *EmailUseCase) syncAccount(ctx context.Context, acc *entity.EmailAccoun
 	if err != nil {
 		return err
 	}
-	addr := fmt.Sprintf("%s:%d", acc.IMAPServer, acc.IMAPPort)
+	addr := net.JoinHostPort(normalizeIMAPServer(acc.IMAPServer), fmt.Sprintf("%d", acc.IMAPPort))
 	c, err := client.DialTLS(addr, nil)
 	if err != nil {
 		return err
@@ -393,6 +414,16 @@ func (uc *EmailUseCase) syncAccount(ctx context.Context, acc *entity.EmailAccoun
 			}
 		}
 	}
+}
+
+func normalizeIMAPServer(value string) string {
+	server := strings.TrimSpace(value)
+	server = strings.TrimPrefix(server, "imaps://")
+	server = strings.TrimPrefix(server, "imap://")
+	server = strings.TrimPrefix(server, "https://")
+	server = strings.TrimPrefix(server, "http://")
+	server = strings.TrimRight(server, "/")
+	return strings.TrimSpace(server)
 }
 
 func (uc *EmailUseCase) persistFetchedMessage(acc *entity.EmailAccount, msg *imap.Message, section *imap.BodySectionName) error {

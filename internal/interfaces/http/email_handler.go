@@ -14,6 +14,7 @@ type EmailUseCase interface {
 	DeleteAccount(companyID, id string) error
 	GetAccount(companyID, id string) (*dto.EmailAccountResponse, error)
 	ListAccounts(companyID string, limit, offset int) ([]dto.EmailAccountResponse, error)
+	TestConnectionBeforeSave(companyID string, in dto.CreateEmailAccountRequest) (*dto.TestIMAPConnectionResponse, error)
 	TestConnection(companyID, id string) (*dto.TestIMAPConnectionResponse, error)
 	ListEmails(companyID, customerID string, isRead *bool, limit, offset int) (*dto.EmailListResponse, error)
 	GetEmailAndMarkAsRead(companyID, id string) (*dto.EmailResponse, error)
@@ -147,6 +148,33 @@ func (h *EmailHandler) TestEmailAccountConnection(c *fiber.Ctx) error {
 			return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 		}
 	}
+	if !out.Success {
+		return c.Status(fiber.StatusBadGateway).JSON(out)
+	}
+	return c.JSON(out)
+}
+
+func (h *EmailHandler) TestEmailAccountConnectionBeforeSave(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	if companyID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+
+	var in dto.CreateEmailAccountRequest
+	if err := c.BodyParser(&in); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
+	}
+
+	out, err := h.uc.TestConnectionBeforeSave(companyID, in)
+	if err != nil {
+		switch err {
+		case domain.ErrInvalidInput:
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "email_address, imap_server, imap_port y password son requeridos"})
+		default:
+			return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+		}
+	}
+
 	if !out.Success {
 		return c.Status(fiber.StatusBadGateway).JSON(out)
 	}

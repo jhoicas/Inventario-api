@@ -348,7 +348,16 @@ func Router(app *fiber.App, deps RouterDeps) {
 		settingsEmailGroup.Get("/:id", h.GetEmailAccount)
 		settingsEmailGroup.Put("/:id", h.UpdateEmailAccount)
 		settingsEmailGroup.Delete("/:id", h.DeleteEmailAccount)
+		settingsEmailGroup.Post("/test-connection", h.TestEmailAccountConnectionBeforeSave)
 		settingsEmailGroup.Post("/:id/test", h.TestEmailAccountConnection)
+
+		protected.Post(
+			"/email/accounts/test-connection",
+			RequireModule(entity.ModuleCRM, deps.ModuleService),
+			screenAccess,
+			RequireRole(entity.RoleAdmin),
+			h.TestEmailAccountConnectionBeforeSave,
+		)
 
 		emailGroup := protected.Group(
 			"/emails",
