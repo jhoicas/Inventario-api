@@ -69,3 +69,36 @@ type CreateTicketFromEmailResponse struct {
 	TicketID string `json:"ticket_id"`
 	Status   string `json:"status"`
 }
+
+type OAuthEmailAccountRequest struct {
+	Provider     string `json:"provider"`
+	AuthCode     string `json:"auth_code"`
+	RedirectURI  string `json:"redirect_uri"`
+	EmailAddress string `json:"email_address"`
+	IsActive     *bool  `json:"is_active,omitempty"`
+}
+
+type CustomEmailAccountRequest struct {
+	EmailAddress string `json:"email_address"`
+	ImapHost     string `json:"imap_host"`
+	ImapPort     int    `json:"imap_port"`
+	SmtpHost     string `json:"smtp_host"`
+	SmtpPort     int    `json:"smtp_port"`
+	AppPassword  string `json:"app_password"`
+	IsActive     *bool  `json:"is_active,omitempty"`
+}
+
+type EmailAccountConfigResponse struct {
+	ID           string    `json:"id"`
+	UserID       string    `json:"user_id"`
+	CompanyID    string    `json:"company_id"`
+	Provider     string    `json:"provider"`
+	EmailAddress string    `json:"email_address"`
+	ImapHost     string    `json:"imap_host,omitempty"`
+	ImapPort     int       `json:"imap_port,omitempty"`
+	SmtpHost     string    `json:"smtp_host,omitempty"`
+	SmtpPort     int       `json:"smtp_port,omitempty"`
+	IsActive     bool      `json:"is_active"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}

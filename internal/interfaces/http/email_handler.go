@@ -10,6 +10,8 @@ import (
 
 type EmailUseCase interface {
 	CreateAccount(companyID string, in dto.CreateEmailAccountRequest) (*dto.EmailAccountResponse, error)
+	ProcessOAuthAccount(companyID, userID string, in dto.OAuthEmailAccountRequest) (*dto.EmailAccountConfigResponse, error)
+	SaveCustomAccount(companyID, userID string, in dto.CustomEmailAccountRequest) (*dto.EmailAccountConfigResponse, error)
 	UpdateAccount(companyID, id string, in dto.UpdateEmailAccountRequest) (*dto.EmailAccountResponse, error)
 	DeleteAccount(companyID, id string) error
 	GetAccount(companyID, id string) (*dto.EmailAccountResponse, error)
@@ -63,6 +65,60 @@ func (h *EmailHandler) CreateEmailAccount(c *fiber.Ctx) error {
 			return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 		}
 	}
+	return c.Status(fiber.StatusCreated).JSON(out)
+}
+
+func (h *EmailHandler) CreateOAuthEmailAccount(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	userID := GetUserID(c)
+	if companyID == "" || userID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+
+	var in dto.OAuthEmailAccountRequest
+	if err := c.BodyParser(&in); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
+	}
+
+	out, err := h.uc.ProcessOAuthAccount(companyID, userID, in)
+	if err != nil {
+		switch err {
+		case domain.ErrInvalidInput:
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "provider, auth_code y email_address son requeridos"})
+		case domain.ErrDuplicate:
+			return c.Status(fiber.StatusConflict).JSON(dto.ErrorResponse{Code: "DUPLICATE", Message: "la cuenta ya existe para la compañía"})
+		default:
+			return c.Status(fiber.StatusBadGateway).JSON(dto.ErrorResponse{Code: "OAUTH_EXCHANGE_FAILED", Message: err.Error()})
+		}
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(out)
+}
+
+func (h *EmailHandler) CreateCustomEmailAccount(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	userID := GetUserID(c)
+	if companyID == "" || userID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+
+	var in dto.CustomEmailAccountRequest
+	if err := c.BodyParser(&in); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
+	}
+
+	out, err := h.uc.SaveCustomAccount(companyID, userID, in)
+	if err != nil {
+		switch err {
+		case domain.ErrInvalidInput:
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "email_address, imap_host, imap_port y app_password son requeridos"})
+		case domain.ErrDuplicate:
+			return c.Status(fiber.StatusConflict).JSON(dto.ErrorResponse{Code: "DUPLICATE", Message: "la cuenta ya existe para la compañía"})
+		default:
+			return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+		}
+	}
+
 	return c.Status(fiber.StatusCreated).JSON(out)
 }
 

@@ -20,6 +20,8 @@ import (
 	"github.com/jhoicas/Inventario-api/internal/domain"
 	"github.com/jhoicas/Inventario-api/internal/domain/entity"
 	"github.com/jhoicas/Inventario-api/internal/domain/repository"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
 )
 
 type IMAPSecretEncryptor interface {
@@ -31,28 +33,157 @@ type customerEmailLookupRepository interface {
 	GetByCompanyAndEmail(companyID, email string) (*entity.Customer, error)
 }
 
+type OAuthProviderConfig struct {
+	ClientID     string
+	ClientSecret string
+	RedirectURL  string
+}
+
+type EmailOAuthConfig struct {
+	Google    OAuthProviderConfig
+	Microsoft OAuthProviderConfig
+}
+
 type EmailUseCase struct {
 	accountRepo  repository.EmailAccountRepository
 	emailRepo    repository.EmailRepository
+	hybridRepo   repository.HybridEmailAccountRepository
 	customerRepo customerEmailLookupRepository
 	ticketRepo   repository.CRMTicketRepository
+	oauthCfg     EmailOAuthConfig
 	encryptor    IMAPSecretEncryptor
 }
 
 func NewEmailUseCase(
 	accountRepo repository.EmailAccountRepository,
 	emailRepo repository.EmailRepository,
+	hybridRepo repository.HybridEmailAccountRepository,
 	customerRepo customerEmailLookupRepository,
 	ticketRepo repository.CRMTicketRepository,
+	oauthCfg EmailOAuthConfig,
 	encryptor IMAPSecretEncryptor,
 ) *EmailUseCase {
 	return &EmailUseCase{
 		accountRepo:  accountRepo,
 		emailRepo:    emailRepo,
+		hybridRepo:   hybridRepo,
 		customerRepo: customerRepo,
 		ticketRepo:   ticketRepo,
+		oauthCfg:     oauthCfg,
 		encryptor:    encryptor,
 	}
+}
+
+func (uc *EmailUseCase) ProcessOAuthAccount(companyID, userID string, in dto.OAuthEmailAccountRequest) (*dto.EmailAccountConfigResponse, error) {
+	if strings.TrimSpace(companyID) == "" || strings.TrimSpace(userID) == "" {
+		return nil, domain.ErrUnauthorized
+	}
+	if uc.hybridRepo == nil {
+		return nil, fmt.Errorf("hybrid email account repository no configurado")
+	}
+
+	provider := strings.ToLower(strings.TrimSpace(in.Provider))
+	if provider == "" || strings.TrimSpace(in.AuthCode) == "" {
+		return nil, domain.ErrInvalidInput
+	}
+
+	oauthConfig, scopes, err := uc.oauthConfigFor(provider, strings.TrimSpace(in.RedirectURI))
+	if err != nil {
+		return nil, err
+	}
+
+	tok, err := oauthConfig.Exchange(context.Background(), strings.TrimSpace(in.AuthCode))
+	if err != nil {
+		return nil, fmt.Errorf("intercambiar auth code de %s: %w", provider, err)
+	}
+
+	_ = scopes // alcance usado para construir config de intercambio
+
+	emailAddress := strings.TrimSpace(strings.ToLower(in.EmailAddress))
+	if emailAddress == "" {
+		if tokenEmail, ok := tok.Extra("email").(string); ok {
+			emailAddress = strings.TrimSpace(strings.ToLower(tokenEmail))
+		}
+	}
+	if emailAddress == "" {
+		return nil, domain.ErrInvalidInput
+	}
+
+	isActive := true
+	if in.IsActive != nil {
+		isActive = *in.IsActive
+	}
+
+	item := &entity.EmailAccountConfig{
+		ID:           uuid.New().String(),
+		UserID:       userID,
+		CompanyID:    companyID,
+		Provider:     provider,
+		EmailAddress: emailAddress,
+		AccessToken:  strings.TrimSpace(tok.AccessToken),
+		RefreshToken: strings.TrimSpace(tok.RefreshToken),
+		IsActive:     isActive,
+		CreatedAt:    time.Now().UTC(),
+		UpdatedAt:    time.Now().UTC(),
+	}
+
+	if err := uc.hybridRepo.Save(context.Background(), item); err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "duplicate") || strings.Contains(strings.ToLower(err.Error()), "uq_email_accounts_company_email") {
+			return nil, domain.ErrDuplicate
+		}
+		return nil, err
+	}
+	resp := toEmailAccountConfigResponse(item)
+	return &resp, nil
+}
+
+func (uc *EmailUseCase) SaveCustomAccount(companyID, userID string, in dto.CustomEmailAccountRequest) (*dto.EmailAccountConfigResponse, error) {
+	if strings.TrimSpace(companyID) == "" || strings.TrimSpace(userID) == "" {
+		return nil, domain.ErrUnauthorized
+	}
+	if uc.hybridRepo == nil {
+		return nil, fmt.Errorf("hybrid email account repository no configurado")
+	}
+
+	imapHost := normalizeIMAPServer(in.ImapHost)
+	if strings.TrimSpace(in.EmailAddress) == "" || imapHost == "" || in.ImapPort <= 0 || strings.TrimSpace(in.AppPassword) == "" {
+		return nil, domain.ErrInvalidInput
+	}
+
+	encryptedPassword, err := uc.encryptor.Encrypt(strings.TrimSpace(in.AppPassword))
+	if err != nil {
+		return nil, err
+	}
+
+	isActive := true
+	if in.IsActive != nil {
+		isActive = *in.IsActive
+	}
+
+	item := &entity.EmailAccountConfig{
+		ID:           uuid.New().String(),
+		UserID:       userID,
+		CompanyID:    companyID,
+		Provider:     "custom",
+		EmailAddress: strings.TrimSpace(strings.ToLower(in.EmailAddress)),
+		ImapHost:     imapHost,
+		ImapPort:     in.ImapPort,
+		SmtpHost:     strings.TrimSpace(in.SmtpHost),
+		SmtpPort:     in.SmtpPort,
+		AppPassword:  encryptedPassword,
+		IsActive:     isActive,
+		CreatedAt:    time.Now().UTC(),
+		UpdatedAt:    time.Now().UTC(),
+	}
+
+	if err := uc.hybridRepo.Save(context.Background(), item); err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "duplicate") || strings.Contains(strings.ToLower(err.Error()), "uq_email_accounts_company_email") {
+			return nil, domain.ErrDuplicate
+		}
+		return nil, err
+	}
+	resp := toEmailAccountConfigResponse(item)
+	return &resp, nil
 }
 
 func (uc *EmailUseCase) CreateAccount(companyID string, in dto.CreateEmailAccountRequest) (*dto.EmailAccountResponse, error) {
@@ -424,6 +555,72 @@ func normalizeIMAPServer(value string) string {
 	server = strings.TrimPrefix(server, "http://")
 	server = strings.TrimRight(server, "/")
 	return strings.TrimSpace(server)
+}
+
+func toEmailAccountConfigResponse(item *entity.EmailAccountConfig) dto.EmailAccountConfigResponse {
+	if item == nil {
+		return dto.EmailAccountConfigResponse{}
+	}
+	return dto.EmailAccountConfigResponse{
+		ID:           item.ID,
+		UserID:       item.UserID,
+		CompanyID:    item.CompanyID,
+		Provider:     item.Provider,
+		EmailAddress: item.EmailAddress,
+		ImapHost:     item.ImapHost,
+		ImapPort:     item.ImapPort,
+		SmtpHost:     item.SmtpHost,
+		SmtpPort:     item.SmtpPort,
+		IsActive:     item.IsActive,
+		CreatedAt:    item.CreatedAt,
+		UpdatedAt:    item.UpdatedAt,
+	}
+}
+
+func (uc *EmailUseCase) oauthConfigFor(provider, redirectURI string) (*oauth2.Config, []string, error) {
+	provider = strings.TrimSpace(strings.ToLower(provider))
+	if provider == "" {
+		return nil, nil, domain.ErrInvalidInput
+	}
+
+	scopes := []string{"openid", "profile", "email"}
+	var endpoint oauth2.Endpoint
+	var cfg OAuthProviderConfig
+
+	switch provider {
+	case "google":
+		cfg = uc.oauthCfg.Google
+		endpoint = google.Endpoint
+		scopes = []string{"openid", "profile", "email", "https://mail.google.com/"}
+	case "microsoft":
+		cfg = uc.oauthCfg.Microsoft
+		endpoint = oauth2.Endpoint{
+			AuthURL:  "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+			TokenURL: "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+		}
+		scopes = []string{"openid", "profile", "email", "offline_access", "https://outlook.office.com/IMAP.AccessAsUser.All", "https://outlook.office.com/SMTP.Send"}
+	default:
+		return nil, nil, domain.ErrInvalidInput
+	}
+
+	clientID := strings.TrimSpace(cfg.ClientID)
+	clientSecret := strings.TrimSpace(cfg.ClientSecret)
+	finalRedirectURI := strings.TrimSpace(redirectURI)
+	if finalRedirectURI == "" {
+		finalRedirectURI = strings.TrimSpace(cfg.RedirectURL)
+	}
+
+	if clientID == "" || clientSecret == "" || finalRedirectURI == "" {
+		return nil, nil, fmt.Errorf("configuración OAuth incompleta para provider %s", provider)
+	}
+
+	return &oauth2.Config{
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
+		RedirectURL:  finalRedirectURI,
+		Endpoint:     endpoint,
+		Scopes:       scopes,
+	}, scopes, nil
 }
 
 func (uc *EmailUseCase) persistFetchedMessage(acc *entity.EmailAccount, msg *imap.Message, section *imap.BodySectionName) error {

@@ -150,6 +150,7 @@ func main() {
 	reorderConfigRepo := postgres.NewReorderConfigRepository(pool)
 	dianSettingsRepo := postgres.NewDIANSettingsRepository(pool)
 	emailAccountRepo := postgres.NewEmailAccountRepository(pool)
+	hybridEmailAccountRepo := postgres.NewHybridEmailAccountRepository(pool)
 	emailRepo := postgres.NewEmailRepository(pool)
 	purchaseOrderRepo := postgres.NewPurchaseOrderRepository(pool)
 	companyUC := usecase.NewCompanyUseCase(companyRepo, resolutionRepo)
@@ -189,7 +190,19 @@ func main() {
 	_ = slaConfigRepo // disponible para futuros endpoints
 	slaWorker := crm.NewSLAWorker(crmTicketRepo, 24*time.Hour)
 	go slaWorker.Start(workerCtx)
-	emailUC := crm.NewEmailUseCase(emailAccountRepo, emailRepo, customerRepo, crmTicketRepo, encryptor)
+	emailOAuthCfg := crm.EmailOAuthConfig{
+		Google: crm.OAuthProviderConfig{
+			ClientID:     os.Getenv("GOOGLE_OAUTH_CLIENT_ID"),
+			ClientSecret: os.Getenv("GOOGLE_OAUTH_CLIENT_SECRET"),
+			RedirectURL:  os.Getenv("GOOGLE_OAUTH_REDIRECT_URL"),
+		},
+		Microsoft: crm.OAuthProviderConfig{
+			ClientID:     os.Getenv("MICROSOFT_OAUTH_CLIENT_ID"),
+			ClientSecret: os.Getenv("MICROSOFT_OAUTH_CLIENT_SECRET"),
+			RedirectURL:  os.Getenv("MICROSOFT_OAUTH_REDIRECT_URL"),
+		},
+	}
+	emailUC := crm.NewEmailUseCase(emailAccountRepo, emailRepo, hybridEmailAccountRepo, customerRepo, crmTicketRepo, emailOAuthCfg, encryptor)
 	emailSyncWorker := crm.NewEmailSyncWorker(emailUC, 5*time.Minute)
 	go emailSyncWorker.Start(workerCtx)
 	loyaltyUC := crm.NewLoyaltyUseCase(crmProfileRepo, customerRepo, crmCategoryRepo, crmBenefitRepo, crmInteractionRepo)
