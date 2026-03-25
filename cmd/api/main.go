@@ -149,6 +149,8 @@ func main() {
 	movementRepo := postgres.NewInventoryMovementRepository(pool)
 	reorderConfigRepo := postgres.NewReorderConfigRepository(pool)
 	dianSettingsRepo := postgres.NewDIANSettingsRepository(pool)
+	emailAccountRepo := postgres.NewEmailAccountRepository(pool)
+	emailRepo := postgres.NewEmailRepository(pool)
 	purchaseOrderRepo := postgres.NewPurchaseOrderRepository(pool)
 	companyUC := usecase.NewCompanyUseCase(companyRepo, resolutionRepo)
 	warehouseUC := usecase.NewWarehouseUseCase(warehouseRepo)
@@ -187,6 +189,9 @@ func main() {
 	_ = slaConfigRepo // disponible para futuros endpoints
 	slaWorker := crm.NewSLAWorker(crmTicketRepo, 24*time.Hour)
 	go slaWorker.Start(workerCtx)
+	emailUC := crm.NewEmailUseCase(emailAccountRepo, emailRepo, customerRepo, crmTicketRepo, encryptor)
+	emailSyncWorker := crm.NewEmailSyncWorker(emailUC, 5*time.Minute)
+	go emailSyncWorker.Start(workerCtx)
 	loyaltyUC := crm.NewLoyaltyUseCase(crmProfileRepo, customerRepo, crmCategoryRepo, crmBenefitRepo, crmInteractionRepo)
 	taskUC := crm.NewTaskUseCase(crmTaskRepo)
 	aiCRMUC := crm.NewAICRMUseCase(anthropicSvc)
@@ -199,6 +204,7 @@ func main() {
 	templateUC := crm.NewCampaignTemplateUseCase(crmTemplateRepo)
 	opportunityUC := crm.NewOpportunityUseCase(crmOpportunityRepo)
 	crmHandler := httpRouter.NewCRMHandler(loyaltyUC, taskUC, pqrUC, aiCRMUC, customerUC, crmInteractionRepo, opportunityUC, invoiceRepo, campaignUC, templateUC)
+	emailHandler := httpRouter.NewEmailHandler(emailUC)
 
 	// Worker diario de reposición crítica → crea tareas CRM de reabastecimiento.
 	go func() {
@@ -354,6 +360,7 @@ func main() {
 		DashboardUC:            dashboardUC,
 		AIUC:                   aiUC,
 		CRMHandler:             crmHandler,
+		EmailHandler:           emailHandler,
 		CustomerLookup:         customerLookupHandler,
 		InvoiceMailer:          invoiceMailer,
 		JWTSecret:              cfg.JWT.Secret,

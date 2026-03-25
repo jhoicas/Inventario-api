@@ -42,6 +42,7 @@ type RouterDeps struct {
 	DashboardUC            *appanalytics.DashboardUseCase
 	AIUC                   *usecase.AIUseCase
 	CRMHandler             *CRMHandler
+	EmailHandler           *EmailHandler
 	CustomerLookup         *dianws.CustomerLookupHandler
 	InvoiceMailer          InvoiceMailerUseCase
 	JWTSecret              string
@@ -331,6 +332,32 @@ func Router(app *fiber.App, deps RouterDeps) {
 			RequireModule(entity.ModuleBilling, deps.ModuleService),
 			h.GetPurchaseHistory,
 		)
+	}
+
+	if deps.EmailHandler != nil {
+		h := deps.EmailHandler
+
+		settingsEmailGroup := protected.Group(
+			"/settings/email-accounts",
+			RequireModule(entity.ModuleCRM, deps.ModuleService),
+			screenAccess,
+			RequireRole(entity.RoleAdmin),
+		)
+		settingsEmailGroup.Get("/", h.ListEmailAccounts)
+		settingsEmailGroup.Post("/", h.CreateEmailAccount)
+		settingsEmailGroup.Get("/:id", h.GetEmailAccount)
+		settingsEmailGroup.Put("/:id", h.UpdateEmailAccount)
+		settingsEmailGroup.Delete("/:id", h.DeleteEmailAccount)
+		settingsEmailGroup.Post("/:id/test", h.TestEmailAccountConnection)
+
+		emailGroup := protected.Group(
+			"/emails",
+			RequireModule(entity.ModuleCRM, deps.ModuleService),
+			screenAccess,
+		)
+		emailGroup.Get("/", h.ListEmails)
+		emailGroup.Get("/:id", h.GetEmail)
+		emailGroup.Post("/:id/create-ticket", h.CreateTicketFromEmail)
 	}
 
 	// ── IA (reservado para futuros usos; sugerencia de clasificación de productos deshabilitada — parametrización manual)

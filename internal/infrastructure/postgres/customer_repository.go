@@ -78,6 +78,24 @@ func (r *CustomerRepo) GetByCompanyAndTaxID(companyID, taxID string) (*entity.Cu
 	return &c, nil
 }
 
+// GetByCompanyAndEmail obtiene un cliente por empresa y correo electrónico.
+func (r *CustomerRepo) GetByCompanyAndEmail(companyID, email string) (*entity.Customer, error) {
+	query := `
+		SELECT id, company_id, name, tax_id, COALESCE(email, ''), COALESCE(phone, ''), is_active, created_at, updated_at
+		FROM customers WHERE company_id = $1 AND LOWER(email) = LOWER($2)`
+	var c entity.Customer
+	err := r.q.QueryRow(context.Background(), query, companyID, email).Scan(
+		&c.ID, &c.CompanyID, &c.Name, &c.TaxID, &c.Email, &c.Phone, &c.IsActive, &c.CreatedAt, &c.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get customer by email: %w", err)
+	}
+	return &c, nil
+}
+
 // ListByCompany lista clientes de la empresa con paginación.
 func (r *CustomerRepo) ListByCompany(companyID string, search string, limit, offset int) ([]*entity.Customer, error) {
 	base := `

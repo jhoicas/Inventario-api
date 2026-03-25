@@ -48,6 +48,32 @@ func (e *AesGCMEncryptor) Encrypt(plaintext string) (string, error) {
 	return base64.StdEncoding.EncodeToString(combined), nil
 }
 
+func (e *AesGCMEncryptor) Decrypt(ciphertext string) (string, error) {
+	block, err := aes.NewCipher(e.key)
+	if err != nil {
+		return "", fmt.Errorf("crear cipher AES: %w", err)
+	}
+	aead, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", fmt.Errorf("crear GCM: %w", err)
+	}
+
+	raw, err := base64.StdEncoding.DecodeString(ciphertext)
+	if err != nil {
+		return "", fmt.Errorf("decodificar ciphertext: %w", err)
+	}
+	nonceSize := aead.NonceSize()
+	if len(raw) < nonceSize {
+		return "", errors.New("ciphertext inválido")
+	}
+	nonce, data := raw[:nonceSize], raw[nonceSize:]
+	plain, err := aead.Open(nil, nonce, data, nil)
+	if err != nil {
+		return "", fmt.Errorf("descifrar ciphertext: %w", err)
+	}
+	return string(plain), nil
+}
+
 type DIANCertificateFileStore struct {
 	basePath string
 }
