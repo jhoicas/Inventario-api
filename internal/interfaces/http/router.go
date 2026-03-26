@@ -369,6 +369,13 @@ func Router(app *fiber.App, deps RouterDeps) {
 			RequireRole(entity.RoleAdmin),
 			h.TestEmailAccountConnectionBeforeSave,
 		)
+		protected.Delete(
+			"/email/accounts/:id",
+			RequireModule(entity.ModuleCRM, deps.ModuleService),
+			screenAccess,
+			RequireRole(entity.RoleAdmin),
+			h.DeleteEmailAccount,
+		)
 
 		emailGroup := protected.Group(
 			"/emails",

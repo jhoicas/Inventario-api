@@ -234,7 +234,10 @@ func (h *EmailHandler) DeleteEmailAccount(c *fiber.Ctx) error {
 			return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 		}
 	}
-	return c.SendStatus(fiber.StatusNoContent)
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"success": true,
+		"message": "cuenta eliminada correctamente",
+	})
 }
 
 func (h *EmailHandler) TestEmailAccountConnection(c *fiber.Ctx) error {
