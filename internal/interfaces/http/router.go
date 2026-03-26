@@ -346,6 +346,7 @@ func Router(app *fiber.App, deps RouterDeps) {
 		settingsEmailGroup.Get("/", h.ListEmailAccounts)
 		settingsEmailGroup.Post("/", h.CreateEmailAccount)
 		settingsEmailGroup.Get("/:id", h.GetEmailAccount)
+		settingsEmailGroup.Get("/:id/emails", h.GetEmailAccountInbox)
 		settingsEmailGroup.Put("/:id", h.UpdateEmailAccount)
 		settingsEmailGroup.Delete("/:id", h.DeleteEmailAccount)
 		settingsEmailGroup.Post("/test-connection", h.TestEmailAccountConnectionBeforeSave)

@@ -3,6 +3,7 @@ package crm
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"mime"
@@ -11,6 +12,7 @@ import (
 	"net/http"
 	stdmail "net/mail"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -506,6 +508,354 @@ func (uc *EmailUseCase) TestConnectionBeforeSave(companyID string, in dto.Create
 		return &dto.TestIMAPConnectionResponse{Success: false, Message: err.Error()}, nil
 	}
 	return &dto.TestIMAPConnectionResponse{Success: true, Message: "conexión IMAP exitosa"}, nil
+}
+
+func (uc *EmailUseCase) GetAccountEmails(companyID, accountID string) (*dto.AccountEmailListResponse, error) {
+	if strings.TrimSpace(companyID) == "" || strings.TrimSpace(accountID) == "" {
+		return nil, domain.ErrInvalidInput
+	}
+
+	var cfg *entity.EmailAccountConfig
+	if uc.hybridRepo != nil {
+		item, err := uc.hybridRepo.GetByID(context.Background(), companyID, accountID)
+		if err != nil {
+			return nil, err
+		}
+		cfg = item
+	}
+
+	if cfg == nil {
+		return uc.getIMAPAccountEmails(companyID, accountID, nil)
+	}
+
+	provider := strings.TrimSpace(strings.ToLower(cfg.Provider))
+	if provider == "" {
+		provider = "custom"
+	}
+
+	switch provider {
+	case "google":
+		return uc.getGoogleAccountEmails(cfg)
+	case "microsoft", "microsoft365":
+		return uc.getMicrosoftAccountEmails(cfg)
+	default:
+		return uc.getIMAPAccountEmails(companyID, accountID, cfg)
+	}
+}
+
+func (uc *EmailUseCase) getGoogleAccountEmails(cfg *entity.EmailAccountConfig) (*dto.AccountEmailListResponse, error) {
+	token, err := uc.decryptOAuthToken(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	var listResp struct {
+		Messages []struct {
+			ID string `json:"id"`
+		} `json:"messages"`
+	}
+	if err := oauthGetJSON("https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=20", token, &listResp); err != nil {
+		return nil, err
+	}
+
+	items := make([]dto.EmailMessage, 0, len(listResp.Messages))
+	for _, m := range listResp.Messages {
+		if strings.TrimSpace(m.ID) == "" {
+			continue
+		}
+		endpoint := fmt.Sprintf("https://gmail.googleapis.com/gmail/v1/users/me/messages/%s?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date", m.ID)
+		var detail struct {
+			ID           string   `json:"id"`
+			Snippet      string   `json:"snippet"`
+			InternalDate string   `json:"internalDate"`
+			LabelIds     []string `json:"labelIds"`
+			Payload      struct {
+				Headers []struct {
+					Name  string `json:"name"`
+					Value string `json:"value"`
+				} `json:"headers"`
+			} `json:"payload"`
+		}
+		if err := oauthGetJSON(endpoint, token, &detail); err != nil {
+			continue
+		}
+
+		subject := ""
+		from := ""
+		dateValue := ""
+		for _, h := range detail.Payload.Headers {
+			switch strings.ToLower(strings.TrimSpace(h.Name)) {
+			case "subject":
+				subject = strings.TrimSpace(h.Value)
+			case "from":
+				from = strings.TrimSpace(h.Value)
+			case "date":
+				dateValue = strings.TrimSpace(h.Value)
+			}
+		}
+		if subject == "" {
+			subject = "(sin asunto)"
+		}
+
+		parsedDate := parseEmailDate(dateValue)
+		if parsedDate.IsZero() && strings.TrimSpace(detail.InternalDate) != "" {
+			if ms, convErr := strconv.ParseInt(strings.TrimSpace(detail.InternalDate), 10, 64); convErr == nil {
+				parsedDate = time.UnixMilli(ms).UTC()
+			}
+		}
+		if parsedDate.IsZero() {
+			parsedDate = time.Now().UTC()
+		}
+
+		isRead := true
+		for _, label := range detail.LabelIds {
+			if strings.EqualFold(strings.TrimSpace(label), "UNREAD") {
+				isRead = false
+				break
+			}
+		}
+
+		items = append(items, dto.EmailMessage{
+			ID:      detail.ID,
+			Subject: subject,
+			From:    from,
+			Date:    parsedDate,
+			Snippet: strings.TrimSpace(detail.Snippet),
+			IsRead:  isRead,
+		})
+	}
+
+	return &dto.AccountEmailListResponse{Provider: "google", Items: items}, nil
+}
+
+func (uc *EmailUseCase) getMicrosoftAccountEmails(cfg *entity.EmailAccountConfig) (*dto.AccountEmailListResponse, error) {
+	token, err := uc.decryptOAuthToken(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	var listResp struct {
+		Value []struct {
+			ID               string `json:"id"`
+			Subject          string `json:"subject"`
+			ReceivedDateTime string `json:"receivedDateTime"`
+			BodyPreview      string `json:"bodyPreview"`
+			IsRead           bool   `json:"isRead"`
+			From             struct {
+				EmailAddress struct {
+					Address string `json:"address"`
+				} `json:"emailAddress"`
+			} `json:"from"`
+		} `json:"value"`
+	}
+	if err := oauthGetJSON("https://graph.microsoft.com/v1.0/me/messages?$top=20&$select=id,subject,from,receivedDateTime,bodyPreview,isRead", token, &listResp); err != nil {
+		return nil, err
+	}
+
+	items := make([]dto.EmailMessage, 0, len(listResp.Value))
+	for _, m := range listResp.Value {
+		parsedDate := parseEmailDate(strings.TrimSpace(m.ReceivedDateTime))
+		if parsedDate.IsZero() {
+			parsedDate = time.Now().UTC()
+		}
+		subject := strings.TrimSpace(m.Subject)
+		if subject == "" {
+			subject = "(sin asunto)"
+		}
+		items = append(items, dto.EmailMessage{
+			ID:      strings.TrimSpace(m.ID),
+			Subject: subject,
+			From:    strings.TrimSpace(m.From.EmailAddress.Address),
+			Date:    parsedDate,
+			Snippet: strings.TrimSpace(m.BodyPreview),
+			IsRead:  m.IsRead,
+		})
+	}
+
+	return &dto.AccountEmailListResponse{Provider: "microsoft", Items: items}, nil
+}
+
+func (uc *EmailUseCase) getIMAPAccountEmails(companyID, accountID string, cfg *entity.EmailAccountConfig) (*dto.AccountEmailListResponse, error) {
+	emailAddress := ""
+	imapServer := ""
+	imapPort := 0
+	passwordCipher := ""
+
+	if cfg != nil {
+		emailAddress = strings.TrimSpace(strings.ToLower(cfg.EmailAddress))
+		imapServer = normalizeIMAPServer(cfg.ImapHost)
+		imapPort = cfg.ImapPort
+		passwordCipher = strings.TrimSpace(cfg.AppPassword)
+	}
+
+	legacyAcc, err := uc.accountRepo.GetByID(companyID, accountID)
+	if err != nil {
+		return nil, err
+	}
+	if legacyAcc == nil && strings.TrimSpace(passwordCipher) == "" {
+		return nil, domain.ErrNotFound
+	}
+	if legacyAcc != nil {
+		if emailAddress == "" {
+			emailAddress = strings.TrimSpace(strings.ToLower(legacyAcc.EmailAddress))
+		}
+		if imapServer == "" {
+			imapServer = normalizeIMAPServer(legacyAcc.IMAPServer)
+		}
+		if imapPort <= 0 {
+			imapPort = legacyAcc.IMAPPort
+		}
+		if passwordCipher == "" {
+			passwordCipher = strings.TrimSpace(legacyAcc.Password)
+		}
+	}
+
+	if emailAddress == "" || imapServer == "" || imapPort <= 0 || strings.TrimSpace(passwordCipher) == "" {
+		return nil, domain.ErrInvalidInput
+	}
+
+	password, err := uc.encryptor.Decrypt(passwordCipher)
+	if err != nil {
+		return nil, fmt.Errorf("descifrar credenciales: %w", err)
+	}
+
+	addr := net.JoinHostPort(normalizeIMAPServer(imapServer), fmt.Sprintf("%d", imapPort))
+	c, err := client.DialTLS(addr, nil)
+	if err != nil {
+		return nil, fmt.Errorf("dial IMAP: %w", err)
+	}
+	defer c.Logout()
+
+	if err := c.Login(emailAddress, password); err != nil {
+		return nil, fmt.Errorf("login IMAP: %w", err)
+	}
+
+	mbox, err := c.Select("INBOX", true)
+	if err != nil {
+		return nil, fmt.Errorf("select INBOX: %w", err)
+	}
+	if mbox.Messages == 0 {
+		return &dto.AccountEmailListResponse{Provider: "custom", Items: []dto.EmailMessage{}}, nil
+	}
+
+	var fromSeq uint32 = 1
+	if mbox.Messages > 20 {
+		fromSeq = mbox.Messages - 19
+	}
+	toSeq := mbox.Messages
+
+	seqset := new(imap.SeqSet)
+	seqset.AddRange(fromSeq, toSeq)
+
+	itemsToFetch := []imap.FetchItem{imap.FetchEnvelope, imap.FetchFlags, imap.FetchInternalDate}
+	messages := make(chan *imap.Message, 20)
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- c.Fetch(seqset, itemsToFetch, messages)
+	}()
+
+	result := make([]dto.EmailMessage, 0, 20)
+	for msg := range messages {
+		if msg == nil {
+			continue
+		}
+		subject := "(sin asunto)"
+		from := ""
+		if msg.Envelope != nil {
+			if strings.TrimSpace(msg.Envelope.Subject) != "" {
+				subject = strings.TrimSpace(msg.Envelope.Subject)
+			}
+			if len(msg.Envelope.From) > 0 {
+				f := msg.Envelope.From[0]
+				from = strings.TrimSpace(strings.ToLower(f.MailboxName + "@" + f.HostName))
+			}
+		}
+		date := msg.InternalDate
+		if date.IsZero() {
+			date = time.Now().UTC()
+		}
+		isRead := false
+		for _, flag := range msg.Flags {
+			if flag == imap.SeenFlag {
+				isRead = true
+				break
+			}
+		}
+		result = append(result, dto.EmailMessage{
+			ID:      fmt.Sprintf("%d", msg.SeqNum),
+			Subject: subject,
+			From:    from,
+			Date:    date.UTC(),
+			Snippet: subject,
+			IsRead:  isRead,
+		})
+	}
+	if fetchErr := <-errCh; fetchErr != nil {
+		return nil, fmt.Errorf("fetch IMAP: %w", fetchErr)
+	}
+
+	for i, j := 0, len(result)-1; i < j; i, j = i+1, j-1 {
+		result[i], result[j] = result[j], result[i]
+	}
+
+	return &dto.AccountEmailListResponse{Provider: "custom", Items: result}, nil
+}
+
+func (uc *EmailUseCase) decryptOAuthToken(cfg *entity.EmailAccountConfig) (string, error) {
+	if cfg == nil {
+		return "", domain.ErrInvalidInput
+	}
+	tokenCipher := strings.TrimSpace(cfg.AccessToken)
+	if tokenCipher == "" {
+		tokenCipher = strings.TrimSpace(cfg.AppPassword)
+	}
+	if tokenCipher == "" {
+		return "", fmt.Errorf("credencial OAuth no encontrada")
+	}
+	token, err := uc.encryptor.Decrypt(tokenCipher)
+	if err != nil {
+		return "", fmt.Errorf("descifrar credenciales: %w", err)
+	}
+	return token, nil
+}
+
+func oauthGetJSON(url, accessToken string, out any) error {
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return fmt.Errorf("crear petición OAuth: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(accessToken))
+
+	clientHTTP := &http.Client{Timeout: 15 * time.Second}
+	resp, err := clientHTTP.Do(req)
+	if err != nil {
+		return fmt.Errorf("llamar proveedor OAuth: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return fmt.Errorf("token OAuth inválido o expirado (status %d): %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
+		return fmt.Errorf("decodificar respuesta OAuth: %w", err)
+	}
+	return nil
+}
+
+func parseEmailDate(value string) time.Time {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return time.Time{}
+	}
+	if t, err := time.Parse(time.RFC3339, value); err == nil {
+		return t.UTC()
+	}
+	if t, err := stdmail.ParseDate(value); err == nil {
+		return t.UTC()
+	}
+	return time.Time{}
 }
 
 func (uc *EmailUseCase) ListEmails(companyID, customerID string, isRead *bool, limit, offset int) (*dto.EmailListResponse, error) {

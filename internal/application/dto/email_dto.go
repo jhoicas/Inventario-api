@@ -65,6 +65,20 @@ type EmailListResponse struct {
 	Offset int             `json:"offset"`
 }
 
+type EmailMessage struct {
+	ID      string    `json:"id"`
+	Subject string    `json:"subject"`
+	From    string    `json:"from"`
+	Date    time.Time `json:"date"`
+	Snippet string    `json:"snippet"`
+	IsRead  bool      `json:"is_read"`
+}
+
+type AccountEmailListResponse struct {
+	Provider string         `json:"provider"`
+	Items    []EmailMessage `json:"items"`
+}
+
 type CreateTicketFromEmailResponse struct {
 	TicketID string `json:"ticket_id"`
 	Status   string `json:"status"`

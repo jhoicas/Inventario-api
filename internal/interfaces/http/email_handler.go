@@ -21,6 +21,7 @@ type EmailUseCase interface {
 	ListAccounts(companyID string, limit, offset int) ([]dto.EmailAccountResponse, error)
 	TestConnectionBeforeSave(companyID string, in dto.CreateEmailAccountRequest) (*dto.TestIMAPConnectionResponse, error)
 	TestConnection(companyID, id string) (*dto.TestIMAPConnectionResponse, error)
+	GetAccountEmails(companyID, accountID string) (*dto.AccountEmailListResponse, error)
 	ListEmails(companyID, customerID string, isRead *bool, limit, offset int) (*dto.EmailListResponse, error)
 	GetEmailAndMarkAsRead(companyID, id string) (*dto.EmailResponse, error)
 	CreateTicketFromEmail(companyID, userID, emailID string) (*dto.CreateTicketFromEmailResponse, error)
@@ -316,6 +317,27 @@ func (h *EmailHandler) TestEmailAccountConnectionBeforeSave(c *fiber.Ctx) error 
 
 	if !out.Success {
 		return c.Status(fiber.StatusBadGateway).JSON(out)
+	}
+	return c.JSON(out)
+}
+
+func (h *EmailHandler) GetEmailAccountInbox(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	accountID := c.Params("id")
+	if companyID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+
+	out, err := h.uc.GetAccountEmails(companyID, accountID)
+	if err != nil {
+		switch err {
+		case domain.ErrInvalidInput:
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "id inválido"})
+		case domain.ErrNotFound:
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "cuenta no encontrada"})
+		default:
+			return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+		}
 	}
 	return c.JSON(out)
 }
