@@ -300,9 +300,8 @@ type CampaignTemplateResponse struct {
 // ──────────────────────────────────────────────────────────────────────────────
 
 type CampaignRecipientStrategy struct {
-	Type      string `json:"type"`                 // "category_gold" | "reorder_product"
-	ProductID string `json:"product_id,omitempty"` // usado si type == "reorder_product"
-	MonthsAgo int    `json:"months_ago,omitempty"` // ej. 6 (por defecto 6)
+	Type       string `json:"type"` // "category"
+	CategoryID string `json:"category_id"`
 }
 
 type ResolveCampaignRecipientsRequest struct {

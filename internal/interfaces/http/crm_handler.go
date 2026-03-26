@@ -1492,13 +1492,13 @@ func (h *CRMHandler) DeleteCampaignTemplate(c *fiber.Ctx) error {
 }
 
 // ResolveCampaignRecipients resuelve destinatarios potenciales para una campaña
-// en base a estrategias simples (ej. categoría Oro).
+// en base a la estrategia [{"type":"category","category_id":"<UUID>"}].
 // @Summary      Resolver destinatarios de campaña
 // @Tags         crm
 // @Security     Bearer
 // @Accept       json
 // @Produce      json
-// @Param        body  body  dto.ResolveCampaignRecipientsRequest  true  "Estrategias de destinatarios"
+// @Param        body  body  dto.ResolveCampaignRecipientsRequest  true  "Estrategia category con category_id"
 // @Success      200   {object} dto.ResolveCampaignRecipientsResponse
 // @Failure      400   {object} dto.ErrorResponse
 // @Failure      401   {object} dto.ErrorResponse
