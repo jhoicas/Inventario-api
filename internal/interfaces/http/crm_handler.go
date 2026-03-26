@@ -712,6 +712,43 @@ func (h *CRMHandler) CreateTask(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(out)
 }
 
+// CreateTaskFromEmail crea una tarea CRM desde un correo específico.
+// @Summary      Crear tarea desde correo
+// @Tags         crm
+// @Security     Bearer
+// @Accept       json
+// @Produce      json
+// @Param        body  body      dto.CreateTaskFromEmailRequest  true  "Task from email"
+// @Success      201   {object}  dto.TaskResponse
+// @Failure      400   {object}  dto.ErrorResponse
+// @Failure      401   {object}  dto.ErrorResponse
+// @Router       /api/v1/crm/tasks/from-email [post]
+func (h *CRMHandler) CreateTaskFromEmail(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	userID := GetUserID(c)
+	if companyID == "" || userID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if h.TaskUC == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "tasks no configurado"})
+	}
+
+	var in dto.CreateTaskFromEmailRequest
+	if err := c.BodyParser(&in); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
+	}
+
+	out, err := h.TaskUC.CreateFromEmail(c.Context(), companyID, userID, in)
+	if err != nil {
+		if err == domain.ErrInvalidInput {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "email_id, title, description, due_date y assigned_to son requeridos"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(out)
+}
+
 // GetTask obtiene una tarea por ID.
 // @Summary      Obtener tarea
 // @Description  Obtiene el detalle de una tarea CRM por su identificador
@@ -990,6 +1027,47 @@ func (h *CRMHandler) CreateTicket(c *fiber.Ctx) error {
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}
+	return c.Status(fiber.StatusCreated).JSON(out)
+}
+
+// CreateTicketFromEmail radica un ticket CRM desde un correo.
+// @Summary      Crear ticket desde correo
+// @Tags         crm
+// @Security     Bearer
+// @Accept       json
+// @Produce      json
+// @Param        body  body      dto.CreateTicketFromEmailRequest  true  "Ticket from email"
+// @Success      201   {object}  dto.TicketResponse
+// @Failure      400   {object}  dto.ErrorResponse
+// @Failure      401   {object}  dto.ErrorResponse
+// @Failure      404   {object}  dto.ErrorResponse
+// @Router       /api/v1/crm/tickets/from-email [post]
+func (h *CRMHandler) CreateTicketFromEmail(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	userID := GetUserID(c)
+	if companyID == "" || userID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if h.PQRUC == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "tickets no configurado"})
+	}
+
+	var in dto.CreateTicketFromEmailRequest
+	if err := c.BodyParser(&in); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
+	}
+
+	out, err := h.PQRUC.CreateFromEmail(c.Context(), companyID, userID, in)
+	if err != nil {
+		if err == domain.ErrInvalidInput {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "email_id, subject, description, sender_email y priority son requeridos"})
+		}
+		if err == domain.ErrNotFound {
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "no se encontró cliente para sender_email"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+
 	return c.Status(fiber.StatusCreated).JSON(out)
 }
 

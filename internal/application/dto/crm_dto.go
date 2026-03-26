@@ -14,6 +14,15 @@ type CreateTaskRequest struct {
 	DueAt       *time.Time `json:"due_at"`
 }
 
+// CreateTaskFromEmailRequest body para crear una tarea CRM desde un correo.
+type CreateTaskFromEmailRequest struct {
+	EmailID     string    `json:"email_id"`
+	Title       string    `json:"title"`
+	Description string    `json:"description"`
+	DueDate     time.Time `json:"due_date"`
+	AssignedTo  string    `json:"assigned_to"`
+}
+
 // UpdateTaskRequest body para actualizar una tarea.
 type UpdateTaskRequest struct {
 	Title       *string    `json:"title"`
@@ -35,6 +44,16 @@ type CreateTicketRequest struct {
 	CustomerID  string `json:"customer_id" validate:"required"`
 	Subject     string `json:"subject" validate:"required"`
 	Description string `json:"description" validate:"required"`
+}
+
+// CreateTicketFromEmailRequest body para crear un ticket CRM desde un correo.
+type CreateTicketFromEmailRequest struct {
+	EmailID      string `json:"email_id"`
+	Subject      string `json:"subject"`
+	Description  string `json:"description"`
+	SenderEmail  string `json:"sender_email"`
+	Priority     string `json:"priority"`
+	AssignedTo   string `json:"assigned_to,omitempty"`
 }
 
 // UpdateTicketRequest body para actualizar un ticket.

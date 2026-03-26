@@ -328,6 +328,11 @@ func Router(app *fiber.App, deps RouterDeps) {
 		crmGroup.Post("/campaign-templates", h.CreateCampaignTemplate)
 		crmGroup.Get("/campaign-templates", h.ListCampaignTemplates)
 		crmGroup.Delete("/campaign-templates/:id", h.DeleteCampaignTemplate)
+
+		v1CRMGroup := protected.Group("/v1/crm", RequireModule(entity.ModuleCRM, deps.ModuleService), screenAccess)
+		v1CRMGroup.Post("/tickets/from-email", h.CreateTicketFromEmail)
+		v1CRMGroup.Post("/tasks/from-email", h.CreateTaskFromEmail)
+
 		crmGroup.Get("/customers/:id/purchase-history",
 			RequireModule(entity.ModuleBilling, deps.ModuleService),
 			h.GetPurchaseHistory,

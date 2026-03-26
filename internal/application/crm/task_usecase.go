@@ -2,6 +2,8 @@ package crm
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -41,6 +43,37 @@ func (uc *TaskUseCase) Create(ctx context.Context, companyID, userID string, in 
 		CreatedBy:   userID,
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
+	}
+	if err := uc.taskRepo.Create(task); err != nil {
+		return nil, err
+	}
+	return toTaskResponse(task), nil
+}
+
+// CreateFromEmail crea una tarea CRM a partir de un correo específico.
+func (uc *TaskUseCase) CreateFromEmail(ctx context.Context, companyID, userID string, in dto.CreateTaskFromEmailRequest) (*dto.TaskResponse, error) {
+	if strings.TrimSpace(in.EmailID) == "" || strings.TrimSpace(in.Title) == "" || strings.TrimSpace(in.Description) == "" || strings.TrimSpace(in.AssignedTo) == "" || in.DueDate.IsZero() {
+		return nil, domain.ErrInvalidInput
+	}
+	assignedTo := strings.TrimSpace(in.AssignedTo)
+	if _, err := uuid.Parse(assignedTo); err != nil {
+		return nil, domain.ErrInvalidInput
+	}
+
+	description := strings.TrimSpace(in.Description)
+	description = fmt.Sprintf("%s\n\n[Origen correo] email_id=%s", description, strings.TrimSpace(in.EmailID))
+
+	now := time.Now()
+	task := &entity.CRMTask{
+		ID:          uuid.New().String(),
+		CompanyID:   companyID,
+		Title:       strings.TrimSpace(in.Title),
+		Description: description,
+		DueAt:       in.DueDate,
+		Status:      entity.TaskStatusPending,
+		CreatedBy:   assignedTo,
+		CreatedAt:   now,
+		UpdatedAt:   now,
 	}
 	if err := uc.taskRepo.Create(task); err != nil {
 		return nil, err

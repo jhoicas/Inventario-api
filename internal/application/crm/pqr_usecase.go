@@ -3,6 +3,7 @@ package crm
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -69,6 +70,53 @@ func (uc *PQRUseCase) Create(ctx context.Context, companyID, userID string, in d
 			ticket.Sentiment = sent
 		}
 	}
+	if err := uc.ticketRepo.Create(ticket); err != nil {
+		return nil, err
+	}
+	return toTicketResponse(ticket), nil
+}
+
+// CreateFromEmail radica un ticket PQR a partir de un correo y asocia cliente por sender_email.
+func (uc *PQRUseCase) CreateFromEmail(ctx context.Context, companyID, userID string, in dto.CreateTicketFromEmailRequest) (*dto.TicketResponse, error) {
+	if strings.TrimSpace(in.EmailID) == "" || strings.TrimSpace(in.Subject) == "" || strings.TrimSpace(in.Description) == "" || strings.TrimSpace(in.SenderEmail) == "" || strings.TrimSpace(in.Priority) == "" {
+		return nil, domain.ErrInvalidInput
+	}
+
+	customer, err := uc.customerRepo.GetByCompanyAndEmail(companyID, strings.TrimSpace(strings.ToLower(in.SenderEmail)))
+	if err != nil {
+		return nil, err
+	}
+	if customer == nil {
+		return nil, domain.ErrNotFound
+	}
+
+	createdBy := strings.TrimSpace(userID)
+	if strings.TrimSpace(in.AssignedTo) != "" {
+		createdBy = strings.TrimSpace(in.AssignedTo)
+	}
+
+	description := strings.TrimSpace(in.Description)
+	description = fmt.Sprintf("%s\n\n[Origen correo] email_id=%s\n[Prioridad] %s", description, strings.TrimSpace(in.EmailID), strings.TrimSpace(in.Priority))
+
+	now := time.Now()
+	ticket := &entity.CRMTicket{
+		ID:          uuid.New().String(),
+		CompanyID:   companyID,
+		CustomerID:  customer.ID,
+		Subject:     strings.TrimSpace(in.Subject),
+		Description: description,
+		Status:      entity.TicketStatusOpen,
+		CreatedBy:   createdBy,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+
+	if uc.sentiment != nil {
+		if sent, err := uc.sentiment.AnalyzePQRSentiment(ctx, ticket.Description); err == nil && sent != "" {
+			ticket.Sentiment = sent
+		}
+	}
+
 	if err := uc.ticketRepo.Create(ticket); err != nil {
 		return nil, err
 	}
