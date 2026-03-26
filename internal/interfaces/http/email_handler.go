@@ -12,6 +12,7 @@ type EmailUseCase interface {
 	CreateAccount(companyID string, in dto.CreateEmailAccountRequest) (*dto.EmailAccountResponse, error)
 	ProcessOAuthAccount(companyID, userID string, in dto.OAuthEmailAccountRequest) (*dto.EmailAccountConfigResponse, error)
 	SaveGoogleOAuthCredential(companyID, userID string, in dto.GoogleOAuthCredentialRequest) error
+	SaveMicrosoftOAuthCredential(companyID, userID string, in dto.GoogleOAuthCredentialRequest) error
 	GetGoogleOAuthCredentialStatus(companyID string) (*dto.GoogleOAuthCredentialStatusResponse, error)
 	SaveCustomAccount(companyID, userID string, in dto.CustomEmailAccountRequest) (*dto.EmailAccountConfigResponse, error)
 	UpdateAccount(companyID, id string, in dto.UpdateEmailAccountRequest) (*dto.EmailAccountResponse, error)
@@ -123,6 +124,35 @@ func (h *EmailHandler) CreateGoogleOAuthEmailAccount(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"success": true,
 		"message": "credenciales de Google guardadas correctamente",
+	})
+}
+
+func (h *EmailHandler) CreateMicrosoftOAuthEmailAccount(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	userID := GetUserID(c)
+	if companyID == "" || userID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+
+	var in dto.GoogleOAuthCredentialRequest
+	if err := c.BodyParser(&in); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
+	}
+
+	if err := h.uc.SaveMicrosoftOAuthCredential(companyID, userID, in); err != nil {
+		switch err {
+		case domain.ErrInvalidInput:
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "credential y email_address son requeridos"})
+		case domain.ErrUnauthorized:
+			return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+		default:
+			return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+		}
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"success": true,
+		"message": "credenciales de Microsoft guardadas correctamente",
 	})
 }
 

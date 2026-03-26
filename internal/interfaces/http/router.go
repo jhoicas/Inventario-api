@@ -352,6 +352,7 @@ func Router(app *fiber.App, deps RouterDeps) {
 		settingsEmailGroup.Post("/:id/test", h.TestEmailAccountConnection)
 		settingsEmailGroup.Get("/oauth/google", h.GetGoogleOAuthEmailAccount)
 		settingsEmailGroup.Post("/oauth/google", h.CreateGoogleOAuthEmailAccount)
+		settingsEmailGroup.Post("/oauth/microsoft", h.CreateMicrosoftOAuthEmailAccount)
 
 		v1EmailAccountsGroup := protected.Group(
 			"/v1/email/accounts",

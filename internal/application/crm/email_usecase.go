@@ -151,11 +151,23 @@ func (uc *EmailUseCase) ProcessOAuthAccount(companyID, userID string, in dto.OAu
 }
 
 func (uc *EmailUseCase) SaveGoogleOAuthCredential(companyID, userID string, in dto.GoogleOAuthCredentialRequest) error {
+	return uc.saveOAuthCredentialWithProvider(companyID, userID, in, "google")
+}
+
+func (uc *EmailUseCase) SaveMicrosoftOAuthCredential(companyID, userID string, in dto.GoogleOAuthCredentialRequest) error {
+	return uc.saveOAuthCredentialWithProvider(companyID, userID, in, "microsoft")
+}
+
+func (uc *EmailUseCase) saveOAuthCredentialWithProvider(companyID, userID string, in dto.GoogleOAuthCredentialRequest, provider string) error {
 	if strings.TrimSpace(companyID) == "" || strings.TrimSpace(userID) == "" {
 		return domain.ErrUnauthorized
 	}
 	if uc.hybridRepo == nil {
 		return fmt.Errorf("hybrid email account repository no configurado")
+	}
+	provider = strings.TrimSpace(strings.ToLower(provider))
+	if provider == "" {
+		return domain.ErrInvalidInput
 	}
 
 	credential := strings.TrimSpace(in.Credential)
@@ -179,7 +191,7 @@ func (uc *EmailUseCase) SaveGoogleOAuthCredential(companyID, userID string, in d
 		ID:           uuid.New().String(),
 		UserID:       userID,
 		CompanyID:    companyID,
-		Provider:     "google",
+		Provider:     provider,
 		EmailAddress: emailAddress,
 		AccessToken:  encryptedCredential,
 		AppPassword:  encryptedCredential,
