@@ -219,3 +219,58 @@ func (r *HybridEmailAccountRepo) GetByCompanyAndEmail(ctx context.Context, compa
 	}
 	return &out, nil
 }
+
+func (r *HybridEmailAccountRepo) GetByCompanyAndProvider(ctx context.Context, companyID, provider string) (*entity.EmailAccountConfig, error) {
+	var out entity.EmailAccountConfig
+	var userID *string
+	err := r.pool.QueryRow(ctx, `
+		SELECT
+			id,
+			user_id::text,
+			company_id,
+			COALESCE(provider, 'custom'),
+			email_address,
+			COALESCE(access_token, ''),
+			COALESCE(refresh_token, ''),
+			COALESCE(imap_host, imap_server, ''),
+			COALESCE(imap_port, 0),
+			COALESCE(smtp_host, ''),
+			COALESCE(smtp_port, 0),
+			COALESCE(app_password, password, ''),
+			is_active,
+			created_at,
+			updated_at
+		FROM email_accounts
+		WHERE company_id = $1 AND LOWER(COALESCE(provider, 'custom')) = LOWER($2)
+		ORDER BY is_active DESC, updated_at DESC
+		LIMIT 1`,
+		companyID,
+		strings.TrimSpace(provider),
+	).Scan(
+		&out.ID,
+		&userID,
+		&out.CompanyID,
+		&out.Provider,
+		&out.EmailAddress,
+		&out.AccessToken,
+		&out.RefreshToken,
+		&out.ImapHost,
+		&out.ImapPort,
+		&out.SmtpHost,
+		&out.SmtpPort,
+		&out.AppPassword,
+		&out.IsActive,
+		&out.CreatedAt,
+		&out.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get hybrid email account by provider: %w", err)
+	}
+	if userID != nil {
+		out.UserID = *userID
+	}
+	return &out, nil
+}

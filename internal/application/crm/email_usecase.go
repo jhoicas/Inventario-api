@@ -137,6 +137,69 @@ func (uc *EmailUseCase) ProcessOAuthAccount(companyID, userID string, in dto.OAu
 	return &resp, nil
 }
 
+func (uc *EmailUseCase) SaveGoogleOAuthCredential(companyID, userID string, in dto.GoogleOAuthCredentialRequest) error {
+	if strings.TrimSpace(companyID) == "" || strings.TrimSpace(userID) == "" {
+		return domain.ErrUnauthorized
+	}
+	if uc.hybridRepo == nil {
+		return fmt.Errorf("hybrid email account repository no configurado")
+	}
+
+	credential := strings.TrimSpace(in.Credential)
+	emailAddress := strings.TrimSpace(strings.ToLower(in.EmailAddress))
+	if credential == "" || emailAddress == "" {
+		return domain.ErrInvalidInput
+	}
+
+	isActive := true
+	if in.IsActive != nil {
+		isActive = *in.IsActive
+	}
+
+	now := time.Now().UTC()
+	item := &entity.EmailAccountConfig{
+		ID:           uuid.New().String(),
+		UserID:       userID,
+		CompanyID:    companyID,
+		Provider:     "google",
+		EmailAddress: emailAddress,
+		AccessToken:  credential,
+		IsActive:     isActive,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+
+	if err := uc.hybridRepo.Save(context.Background(), item); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (uc *EmailUseCase) GetGoogleOAuthCredentialStatus(companyID string) (*dto.GoogleOAuthCredentialStatusResponse, error) {
+	if strings.TrimSpace(companyID) == "" {
+		return nil, domain.ErrUnauthorized
+	}
+	if uc.hybridRepo == nil {
+		return nil, fmt.Errorf("hybrid email account repository no configurado")
+	}
+
+	item, err := uc.hybridRepo.GetByCompanyAndProvider(context.Background(), companyID, "google")
+	if err != nil {
+		return nil, err
+	}
+	if item == nil {
+		return &dto.GoogleOAuthCredentialStatusResponse{Configured: false}, nil
+	}
+
+	return &dto.GoogleOAuthCredentialStatusResponse{
+		Configured:   true,
+		Provider:     "google",
+		EmailAddress: item.EmailAddress,
+		IsActive:     item.IsActive,
+	}, nil
+}
+
 func (uc *EmailUseCase) SaveCustomAccount(companyID, userID string, in dto.CustomEmailAccountRequest) (*dto.EmailAccountConfigResponse, error) {
 	if strings.TrimSpace(companyID) == "" || strings.TrimSpace(userID) == "" {
 		return nil, domain.ErrUnauthorized

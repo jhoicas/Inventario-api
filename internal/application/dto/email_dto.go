@@ -78,6 +78,19 @@ type OAuthEmailAccountRequest struct {
 	IsActive     *bool  `json:"is_active,omitempty"`
 }
 
+type GoogleOAuthCredentialRequest struct {
+	Credential   string `json:"credential"`
+	EmailAddress string `json:"email_address"`
+	IsActive     *bool  `json:"is_active,omitempty"`
+}
+
+type GoogleOAuthCredentialStatusResponse struct {
+	Configured   bool   `json:"configured"`
+	Provider     string `json:"provider,omitempty"`
+	EmailAddress string `json:"email_address,omitempty"`
+	IsActive     bool   `json:"is_active,omitempty"`
+}
+
 type CustomEmailAccountRequest struct {
 	EmailAddress string `json:"email_address"`
 	ImapHost     string `json:"imap_host"`

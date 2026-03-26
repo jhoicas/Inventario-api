@@ -12,4 +12,5 @@ type HybridEmailAccountRepository interface {
 	Save(ctx context.Context, account *entity.EmailAccountConfig) error
 	GetByID(ctx context.Context, companyID, id string) (*entity.EmailAccountConfig, error)
 	GetByCompanyAndEmail(ctx context.Context, companyID, emailAddress string) (*entity.EmailAccountConfig, error)
+	GetByCompanyAndProvider(ctx context.Context, companyID, provider string) (*entity.EmailAccountConfig, error)
 }
