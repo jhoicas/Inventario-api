@@ -97,6 +97,18 @@ func (uc *EmailUseCase) ProcessOAuthAccount(companyID, userID string, in dto.OAu
 		return nil, fmt.Errorf("intercambiar auth code de %s: %w", provider, err)
 	}
 
+	encryptedAccessToken, err := uc.encryptor.Encrypt(strings.TrimSpace(tok.AccessToken))
+	if err != nil {
+		return nil, fmt.Errorf("cifrar access token: %w", err)
+	}
+	encryptedRefreshToken := ""
+	if strings.TrimSpace(tok.RefreshToken) != "" {
+		encryptedRefreshToken, err = uc.encryptor.Encrypt(strings.TrimSpace(tok.RefreshToken))
+		if err != nil {
+			return nil, fmt.Errorf("cifrar refresh token: %w", err)
+		}
+	}
+
 	_ = scopes // alcance usado para construir config de intercambio
 
 	emailAddress := strings.TrimSpace(strings.ToLower(in.EmailAddress))
@@ -120,8 +132,9 @@ func (uc *EmailUseCase) ProcessOAuthAccount(companyID, userID string, in dto.OAu
 		CompanyID:    companyID,
 		Provider:     provider,
 		EmailAddress: emailAddress,
-		AccessToken:  strings.TrimSpace(tok.AccessToken),
-		RefreshToken: strings.TrimSpace(tok.RefreshToken),
+		AccessToken:  encryptedAccessToken,
+		RefreshToken: encryptedRefreshToken,
+		AppPassword:  encryptedAccessToken,
 		IsActive:     isActive,
 		CreatedAt:    time.Now().UTC(),
 		UpdatedAt:    time.Now().UTC(),
@@ -151,6 +164,11 @@ func (uc *EmailUseCase) SaveGoogleOAuthCredential(companyID, userID string, in d
 		return domain.ErrInvalidInput
 	}
 
+	encryptedCredential, err := uc.encryptor.Encrypt(credential)
+	if err != nil {
+		return fmt.Errorf("cifrar credencial oauth: %w", err)
+	}
+
 	isActive := true
 	if in.IsActive != nil {
 		isActive = *in.IsActive
@@ -163,7 +181,8 @@ func (uc *EmailUseCase) SaveGoogleOAuthCredential(companyID, userID string, in d
 		CompanyID:    companyID,
 		Provider:     "google",
 		EmailAddress: emailAddress,
-		AccessToken:  credential,
+		AccessToken:  encryptedCredential,
+		AppPassword:  encryptedCredential,
 		IsActive:     isActive,
 		CreatedAt:    now,
 		UpdatedAt:    now,
