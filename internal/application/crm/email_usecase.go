@@ -8,6 +8,7 @@ import (
 	"mime"
 	"mime/multipart"
 	"net"
+	"net/http"
 	stdmail "net/mail"
 	"sort"
 	"strings"
@@ -433,6 +434,52 @@ func (uc *EmailUseCase) TestConnection(companyID, id string) (*dto.TestIMAPConne
 	if strings.TrimSpace(companyID) == "" || strings.TrimSpace(id) == "" {
 		return nil, domain.ErrInvalidInput
 	}
+
+	if uc.hybridRepo != nil {
+		cfg, err := uc.hybridRepo.GetByID(context.Background(), companyID, id)
+		if err != nil {
+			return nil, err
+		}
+		if cfg != nil {
+			provider := strings.TrimSpace(strings.ToLower(cfg.Provider))
+			switch provider {
+			case "google":
+				tokenCipher := strings.TrimSpace(cfg.AccessToken)
+				if tokenCipher == "" {
+					tokenCipher = strings.TrimSpace(cfg.AppPassword)
+				}
+				if tokenCipher == "" {
+					return &dto.TestIMAPConnectionResponse{Success: false, Message: "credencial OAuth no encontrada"}, nil
+				}
+				token, err := uc.encryptor.Decrypt(tokenCipher)
+				if err != nil {
+					return &dto.TestIMAPConnectionResponse{Success: false, Message: fmt.Sprintf("descifrar credenciales: %v", err)}, nil
+				}
+				if err := testOAuthBearerEndpoint("https://gmail.googleapis.com/gmail/v1/users/me/profile", token); err != nil {
+					return &dto.TestIMAPConnectionResponse{Success: false, Message: err.Error()}, nil
+				}
+				return &dto.TestIMAPConnectionResponse{Success: true, Message: "conexión OAuth Google exitosa"}, nil
+
+			case "microsoft", "microsoft365":
+				tokenCipher := strings.TrimSpace(cfg.AccessToken)
+				if tokenCipher == "" {
+					tokenCipher = strings.TrimSpace(cfg.AppPassword)
+				}
+				if tokenCipher == "" {
+					return &dto.TestIMAPConnectionResponse{Success: false, Message: "credencial OAuth no encontrada"}, nil
+				}
+				token, err := uc.encryptor.Decrypt(tokenCipher)
+				if err != nil {
+					return &dto.TestIMAPConnectionResponse{Success: false, Message: fmt.Sprintf("descifrar credenciales: %v", err)}, nil
+				}
+				if err := testOAuthBearerEndpoint("https://graph.microsoft.com/v1.0/me", token); err != nil {
+					return &dto.TestIMAPConnectionResponse{Success: false, Message: err.Error()}, nil
+				}
+				return &dto.TestIMAPConnectionResponse{Success: true, Message: "conexión OAuth Microsoft exitosa"}, nil
+			}
+		}
+	}
+
 	acc, err := uc.accountRepo.GetByID(companyID, id)
 	if err != nil {
 		return nil, err
@@ -585,6 +632,27 @@ func testIMAPCredentials(emailAddress, password, imapServer string, imapPort int
 	}
 	if _, err := c.Select("INBOX", false); err != nil {
 		return fmt.Errorf("select INBOX: %w", err)
+	}
+	return nil
+}
+
+func testOAuthBearerEndpoint(url, accessToken string) error {
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return fmt.Errorf("crear petición OAuth: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(accessToken))
+
+	clientHTTP := &http.Client{Timeout: 15 * time.Second}
+	resp, err := clientHTTP.Do(req)
+	if err != nil {
+		return fmt.Errorf("probar conexión OAuth: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return fmt.Errorf("token OAuth inválido o expirado (status %d): %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 	return nil
 }
