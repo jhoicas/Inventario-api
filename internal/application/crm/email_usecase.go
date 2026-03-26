@@ -320,15 +320,30 @@ func (uc *EmailUseCase) UpdateAccount(companyID, id string, in dto.UpdateEmailAc
 	}
 
 	if in.EmailAddress != nil {
-		acc.EmailAddress = strings.TrimSpace(strings.ToLower(*in.EmailAddress))
+		emailAddress := strings.TrimSpace(strings.ToLower(*in.EmailAddress))
+		if emailAddress == "" {
+			return nil, domain.ErrInvalidInput
+		}
+		acc.EmailAddress = emailAddress
 	}
 	if in.IMAPServer != nil {
-		acc.IMAPServer = normalizeIMAPServer(*in.IMAPServer)
+		imapServer := normalizeIMAPServer(*in.IMAPServer)
+		if imapServer == "" {
+			return nil, domain.ErrInvalidInput
+		}
+		acc.IMAPServer = imapServer
 	}
 	if in.IMAPPort != nil {
+		if *in.IMAPPort <= 0 {
+			return nil, domain.ErrInvalidInput
+		}
 		acc.IMAPPort = *in.IMAPPort
 	}
 	if in.Password != nil {
+		password := strings.TrimSpace(*in.Password)
+		if password == "" {
+			return nil, domain.ErrInvalidInput
+		}
 		encrypted, err := uc.encryptor.Encrypt(*in.Password)
 		if err != nil {
 			return nil, err
@@ -337,9 +352,6 @@ func (uc *EmailUseCase) UpdateAccount(companyID, id string, in dto.UpdateEmailAc
 	}
 	if in.IsActive != nil {
 		acc.IsActive = *in.IsActive
-	}
-	if strings.TrimSpace(acc.EmailAddress) == "" || strings.TrimSpace(acc.IMAPServer) == "" || acc.IMAPPort <= 0 {
-		return nil, domain.ErrInvalidInput
 	}
 
 	acc.UpdatedAt = time.Now().UTC()
