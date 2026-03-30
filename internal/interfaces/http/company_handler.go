@@ -12,10 +12,15 @@ import (
 type CompanyUseCase interface {
 	Create(in dto.CreateCompanyRequest) (*dto.CompanyResponse, error)
 	GetByID(id string) (*dto.CompanyResponse, error)
+	Update(id string, in dto.UpdateCompanyRequest) (*dto.CompanyResponse, error)
+	Delete(id string) error
 	List(limit, offset int) (*dto.CompanyListResponse, error)
 	CreateResolution(companyID string, in dto.CreateResolutionRequest) (*dto.ResolutionResponse, error)
 	ListResolutions(companyID string) ([]dto.ResolutionResponse, error)
 	ListModules(ctx context.Context, companyID string) (*dto.CompanyModulesResponse, error)
+	UpsertModule(ctx context.Context, companyID string, in dto.CreateCompanyModuleRequest) (*dto.CompanyModuleResponse, error)
+	UpdateModule(ctx context.Context, companyID, moduleName string, in dto.UpdateCompanyModuleRequest) (*dto.CompanyModuleResponse, error)
+	DeleteModule(ctx context.Context, companyID, moduleName string) error
 }
 
 // CompanyHandler maneja las peticiones HTTP para el recurso Company.
@@ -100,6 +105,61 @@ func (h *CompanyHandler) GetByID(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "empresa no encontrada"})
 	}
 	return c.JSON(out)
+}
+
+// Update godoc
+// @Summary      Actualizar empresa
+// @Tags         companies
+// @Accept       json
+// @Produce      json
+// @Param        id    path  string                    true  "ID de la empresa"
+// @Param        body  body  dto.UpdateCompanyRequest  true  "Datos a actualizar"
+// @Success      200   {object}  dto.CompanyResponse
+// @Failure      400   {object}  dto.ErrorResponse
+// @Failure      404   {object}  dto.ErrorResponse
+// @Router       /api/companies/{id} [put]
+func (h *CompanyHandler) Update(c *fiber.Ctx) error {
+	id := c.Params("id")
+	if id == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "MISSING_ID", Message: "id es requerido"})
+	}
+	var in dto.UpdateCompanyRequest
+	if err := c.BodyParser(&in); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
+	}
+	out, err := h.uc.Update(id, in)
+	if err != nil {
+		switch err {
+		case domain.ErrInvalidInput:
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "datos inválidos"})
+		case domain.ErrNotFound:
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "empresa no encontrada"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.JSON(out)
+}
+
+// Delete godoc
+// @Summary      Eliminar empresa
+// @Tags         companies
+// @Produce      json
+// @Param        id   path  string  true  "ID de la empresa"
+// @Success      204
+// @Failure      400  {object}  dto.ErrorResponse
+// @Router       /api/companies/{id} [delete]
+func (h *CompanyHandler) Delete(c *fiber.Ctx) error {
+	id := c.Params("id")
+	if id == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "MISSING_ID", Message: "id es requerido"})
+	}
+	if err := h.uc.Delete(id); err != nil {
+		if err == domain.ErrInvalidInput {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "id inválido"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.SendStatus(fiber.StatusNoContent)
 }
 
 // List godoc
@@ -248,4 +308,96 @@ func (h *CompanyHandler) CreateMyResolution(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}
 	return c.Status(fiber.StatusCreated).JSON(out)
+}
+
+// UpsertModule godoc
+// @Summary      Crear/actualizar módulo de una empresa
+// @Tags         companies
+// @Accept       json
+// @Produce      json
+// @Param        id    path  string                          true  "ID de la empresa"
+// @Param        body  body  dto.CreateCompanyModuleRequest  true  "Datos del módulo"
+// @Success      200   {object}  dto.CompanyModuleResponse
+// @Failure      400   {object}  dto.ErrorResponse
+// @Failure      404   {object}  dto.ErrorResponse
+// @Router       /api/companies/{id}/modules [post]
+func (h *CompanyHandler) UpsertModule(c *fiber.Ctx) error {
+	companyID := c.Params("id")
+	if companyID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "MISSING_ID", Message: "id es requerido"})
+	}
+	var in dto.CreateCompanyModuleRequest
+	if err := c.BodyParser(&in); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
+	}
+	out, err := h.uc.UpsertModule(c.Context(), companyID, in)
+	if err != nil {
+		switch err {
+		case domain.ErrInvalidInput:
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "datos inválidos"})
+		case domain.ErrNotFound:
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "empresa no encontrada"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.JSON(out)
+}
+
+// UpdateModule godoc
+// @Summary      Actualizar módulo de una empresa
+// @Tags         companies
+// @Accept       json
+// @Produce      json
+// @Param        id           path  string                          true  "ID de la empresa"
+// @Param        module_name  path  string                          true  "Nombre del módulo"
+// @Param        body         body  dto.UpdateCompanyModuleRequest  true  "Datos del módulo"
+// @Success      200          {object}  dto.CompanyModuleResponse
+// @Failure      400          {object}  dto.ErrorResponse
+// @Failure      404          {object}  dto.ErrorResponse
+// @Router       /api/companies/{id}/modules/{module_name} [put]
+func (h *CompanyHandler) UpdateModule(c *fiber.Ctx) error {
+	companyID := c.Params("id")
+	moduleName := c.Params("module_name")
+	if companyID == "" || moduleName == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "MISSING_PARAMS", Message: "id y module_name son requeridos"})
+	}
+	var in dto.UpdateCompanyModuleRequest
+	if err := c.BodyParser(&in); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
+	}
+	out, err := h.uc.UpdateModule(c.Context(), companyID, moduleName, in)
+	if err != nil {
+		switch err {
+		case domain.ErrInvalidInput:
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "datos inválidos"})
+		case domain.ErrNotFound:
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "módulo no encontrado"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.JSON(out)
+}
+
+// DeleteModule godoc
+// @Summary      Eliminar módulo de una empresa
+// @Tags         companies
+// @Produce      json
+// @Param        id           path  string  true  "ID de la empresa"
+// @Param        module_name  path  string  true  "Nombre del módulo"
+// @Success      204
+// @Failure      400  {object}  dto.ErrorResponse
+// @Router       /api/companies/{id}/modules/{module_name} [delete]
+func (h *CompanyHandler) DeleteModule(c *fiber.Ctx) error {
+	companyID := c.Params("id")
+	moduleName := c.Params("module_name")
+	if companyID == "" || moduleName == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "MISSING_PARAMS", Message: "id y module_name son requeridos"})
+	}
+	if err := h.uc.DeleteModule(c.Context(), companyID, moduleName); err != nil {
+		if err == domain.ErrInvalidInput {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "parámetros inválidos"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.SendStatus(fiber.StatusNoContent)
 }

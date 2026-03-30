@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/jhoicas/Inventario-api/internal/domain/entity"
+	"github.com/shopspring/decimal"
 )
 
 // CRMCategoryRepository puerto de persistencia para categorías de fidelización.
@@ -32,6 +33,29 @@ type CRMProfileRepository interface {
 	GetProfile360(ctx context.Context, companyID, customerID string) (*entity.Profile360, error)
 	Upsert(profile *entity.CRMCustomerProfile) error
 	ListByCompany(companyID string, limit, offset int) ([]*entity.CRMCustomerProfile, error)
+
+	// GetDashboardKPIs retorna KPIs agregados del dashboard CRM para una empresa.
+	GetDashboardKPIs(companyID string) (*CRMDashboardKPIs, error)
+	// GetDashboardSegmentation retorna distribución de clientes por categoría.
+	GetDashboardSegmentation(companyID string) ([]*CRMSegmentDistribution, error)
+	// GetDashboardMonthlyEvolution retorna ventas mensuales de los últimos N meses.
+	GetDashboardMonthlyEvolution(companyID string, months int) ([]*CRMMonthlySales, error)
+}
+
+type CRMDashboardKPIs struct {
+	TotalCustomers int64
+	TotalSales     decimal.Decimal
+	AverageTicket  decimal.Decimal
+}
+
+type CRMSegmentDistribution struct {
+	Category string
+	Count    int64
+}
+
+type CRMMonthlySales struct {
+	Month string
+	Sales decimal.Decimal
 }
 
 // InteractionFilters filtros opcionales para ListInteractions.
@@ -103,6 +127,7 @@ type CRMCampaignRepository interface {
 	Create(ctx context.Context, c *entity.Campaign) error
 	GetByID(ctx context.Context, id string) (*entity.Campaign, error)
 	GetMetrics(ctx context.Context, campaignID string) (*entity.CampaignMetrics, error)
+	QueueRecipients(ctx context.Context, campaignID string, recipients []*entity.CampaignRecipient) (int, error)
 }
 
 // CRMCampaignTemplateRepository puerto de persistencia para plantillas de campañas.

@@ -2,6 +2,7 @@ package http
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -22,9 +23,15 @@ import (
 type fakeCompanyUseCase struct {
 	createFunc           func(in dto.CreateCompanyRequest) (*dto.CompanyResponse, error)
 	getByIDFunc          func(id string) (*dto.CompanyResponse, error)
+	updateFunc           func(id string, in dto.UpdateCompanyRequest) (*dto.CompanyResponse, error)
+	deleteFunc           func(id string) error
 	listFunc             func(limit, offset int) (*dto.CompanyListResponse, error)
 	createResolutionFunc func(companyID string, in dto.CreateResolutionRequest) (*dto.ResolutionResponse, error)
 	listResolutionsFunc  func(companyID string) ([]dto.ResolutionResponse, error)
+	listModulesFunc      func(ctx context.Context, companyID string) (*dto.CompanyModulesResponse, error)
+	upsertModuleFunc     func(ctx context.Context, companyID string, in dto.CreateCompanyModuleRequest) (*dto.CompanyModuleResponse, error)
+	updateModuleFunc     func(ctx context.Context, companyID, moduleName string, in dto.UpdateCompanyModuleRequest) (*dto.CompanyModuleResponse, error)
+	deleteModuleFunc     func(ctx context.Context, companyID, moduleName string) error
 }
 
 func (f *fakeCompanyUseCase) Create(in dto.CreateCompanyRequest) (*dto.CompanyResponse, error) {
@@ -39,6 +46,20 @@ func (f *fakeCompanyUseCase) GetByID(id string) (*dto.CompanyResponse, error) {
 		return f.getByIDFunc(id)
 	}
 	return nil, errors.New("getByID not configured")
+}
+
+func (f *fakeCompanyUseCase) Update(id string, in dto.UpdateCompanyRequest) (*dto.CompanyResponse, error) {
+	if f.updateFunc != nil {
+		return f.updateFunc(id, in)
+	}
+	return nil, errors.New("update not configured")
+}
+
+func (f *fakeCompanyUseCase) Delete(id string) error {
+	if f.deleteFunc != nil {
+		return f.deleteFunc(id)
+	}
+	return nil
 }
 
 func (f *fakeCompanyUseCase) List(limit, offset int) (*dto.CompanyListResponse, error) {
@@ -60,6 +81,34 @@ func (f *fakeCompanyUseCase) ListResolutions(companyID string) ([]dto.Resolution
 		return f.listResolutionsFunc(companyID)
 	}
 	return nil, errors.New("listResolutions not configured")
+}
+
+func (f *fakeCompanyUseCase) ListModules(ctx context.Context, companyID string) (*dto.CompanyModulesResponse, error) {
+	if f.listModulesFunc != nil {
+		return f.listModulesFunc(ctx, companyID)
+	}
+	return &dto.CompanyModulesResponse{CompanyID: companyID, Modules: []dto.CompanyModuleResponse{}}, nil
+}
+
+func (f *fakeCompanyUseCase) UpsertModule(ctx context.Context, companyID string, in dto.CreateCompanyModuleRequest) (*dto.CompanyModuleResponse, error) {
+	if f.upsertModuleFunc != nil {
+		return f.upsertModuleFunc(ctx, companyID, in)
+	}
+	return nil, errors.New("upsertModule not configured")
+}
+
+func (f *fakeCompanyUseCase) UpdateModule(ctx context.Context, companyID, moduleName string, in dto.UpdateCompanyModuleRequest) (*dto.CompanyModuleResponse, error) {
+	if f.updateModuleFunc != nil {
+		return f.updateModuleFunc(ctx, companyID, moduleName, in)
+	}
+	return nil, errors.New("updateModule not configured")
+}
+
+func (f *fakeCompanyUseCase) DeleteModule(ctx context.Context, companyID, moduleName string) error {
+	if f.deleteModuleFunc != nil {
+		return f.deleteModuleFunc(ctx, companyID, moduleName)
+	}
+	return nil
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────

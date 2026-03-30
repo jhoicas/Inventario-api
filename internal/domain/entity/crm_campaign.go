@@ -49,3 +49,19 @@ type CampaignTemplate struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
+
+// CampaignRecipient representa un destinatario encolado para envío masivo.
+type CampaignRecipient struct {
+	ID          string
+	CampaignID  string
+	CustomerID  string
+	CompanyID   string
+	Email       string
+	Subject     string
+	Body        string
+	Status      string
+	Error       string
+	QueuedAt    time.Time
+	SentAt      *time.Time
+	ProcessedAt *time.Time
+}

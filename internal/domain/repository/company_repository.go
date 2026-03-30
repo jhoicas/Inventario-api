@@ -21,4 +21,13 @@ type CompanyRepository interface {
 
 	// ListModules devuelve los módulos contratados por la empresa.
 	ListModules(ctx context.Context, companyID string) ([]*entity.CompanyModule, error)
+
+	// GetModule devuelve un módulo específico de la empresa.
+	GetModule(ctx context.Context, companyID, moduleName string) (*entity.CompanyModule, error)
+
+	// UpsertModule crea o actualiza el módulo de la empresa.
+	UpsertModule(ctx context.Context, module *entity.CompanyModule) error
+
+	// DeleteModule elimina un módulo asignado a la empresa.
+	DeleteModule(ctx context.Context, companyID, moduleName string) error
 }

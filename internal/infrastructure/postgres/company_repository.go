@@ -189,6 +189,62 @@ func (r *CompanyRepo) ListModules(ctx context.Context, companyID string) ([]*ent
 	return list, rows.Err()
 }
 
+// GetModule devuelve un módulo específico para una empresa.
+func (r *CompanyRepo) GetModule(ctx context.Context, companyID, moduleName string) (*entity.CompanyModule, error) {
+	const query = `
+		SELECT id, company_id, module_name, is_active, activated_at, expires_at, created_at, updated_at
+		FROM company_modules
+		WHERE company_id = $1 AND module_name = $2
+		LIMIT 1`
+	var m entity.CompanyModule
+	err := r.pool.QueryRow(ctx, query, companyID, moduleName).Scan(
+		&m.ID, &m.CompanyID, &m.ModuleName, &m.IsActive, &m.ActivatedAt, &m.ExpiresAt, &m.CreatedAt, &m.UpdatedAt,
+	)
+	if err != nil {
+		if isNoRows(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get company module: %w", err)
+	}
+	return &m, nil
+}
+
+// UpsertModule crea o actualiza el estado de un módulo en una empresa.
+func (r *CompanyRepo) UpsertModule(ctx context.Context, module *entity.CompanyModule) error {
+	const query = `
+		INSERT INTO company_modules (id, company_id, module_name, is_active, activated_at, expires_at, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		ON CONFLICT (company_id, module_name)
+		DO UPDATE SET
+			is_active = EXCLUDED.is_active,
+			activated_at = EXCLUDED.activated_at,
+			expires_at = EXCLUDED.expires_at,
+			updated_at = EXCLUDED.updated_at`
+	_, err := r.pool.Exec(ctx, query,
+		module.ID,
+		module.CompanyID,
+		module.ModuleName,
+		module.IsActive,
+		module.ActivatedAt,
+		module.ExpiresAt,
+		module.CreatedAt,
+		module.UpdatedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("upsert company module: %w", err)
+	}
+	return nil
+}
+
+// DeleteModule elimina la relación company-module.
+func (r *CompanyRepo) DeleteModule(ctx context.Context, companyID, moduleName string) error {
+	const query = `DELETE FROM company_modules WHERE company_id = $1 AND module_name = $2`
+	if _, err := r.pool.Exec(ctx, query, companyID, moduleName); err != nil {
+		return fmt.Errorf("delete company module: %w", err)
+	}
+	return nil
+}
+
 func isNoRows(err error) bool {
 	return errors.Is(err, pgx.ErrNoRows)
 }

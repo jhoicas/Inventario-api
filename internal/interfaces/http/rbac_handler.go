@@ -153,3 +153,19 @@ func (h *RBACHandler) UpdateRoleScreens(c *fiber.Ctx) error {
 	return c.JSON(out)
 }
 
+// AssignRolePermissions godoc
+// @Summary      Asignar permisos (role_screens) a un rol
+// @Tags         rbac
+// @Security     Bearer
+// @Accept       json
+// @Produce      json
+// @Param        role_id  path  string  true  "Role ID o key"
+// @Param        body     body  dto.UpdateRoleScreensRequest  true  "screen_ids"
+// @Success      200      {object}  dto.RBACMenuResponse
+// @Failure      400      {object}  dto.ErrorResponse
+// @Failure      404      {object}  dto.ErrorResponse
+// @Failure      500      {object}  dto.ErrorResponse
+// @Router       /api/rbac/roles/{role_id}/permissions [post]
+func (h *RBACHandler) AssignRolePermissions(c *fiber.Ctx) error {
+	return h.UpdateRoleScreens(c)
+}

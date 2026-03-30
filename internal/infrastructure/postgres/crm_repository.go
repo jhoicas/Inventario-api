@@ -268,6 +268,106 @@ func (r *CRMProfileRepo) ListByCompany(companyID string, limit, offset int) ([]*
 	return list, rows.Err()
 }
 
+func (r *CRMProfileRepo) GetDashboardKPIs(companyID string) (*repository.CRMDashboardKPIs, error) {
+	var out repository.CRMDashboardKPIs
+	var totalSales, avgTicket pgtype.Numeric
+
+	err := r.q.QueryRow(context.Background(), `
+		SELECT
+			(SELECT COUNT(1)::bigint FROM customers WHERE company_id = $1) AS total_customers,
+			COALESCE((SELECT SUM(grand_total) FROM invoices WHERE company_id = $1), 0) AS total_sales,
+			COALESCE((SELECT AVG(grand_total) FROM invoices WHERE company_id = $1), 0) AS average_ticket
+	`, companyID).Scan(&out.TotalCustomers, &totalSales, &avgTicket)
+	if err != nil {
+		return nil, err
+	}
+
+	if totalSales.Valid && totalSales.Int != nil {
+		out.TotalSales = decimal.NewFromBigInt(totalSales.Int, totalSales.Exp)
+	} else {
+		out.TotalSales = decimal.Zero
+	}
+	if avgTicket.Valid && avgTicket.Int != nil {
+		out.AverageTicket = decimal.NewFromBigInt(avgTicket.Int, avgTicket.Exp)
+	} else {
+		out.AverageTicket = decimal.Zero
+	}
+
+	return &out, nil
+}
+
+func (r *CRMProfileRepo) GetDashboardSegmentation(companyID string) ([]*repository.CRMSegmentDistribution, error) {
+	rows, err := r.q.Query(context.Background(), `
+		SELECT
+			COALESCE(cat.name, 'SIN_CATEGORIA') AS category,
+			COUNT(1)::bigint AS count
+		FROM crm_customer_profiles p
+		LEFT JOIN crm_categories cat ON cat.id = p.category_id
+		WHERE p.company_id = $1
+		GROUP BY COALESCE(cat.name, 'SIN_CATEGORIA')
+		ORDER BY count DESC, category ASC
+	`, companyID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]*repository.CRMSegmentDistribution, 0)
+	for rows.Next() {
+		var item repository.CRMSegmentDistribution
+		if err := rows.Scan(&item.Category, &item.Count); err != nil {
+			return nil, err
+		}
+		out = append(out, &item)
+	}
+	return out, rows.Err()
+}
+
+func (r *CRMProfileRepo) GetDashboardMonthlyEvolution(companyID string, months int) ([]*repository.CRMMonthlySales, error) {
+	if months <= 0 {
+		months = 12
+	}
+	rows, err := r.q.Query(context.Background(), `
+		WITH month_series AS (
+			SELECT date_trunc('month', now()) - (interval '1 month' * gs.i) AS month_start
+			FROM generate_series(0, $2 - 1) AS gs(i)
+		),
+		invoice_totals AS (
+			SELECT date_trunc('month', i.date) AS month_start, SUM(i.grand_total) AS sales
+			FROM invoices i
+			WHERE i.company_id = $1
+			  AND i.date >= date_trunc('month', now()) - (interval '1 month' * ($2 - 1))
+			GROUP BY date_trunc('month', i.date)
+		)
+		SELECT
+			to_char(ms.month_start, 'YYYY-MM') AS month,
+			COALESCE(it.sales, 0) AS sales
+		FROM month_series ms
+		LEFT JOIN invoice_totals it ON it.month_start = ms.month_start
+		ORDER BY ms.month_start ASC
+	`, companyID, months)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]*repository.CRMMonthlySales, 0)
+	for rows.Next() {
+		var item repository.CRMMonthlySales
+		var sales pgtype.Numeric
+		if err := rows.Scan(&item.Month, &sales); err != nil {
+			return nil, err
+		}
+		if sales.Valid && sales.Int != nil {
+			item.Sales = decimal.NewFromBigInt(sales.Int, sales.Exp)
+		} else {
+			item.Sales = decimal.Zero
+		}
+		out = append(out, &item)
+	}
+	return out, rows.Err()
+}
+
 // CRMInteractionRepo implementación de CRMInteractionRepository.
 type CRMInteractionRepo struct{ q Querier }
 
@@ -813,6 +913,47 @@ func (r *CRMCampaignRepo) GetMetrics(ctx context.Context, campaignID string) (*e
 		m.Revenue = decimal.NewFromBigInt(revenue.Int, revenue.Exp)
 	}
 	return &m, nil
+}
+
+func (r *CRMCampaignRepo) QueueRecipients(ctx context.Context, campaignID string, recipients []*entity.CampaignRecipient) (int, error) {
+	queued := 0
+	for _, rec := range recipients {
+		if rec == nil {
+			continue
+		}
+		if rec.ID == "" {
+			rec.ID = uuid.New().String()
+		}
+		if strings.TrimSpace(rec.Status) == "" {
+			rec.Status = "QUEUED"
+		}
+		if rec.QueuedAt.IsZero() {
+			rec.QueuedAt = time.Now()
+		}
+		_, err := r.q.Exec(ctx, `
+			INSERT INTO crm_campaign_recipients (
+				id, campaign_id, customer_id, company_id, email, subject, body, status, error_message, queued_at, sent_at, processed_at
+			)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+			rec.ID,
+			campaignID,
+			rec.CustomerID,
+			rec.CompanyID,
+			rec.Email,
+			rec.Subject,
+			rec.Body,
+			rec.Status,
+			nullIfEmpty(rec.Error),
+			rec.QueuedAt,
+			rec.SentAt,
+			rec.ProcessedAt,
+		)
+		if err != nil {
+			return queued, err
+		}
+		queued++
+	}
+	return queued, nil
 }
 
 // ---------------------------------------------------------------------------

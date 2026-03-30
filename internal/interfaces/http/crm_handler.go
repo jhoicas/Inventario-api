@@ -38,6 +38,7 @@ type CRMHandler struct {
 	CampaignUC      *crm.CampaignUseCase
 	TemplateUC      *crm.CampaignTemplateUseCase
 	InvoiceHistory  invoiceHistoryRepo
+	ProfileRepo     repository.CRMProfileRepository
 	InteractionRepo interface {
 		Create(interaction *entity.CRMInteraction) error
 		ListByCustomer(customerID string, limit, offset int) ([]*entity.CRMInteraction, error)
@@ -72,6 +73,7 @@ func NewCRMHandler(
 		CampaignUC:      campaignUC,
 		TemplateUC:      templateUC,
 		InvoiceHistory:  invoiceHistory,
+		ProfileRepo:     nil,
 		InteractionRepo: interactionRepo,
 	}
 }
@@ -1657,6 +1659,75 @@ func (h *CRMHandler) SendCampaign(c *fiber.Ctx) error {
 // @Failure      409   {object} dto.ErrorResponse
 // @Failure      503   {object} dto.ErrorResponse
 // @Router       /api/crm/campaigns/send-test [post]
+func (h *CRMHandler) GetAnalyticsKPIs(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	if companyID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if h.ProfileRepo == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "analytics crm no configurado"})
+	}
+
+	kpis, err := h.ProfileRepo.GetDashboardKPIs(companyID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+
+	return c.JSON(dto.CRMAnalyticsKPIsResponse{
+		TotalCustomers: kpis.TotalCustomers,
+		TotalSales:     kpis.TotalSales,
+		AverageTicket:  kpis.AverageTicket,
+	})
+}
+
+func (h *CRMHandler) GetAnalyticsSegmentation(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	if companyID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if h.ProfileRepo == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "analytics crm no configurado"})
+	}
+
+	items, err := h.ProfileRepo.GetDashboardSegmentation(companyID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+
+	out := make([]dto.CRMAnalyticsSegmentationItem, 0, len(items))
+	for _, item := range items {
+		out = append(out, dto.CRMAnalyticsSegmentationItem{
+			Category: item.Category,
+			Count:    item.Count,
+		})
+	}
+	return c.JSON(out)
+}
+
+func (h *CRMHandler) GetAnalyticsMonthlyEvolution(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	if companyID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if h.ProfileRepo == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "analytics crm no configurado"})
+	}
+
+	items, err := h.ProfileRepo.GetDashboardMonthlyEvolution(companyID, 12)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+
+	out := make([]dto.CRMAnalyticsMonthlyEvolutionItem, 0, len(items))
+	for _, item := range items {
+		out = append(out, dto.CRMAnalyticsMonthlyEvolutionItem{
+			Month: item.Month,
+			Sales: item.Sales,
+		})
+	}
+	return c.JSON(out)
+}
+
 func (h *CRMHandler) SendTestCampaign(c *fiber.Ctx) error {
 	companyID := GetCompanyID(c)
 	userID := GetUserID(c)

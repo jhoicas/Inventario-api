@@ -71,7 +71,12 @@ func Router(app *fiber.App, deps RouterDeps) {
 	api.Get("/companies", companyHandler.List)
 	api.Post("/companies", companyHandler.Create)
 	api.Get("/companies/:id", companyHandler.GetByID)
+	api.Put("/companies/:id", companyHandler.Update)
+	api.Delete("/companies/:id", companyHandler.Delete)
 	api.Get("/companies/:id/modules", companyHandler.GetModules)
+	api.Post("/companies/:id/modules", companyHandler.UpsertModule)
+	api.Put("/companies/:id/modules/:module_name", companyHandler.UpdateModule)
+	api.Delete("/companies/:id/modules/:module_name", companyHandler.DeleteModule)
 	api.Post("/companies/:id/resolutions", companyHandler.CreateResolution)
 	api.Get("/companies/:id/resolutions", companyHandler.ListResolutions)
 
@@ -91,6 +96,7 @@ func Router(app *fiber.App, deps RouterDeps) {
 		rbacGroup.Get("/modules", RequireRole(entity.RoleAdmin), rbacHandler.GetCatalog)
 		rbacGroup.Get("/roles/:role_id/menu", RequireRole(entity.RoleAdmin), rbacHandler.GetRoleMenu)
 		rbacGroup.Put("/roles/:role_id/screens", RequireRole(entity.RoleAdmin), rbacHandler.UpdateRoleScreens)
+		rbacGroup.Post("/roles/:role_id/permissions", RequireRole(entity.RoleAdmin), rbacHandler.AssignRolePermissions)
 	}
 
 	// ── Catálogos de lectura (JWT solo — todos los roles pueden leer para armar la UI) ──
@@ -324,6 +330,9 @@ func Router(app *fiber.App, deps RouterDeps) {
 		crmGroup.Post("/campaigns/send", h.SendCampaign)
 		crmGroup.Post("/campaigns/send-test", h.SendTestCampaign)
 		crmGroup.Get("/campaigns/:id/metrics", h.GetCampaignMetrics)
+		crmGroup.Get("/analytics/kpis", h.GetAnalyticsKPIs)
+		crmGroup.Get("/analytics/segmentation", h.GetAnalyticsSegmentation)
+		crmGroup.Get("/analytics/monthly-evolution", h.GetAnalyticsMonthlyEvolution)
 		crmGroup.Post("/campaigns/recipients/resolve", h.ResolveCampaignRecipients)
 		crmGroup.Post("/campaign-templates", h.CreateCampaignTemplate)
 		crmGroup.Get("/campaign-templates", h.ListCampaignTemplates)

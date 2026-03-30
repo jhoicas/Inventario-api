@@ -70,8 +70,31 @@ type ResolutionResponse struct {
 
 // CompanyModuleResponse salida ligera de módulos SaaS por empresa.
 type CompanyModuleResponse struct {
+	ID          string     `json:"id,omitempty"`
+	ModuleName  string     `json:"module_name"`
+	IsActive    bool       `json:"is_active"`
+	ActivatedAt *time.Time `json:"activated_at,omitempty"`
+	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
+	CreatedAt   *time.Time `json:"created_at,omitempty"`
+	UpdatedAt   *time.Time `json:"updated_at,omitempty"`
+}
+
+// CreateCompanyModuleRequest entrada para crear/asignar un módulo a una empresa.
+type CreateCompanyModuleRequest struct {
 	ModuleName string `json:"module_name"`
-	IsActive   bool   `json:"is_active"`
+	IsActive   *bool  `json:"is_active,omitempty"`
+	ExpiresAt  string `json:"expires_at,omitempty"` // RFC3339 opcional
+}
+
+// UpdateCompanyModuleRequest entrada para actualizar estado/vencimiento de un módulo.
+type UpdateCompanyModuleRequest struct {
+	IsActive  *bool  `json:"is_active,omitempty"`
+	ExpiresAt string `json:"expires_at,omitempty"` // RFC3339 opcional; "" limpia vencimiento
+}
+
+// ToggleCompanyModuleRequest entrada para activar/desactivar rápidamente un módulo.
+type ToggleCompanyModuleRequest struct {
+	IsActive bool `json:"is_active"`
 }
 
 // CompanyModulesResponse respuesta de GET /api/companies/{id}/modules.

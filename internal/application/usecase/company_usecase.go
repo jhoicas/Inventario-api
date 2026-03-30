@@ -58,6 +58,50 @@ func (uc *CompanyUseCase) GetByID(id string) (*dto.CompanyResponse, error) {
 	return entityToCompanyResponse(company), nil
 }
 
+// Update actualiza una empresa existente.
+func (uc *CompanyUseCase) Update(id string, in dto.UpdateCompanyRequest) (*dto.CompanyResponse, error) {
+	if id == "" {
+		return nil, domain.ErrInvalidInput
+	}
+	company, err := uc.repo.GetByID(id)
+	if err != nil {
+		return nil, err
+	}
+	if company == nil {
+		return nil, domain.ErrNotFound
+	}
+
+	if in.Name != nil {
+		company.Name = *in.Name
+	}
+	if in.Address != nil {
+		company.Address = *in.Address
+	}
+	if in.Phone != nil {
+		company.Phone = *in.Phone
+	}
+	if in.Email != nil {
+		company.Email = *in.Email
+	}
+	if in.Status != nil {
+		company.Status = *in.Status
+	}
+
+	company.UpdatedAt = time.Now()
+	if err := uc.repo.Update(company); err != nil {
+		return nil, err
+	}
+	return entityToCompanyResponse(company), nil
+}
+
+// Delete elimina una empresa.
+func (uc *CompanyUseCase) Delete(id string) error {
+	if id == "" {
+		return domain.ErrInvalidInput
+	}
+	return uc.repo.Delete(id)
+}
+
 // List lista empresas con paginación.
 func (uc *CompanyUseCase) List(limit, offset int) (*dto.CompanyListResponse, error) {
 	list, err := uc.repo.List(limit, offset)
@@ -168,12 +212,144 @@ func (uc *CompanyUseCase) ListModules(ctx context.Context, companyID string) (*d
 		Modules:   make([]dto.CompanyModuleResponse, 0, len(list)),
 	}
 	for _, m := range list {
+		activatedAt := m.ActivatedAt
+		createdAt := m.CreatedAt
+		updatedAt := m.UpdatedAt
 		out.Modules = append(out.Modules, dto.CompanyModuleResponse{
-			ModuleName: m.ModuleName,
-			IsActive:   m.IsActive,
+			ID:          m.ID,
+			ModuleName:  m.ModuleName,
+			IsActive:    m.IsActive,
+			ActivatedAt: &activatedAt,
+			ExpiresAt:   m.ExpiresAt,
+			CreatedAt:   &createdAt,
+			UpdatedAt:   &updatedAt,
 		})
 	}
 	return out, nil
+}
+
+// UpsertModule crea/actualiza un módulo para una empresa.
+func (uc *CompanyUseCase) UpsertModule(ctx context.Context, companyID string, in dto.CreateCompanyModuleRequest) (*dto.CompanyModuleResponse, error) {
+	if companyID == "" || in.ModuleName == "" {
+		return nil, domain.ErrInvalidInput
+	}
+	company, err := uc.repo.GetByID(companyID)
+	if err != nil {
+		return nil, err
+	}
+	if company == nil {
+		return nil, domain.ErrNotFound
+	}
+
+	now := time.Now()
+	active := true
+	if in.IsActive != nil {
+		active = *in.IsActive
+	}
+
+	var expiresAt *time.Time
+	if in.ExpiresAt != "" {
+		parsed, err := time.Parse(time.RFC3339, in.ExpiresAt)
+		if err != nil {
+			return nil, domain.ErrInvalidInput
+		}
+		expiresAt = &parsed
+	}
+
+	current, err := uc.repo.GetModule(ctx, companyID, in.ModuleName)
+	if err != nil {
+		return nil, err
+	}
+
+	module := &entity.CompanyModule{
+		ID:          uuid.New().String(),
+		CompanyID:   companyID,
+		ModuleName:  in.ModuleName,
+		IsActive:    active,
+		ActivatedAt: now,
+		ExpiresAt:   expiresAt,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	if current != nil {
+		module.ID = current.ID
+		module.CreatedAt = current.CreatedAt
+		module.ActivatedAt = current.ActivatedAt
+		if active && !current.IsActive {
+			module.ActivatedAt = now
+		}
+	}
+
+	if err := uc.repo.UpsertModule(ctx, module); err != nil {
+		return nil, err
+	}
+
+	createdAt := module.CreatedAt
+	updatedAt := module.UpdatedAt
+	activatedAt := module.ActivatedAt
+	return &dto.CompanyModuleResponse{
+		ID:          module.ID,
+		ModuleName:  module.ModuleName,
+		IsActive:    module.IsActive,
+		ActivatedAt: &activatedAt,
+		ExpiresAt:   module.ExpiresAt,
+		CreatedAt:   &createdAt,
+		UpdatedAt:   &updatedAt,
+	}, nil
+}
+
+// UpdateModule actualiza datos de un módulo ya existente.
+func (uc *CompanyUseCase) UpdateModule(ctx context.Context, companyID, moduleName string, in dto.UpdateCompanyModuleRequest) (*dto.CompanyModuleResponse, error) {
+	if companyID == "" || moduleName == "" {
+		return nil, domain.ErrInvalidInput
+	}
+	module, err := uc.repo.GetModule(ctx, companyID, moduleName)
+	if err != nil {
+		return nil, err
+	}
+	if module == nil {
+		return nil, domain.ErrNotFound
+	}
+
+	if in.IsActive != nil {
+		module.IsActive = *in.IsActive
+		if module.IsActive {
+			module.ActivatedAt = time.Now()
+		}
+	}
+	if in.ExpiresAt != "" {
+		parsed, err := time.Parse(time.RFC3339, in.ExpiresAt)
+		if err != nil {
+			return nil, domain.ErrInvalidInput
+		}
+		module.ExpiresAt = &parsed
+	}
+	module.UpdatedAt = time.Now()
+
+	if err := uc.repo.UpsertModule(ctx, module); err != nil {
+		return nil, err
+	}
+
+	createdAt := module.CreatedAt
+	updatedAt := module.UpdatedAt
+	activatedAt := module.ActivatedAt
+	return &dto.CompanyModuleResponse{
+		ID:          module.ID,
+		ModuleName:  module.ModuleName,
+		IsActive:    module.IsActive,
+		ActivatedAt: &activatedAt,
+		ExpiresAt:   module.ExpiresAt,
+		CreatedAt:   &createdAt,
+		UpdatedAt:   &updatedAt,
+	}, nil
+}
+
+// DeleteModule elimina un módulo de la empresa.
+func (uc *CompanyUseCase) DeleteModule(ctx context.Context, companyID, moduleName string) error {
+	if companyID == "" || moduleName == "" {
+		return domain.ErrInvalidInput
+	}
+	return uc.repo.DeleteModule(ctx, companyID, moduleName)
 }
 
 func entityToCompanyResponse(c *entity.Company) *dto.CompanyResponse {

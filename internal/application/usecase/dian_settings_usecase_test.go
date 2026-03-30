@@ -43,6 +43,18 @@ func (f *fakeCompanyRepoForDIANSettings) List(limit, offset int) ([]*entity.Comp
 	return nil, nil
 }
 func (f *fakeCompanyRepoForDIANSettings) Delete(id string) error { return nil }
+func (f *fakeCompanyRepoForDIANSettings) ListModules(ctx context.Context, companyID string) ([]*entity.CompanyModule, error) {
+	return []*entity.CompanyModule{}, nil
+}
+func (f *fakeCompanyRepoForDIANSettings) GetModule(ctx context.Context, companyID, moduleName string) (*entity.CompanyModule, error) {
+	return nil, nil
+}
+func (f *fakeCompanyRepoForDIANSettings) UpsertModule(ctx context.Context, module *entity.CompanyModule) error {
+	return nil
+}
+func (f *fakeCompanyRepoForDIANSettings) DeleteModule(ctx context.Context, companyID, moduleName string) error {
+	return nil
+}
 func (f *fakeCompanyRepoForDIANSettings) HasActiveModule(ctx context.Context, companyID, moduleName string) (bool, error) {
 	return true, nil
 }

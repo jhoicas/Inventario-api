@@ -48,12 +48,12 @@ type CreateTicketRequest struct {
 
 // CreateTicketFromEmailRequest body para crear un ticket CRM desde un correo.
 type CreateTicketFromEmailRequest struct {
-	EmailID      string `json:"email_id"`
-	Subject      string `json:"subject"`
-	Description  string `json:"description"`
-	SenderEmail  string `json:"sender_email"`
-	Priority     string `json:"priority"`
-	AssignedTo   string `json:"assigned_to,omitempty"`
+	EmailID     string `json:"email_id"`
+	Subject     string `json:"subject"`
+	Description string `json:"description"`
+	SenderEmail string `json:"sender_email"`
+	Priority    string `json:"priority"`
+	AssignedTo  string `json:"assigned_to,omitempty"`
 }
 
 // UpdateTicketRequest body para actualizar un ticket.
@@ -338,6 +338,26 @@ type ResolveCampaignRecipientsResponse struct {
 	Recipients []CampaignRecipientDTO `json:"recipients"`
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+// CRM Analytics Dashboard
+// ──────────────────────────────────────────────────────────────────────────────
+
+type CRMAnalyticsKPIsResponse struct {
+	TotalCustomers int64           `json:"total_customers"`
+	TotalSales     decimal.Decimal `json:"total_sales"`
+	AverageTicket  decimal.Decimal `json:"average_ticket"`
+}
+
+type CRMAnalyticsSegmentationItem struct {
+	Category string `json:"category"`
+	Count    int64  `json:"count"`
+}
+
+type CRMAnalyticsMonthlyEvolutionItem struct {
+	Month string          `json:"month"`
+	Sales decimal.Decimal `json:"sales"`
+}
+
 // SendCampaignRequest body para enviar una campaña de email masiva.
 type SendCampaignRequest struct {
 	Subject    string `json:"subject"`               // requerido
@@ -351,4 +371,26 @@ type SendTestCampaignRequest struct {
 	Body       string `json:"body"`
 	Email      string `json:"email,omitempty"`
 	CustomerID string `json:"customer_id,omitempty"`
+}
+
+// ImportCRMResponse resumen de la importación de clientes CRM desde Excel.
+type ImportCRMResponse struct {
+	ProcessedRows int      `json:"processed_rows"`
+	Created       int      `json:"created"`
+	Updated       int      `json:"updated"`
+	Errors        []string `json:"errors,omitempty"`
+}
+
+// SendBulkCampaignRequest body para encolar envío masivo por customer IDs.
+type SendBulkCampaignRequest struct {
+	CustomerIDs []string `json:"customer_ids"`
+	Subject     string   `json:"subject"`
+	Body        string   `json:"body"`
+}
+
+// SendBulkCampaignResponse respuesta de encolado masivo.
+type SendBulkCampaignResponse struct {
+	CampaignID string `json:"campaign_id"`
+	Queued     int    `json:"queued"`
+	Status     string `json:"status"`
 }

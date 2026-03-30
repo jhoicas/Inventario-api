@@ -37,6 +37,18 @@ func (f *fakeCompanyRepoForRouter) List(limit, offset int) ([]*entity.Company, e
 	return nil, nil
 }
 func (f *fakeCompanyRepoForRouter) Delete(id string) error { return nil }
+func (f *fakeCompanyRepoForRouter) ListModules(ctx context.Context, companyID string) ([]*entity.CompanyModule, error) {
+	return []*entity.CompanyModule{}, nil
+}
+func (f *fakeCompanyRepoForRouter) GetModule(ctx context.Context, companyID, moduleName string) (*entity.CompanyModule, error) {
+	return nil, nil
+}
+func (f *fakeCompanyRepoForRouter) UpsertModule(ctx context.Context, module *entity.CompanyModule) error {
+	return nil
+}
+func (f *fakeCompanyRepoForRouter) DeleteModule(ctx context.Context, companyID, moduleName string) error {
+	return nil
+}
 func (f *fakeCompanyRepoForRouter) HasActiveModule(ctx context.Context, companyID, moduleName string) (bool, error) {
 	if f.hasActiveModuleFunc != nil {
 		return f.hasActiveModuleFunc(ctx, companyID, moduleName)
