@@ -28,16 +28,20 @@ type Module struct {
 
 // Screen representa una pantalla/entrada navegable y su endpoint asociado.
 type Screen struct {
-	ID            string
-	ModuleID      string
-	Key           string
-	Name          string
-	FrontendRoute string
-	ApiEndpoint   string
-	Order         int
-	IsActive      bool
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	ID                   string
+	ModuleID             string
+	ModuleKey            string
+	ModuleName           string
+	ModuleKeySnapshot    string
+	Key                  string
+	Name                 string
+	FrontendRoute        string
+	ApiEndpoint          string
+	Order                int
+	IsActive             bool
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
+	ModuleClassification string
 }
 
 // RoleScreen es la tabla pivote entre roles y pantallas.
@@ -46,4 +50,3 @@ type RoleScreen struct {
 	ScreenID  string
 	CreatedAt time.Time
 }
-

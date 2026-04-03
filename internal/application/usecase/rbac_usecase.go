@@ -163,12 +163,16 @@ func mapModules(modules []*entity.Module) []dto.ModuleResponse {
 		}
 		for _, screen := range module.Screens {
 			m.Screens = append(m.Screens, dto.ScreenResponse{
-				ID:            screen.ID,
-				Key:           screen.Key,
-				Name:          screen.Name,
-				FrontendRoute: screen.FrontendRoute,
-				ApiEndpoint:   screen.ApiEndpoint,
-				Order:         screen.Order,
+				ID:                   screen.ID,
+				Key:                  screen.Key,
+				Name:                 screen.Name,
+				ModuleKey:            screen.ModuleKey,
+				ModuleName:           screen.ModuleName,
+				ModuleKeySnapshot:    screen.ModuleKeySnapshot,
+				FrontendRoute:        screen.FrontendRoute,
+				ApiEndpoint:          screen.ApiEndpoint,
+				Order:                screen.Order,
+				ModuleClassification: deriveModuleClassification(module.Key),
 			})
 		}
 		out = append(out, m)
@@ -176,3 +180,11 @@ func mapModules(modules []*entity.Module) []dto.ModuleResponse {
 	return out
 }
 
+func deriveModuleClassification(moduleKey string) string {
+	moduleKey = strings.TrimSpace(moduleKey)
+	if moduleKey == "" {
+		return ""
+	}
+	parts := strings.SplitN(moduleKey, ".", 2)
+	return parts[0]
+}

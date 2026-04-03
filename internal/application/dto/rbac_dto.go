@@ -13,12 +13,16 @@ type RoleResponse struct {
 
 // ScreenResponse representa una pantalla dentro de un módulo.
 type ScreenResponse struct {
-	ID            string `json:"id"`
-	Key           string `json:"key"`
-	Name          string `json:"name"`
-	FrontendRoute string `json:"frontend_route"`
-	ApiEndpoint   string `json:"api_endpoint"`
-	Order         int    `json:"order"`
+	ID                   string `json:"id"`
+	Key                  string `json:"key"`
+	Name                 string `json:"name"`
+	ModuleKey            string `json:"module_key,omitempty"`
+	ModuleName           string `json:"module_name,omitempty"`
+	ModuleKeySnapshot    string `json:"module_key_snapshot,omitempty"`
+	FrontendRoute        string `json:"frontend_route"`
+	ApiEndpoint          string `json:"api_endpoint"`
+	Order                int    `json:"order"`
+	ModuleClassification string `json:"module_classification,omitempty"`
 }
 
 // ModuleResponse representa un módulo con sus pantallas permitidas.
@@ -48,4 +52,3 @@ type RBACCatalogResponse struct {
 type UpdateRoleScreensRequest struct {
 	ScreenIDs []string `json:"screen_ids"`
 }
-

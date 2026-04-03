@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
@@ -177,7 +178,7 @@ func (r *RBACRepo) loadModules(ctx context.Context, roleID string) ([]*entity.Mo
 	if roleID == "" {
 		rows, err = r.pool.Query(ctx, `
 			SELECT m.id, m.key, m.name, m.icon, m."order", m.is_active,
-			       s.id, s.module_id, s.key, s.name, s.frontend_route, s.api_endpoint, s."order", s.is_active,
+			       s.id, s.module_id, m.key AS module_key, m.name AS module_name, COALESCE(s.module_key_snapshot, ''), s.key, s.name, s.frontend_route, s.api_endpoint, s."order", s.is_active,
 			       m.created_at, m.updated_at, s.created_at, s.updated_at
 			FROM modules m
 			JOIN screens s ON s.module_id = m.id AND s.is_active = true
@@ -186,7 +187,7 @@ func (r *RBACRepo) loadModules(ctx context.Context, roleID string) ([]*entity.Mo
 	} else {
 		rows, err = r.pool.Query(ctx, `
 			SELECT m.id, m.key, m.name, m.icon, m."order", m.is_active,
-			       s.id, s.module_id, s.key, s.name, s.frontend_route, s.api_endpoint, s."order", s.is_active,
+			       s.id, s.module_id, m.key AS module_key, m.name AS module_name, COALESCE(s.module_key_snapshot, ''), s.key, s.name, s.frontend_route, s.api_endpoint, s."order", s.is_active,
 			       m.created_at, m.updated_at, s.created_at, s.updated_at
 			FROM modules m
 			JOIN screens s ON s.module_id = m.id AND s.is_active = true
@@ -207,8 +208,10 @@ func (r *RBACRepo) loadModules(ctx context.Context, roleID string) ([]*entity.Mo
 
 	for rows.Next() {
 		var (
-			module     entity.Module
-			screen     entity.Screen
+			module           entity.Module
+			screen           entity.Screen
+			screenModuleKey  string
+			screenModuleName sql.NullString
 		)
 
 		if err := rows.Scan(
@@ -220,6 +223,9 @@ func (r *RBACRepo) loadModules(ctx context.Context, roleID string) ([]*entity.Mo
 			&module.IsActive,
 			&screen.ID,
 			&screen.ModuleID,
+			&screenModuleKey,
+			&screenModuleName,
+			&screen.ModuleKeySnapshot,
 			&screen.Key,
 			&screen.Name,
 			&screen.FrontendRoute,
@@ -232,6 +238,11 @@ func (r *RBACRepo) loadModules(ctx context.Context, roleID string) ([]*entity.Mo
 			&screen.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan rbac module row: %w", err)
+		}
+
+		screen.ModuleKey = screenModuleKey
+		if screenModuleName.Valid {
+			screen.ModuleName = screenModuleName.String
 		}
 
 		if existing, ok := modulesByID[module.ID]; ok {
@@ -264,4 +275,3 @@ func normalizeEndpoint(endpoint string) string {
 	}
 	return endpoint
 }
-
