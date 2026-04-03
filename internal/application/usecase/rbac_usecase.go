@@ -110,6 +110,22 @@ func (uc *RBACUseCase) CanAccess(ctx context.Context, roleRef, apiEndpoint strin
 	return uc.rbacRepo.CanAccess(role.ID, apiEndpoint)
 }
 
+// GetScreenByID devuelve una pantalla por su ID.
+func (uc *RBACUseCase) GetScreenByID(ctx context.Context, id string) (*entity.Screen, error) {
+	if uc.rbacRepo == nil {
+		return nil, fmt.Errorf("rbac repository no configurado")
+	}
+	return uc.rbacRepo.GetScreenByID(ctx, id)
+}
+
+// GetScreenByEndpoint devuelve una pantalla por su endpoint API normalizado.
+func (uc *RBACUseCase) GetScreenByEndpoint(ctx context.Context, apiEndpoint string) (*entity.Screen, error) {
+	if uc.rbacRepo == nil {
+		return nil, fmt.Errorf("rbac repository no configurado")
+	}
+	return uc.rbacRepo.GetScreenByEndpoint(ctx, apiEndpoint)
+}
+
 // ResolveRoleID normaliza un roleRef y devuelve su ID real.
 func (uc *RBACUseCase) ResolveRoleID(ctx context.Context, roleRef string) (string, error) {
 	role, err := uc.resolveRole(ctx, roleRef)

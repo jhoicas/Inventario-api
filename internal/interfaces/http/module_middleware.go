@@ -22,6 +22,9 @@ type moduleChecker interface {
 //   - Si no hay company_id en el contexto, responde 401 (el AuthMiddleware debería haberlo puesto).
 func RequireModule(moduleName string, checker moduleChecker) fiber.Handler {
 	return func(c *fiber.Ctx) error {
+		if IsAdmin(c) || IsSuperAdmin(c) {
+			return c.Next()
+		}
 		companyID := GetCompanyID(c)
 		if companyID == "" {
 			return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{

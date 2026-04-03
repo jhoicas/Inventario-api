@@ -48,3 +48,19 @@ type CompanyModule struct {
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }
+
+// CompanyScreen representa la habilitación de una pantalla para una empresa.
+type CompanyScreen struct {
+	ID            string
+	CompanyID     string
+	ScreenID      string
+	ScreenKey     string
+	ScreenName    string
+	ModuleKey     string
+	ModuleName    string
+	FrontendRoute string
+	ApiEndpoint   string
+	IsActive      bool
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}

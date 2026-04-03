@@ -91,9 +91,9 @@ func RequireRole(allowedRoles ...string) fiber.Handler {
 				Message: "el token no contiene información de roles; vuelve a iniciar sesión",
 			})
 		}
-		// Acceso siempre permitido para admin.
+		// Acceso siempre permitido para admin/superadmin.
 		for _, r := range roles {
-			if r == entity.RoleAdmin {
+			if r == entity.RoleAdmin || r == entity.RoleSuperAdmin {
 				return c.Next()
 			}
 		}
@@ -165,6 +165,17 @@ func IsAdmin(c *fiber.Ctx) bool {
 	roles := GetRoles(c)
 	for _, r := range roles {
 		if r == entity.RoleAdmin {
+			return true
+		}
+	}
+	return false
+}
+
+// IsSuperAdmin comprueba si el usuario tiene el rol superadmin.
+func IsSuperAdmin(c *fiber.Ctx) bool {
+	roles := GetRoles(c)
+	for _, r := range roles {
+		if r == entity.RoleSuperAdmin {
 			return true
 		}
 	}

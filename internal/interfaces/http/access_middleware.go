@@ -31,7 +31,7 @@ func RequireAccess(moduleName string, moduleChecker moduleAccessChecker, screenC
 		}
 
 		// Admin/super-admin bypass en pantalla y módulo.
-		if IsAdmin(c) {
+		if IsAdmin(c) || IsSuperAdmin(c) {
 			return c.Next()
 		}
 

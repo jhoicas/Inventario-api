@@ -15,6 +15,7 @@ import (
 // RouterDeps dependencias para el router.
 type RouterDeps struct {
 	CompanyUC              *usecase.CompanyUseCase
+	CompanyScreensUC       *usecase.CompanyScreenUseCase
 	CompanyRepo            repository.CompanyRepository // Para inyectar configuración DIAN
 	WarehouseUC            *usecase.WarehouseUseCase
 	ProductUC              *usecase.ProductUseCase
@@ -85,7 +86,7 @@ func Router(app *fiber.App, deps RouterDeps) {
 	protected := api.Group("/", AuthMiddleware(deps.JWTSecret))
 	screenAccess := fiber.Handler(func(c *fiber.Ctx) error { return c.Next() })
 	if deps.RBACUC != nil {
-		screenAccess = RequirePermission(deps.RBACUC)
+		screenAccess = RequirePermission(deps.RBACUC, deps.CompanyRepo)
 	}
 
 	if deps.RBACUC != nil {
@@ -97,6 +98,16 @@ func Router(app *fiber.App, deps RouterDeps) {
 		rbacGroup.Get("/roles/:role_id/menu", RequireRole(entity.RoleAdmin), rbacHandler.GetRoleMenu)
 		rbacGroup.Put("/roles/:role_id/screens", RequireRole(entity.RoleAdmin), rbacHandler.UpdateRoleScreens)
 		rbacGroup.Post("/roles/:role_id/permissions", RequireRole(entity.RoleAdmin), rbacHandler.AssignRolePermissions)
+	}
+
+	if deps.CompanyScreensUC != nil {
+		companyScreenHandler := NewCompanyScreenHandler(deps.CompanyScreensUC)
+		superAdminGroup := protected.Group("/admin", RequireRole(entity.RoleSuperAdmin))
+		adminCompanies := superAdminGroup.Group("/companies")
+		adminCompanies.Get("/:id/screens", companyScreenHandler.List)
+		adminCompanies.Post("/:id/screens", companyScreenHandler.Upsert)
+		adminCompanies.Put("/:id/screens/:screen_id", companyScreenHandler.Update)
+		adminCompanies.Delete("/:id/screens/:screen_id", companyScreenHandler.Delete)
 	}
 
 	// ── Catálogos de lectura (JWT solo — todos los roles pueden leer para armar la UI) ──

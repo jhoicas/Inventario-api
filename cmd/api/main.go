@@ -154,6 +154,7 @@ func main() {
 	emailRepo := postgres.NewEmailRepository(pool)
 	purchaseOrderRepo := postgres.NewPurchaseOrderRepository(pool)
 	companyUC := usecase.NewCompanyUseCase(companyRepo, resolutionRepo)
+	companyScreenUC := usecase.NewCompanyScreenUseCase(companyRepo, rbacRepo)
 	warehouseUC := usecase.NewWarehouseUseCase(warehouseRepo)
 	productUC := usecase.NewProductUseCase(productRepo)
 	supplierUC := usecase.NewSupplierUseCase(supplierRepo)
@@ -347,6 +348,7 @@ func main() {
 
 	httpRouter.Router(app, httpRouter.RouterDeps{
 		CompanyUC:              companyUC,
+		CompanyScreensUC:       companyScreenUC,
 		CompanyRepo:            companyRepo,
 		WarehouseUC:            warehouseUC,
 		ProductUC:              productUC,

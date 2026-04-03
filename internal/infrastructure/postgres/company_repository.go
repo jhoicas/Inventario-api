@@ -245,6 +245,132 @@ func (r *CompanyRepo) DeleteModule(ctx context.Context, companyID, moduleName st
 	return nil
 }
 
+// HasActiveScreen informa si la empresa tiene la pantalla activa.
+func (r *CompanyRepo) HasActiveScreen(ctx context.Context, companyID, screenID string) (bool, error) {
+	const query = `
+		SELECT EXISTS (
+			SELECT 1 FROM company_screens
+			 WHERE company_id = $1
+			   AND screen_id = $2
+			   AND is_active = true
+		)
+	`
+	var active bool
+	if err := r.pool.QueryRow(ctx, query, companyID, screenID).Scan(&active); err != nil {
+		return false, fmt.Errorf("check company screen %s: %w", screenID, err)
+	}
+	return active, nil
+}
+
+// ListScreens devuelve las pantallas habilitadas para la empresa.
+func (r *CompanyRepo) ListScreens(ctx context.Context, companyID string) ([]*entity.CompanyScreen, error) {
+	const query = `
+		SELECT cs.id, cs.company_id, cs.screen_id, s.key, s.name, m.key, m.name, s.frontend_route, s.api_endpoint,
+		       cs.is_active, cs.created_at, cs.updated_at
+		FROM company_screens cs
+		JOIN screens s ON s.id = cs.screen_id
+		JOIN modules m ON m.id = s.module_id
+		WHERE cs.company_id = $1
+		ORDER BY m."order", s."order"`
+	rows, err := r.pool.Query(ctx, query, companyID)
+	if err != nil {
+		return nil, fmt.Errorf("list company screens: %w", err)
+	}
+	defer rows.Close()
+
+	var list []*entity.CompanyScreen
+	for rows.Next() {
+		var cs entity.CompanyScreen
+		if err := rows.Scan(
+			&cs.ID,
+			&cs.CompanyID,
+			&cs.ScreenID,
+			&cs.ScreenKey,
+			&cs.ScreenName,
+			&cs.ModuleKey,
+			&cs.ModuleName,
+			&cs.FrontendRoute,
+			&cs.ApiEndpoint,
+			&cs.IsActive,
+			&cs.CreatedAt,
+			&cs.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan company screen: %w", err)
+		}
+		list = append(list, &cs)
+	}
+	return list, rows.Err()
+}
+
+// GetScreen devuelve una pantalla específica de la empresa.
+func (r *CompanyRepo) GetScreen(ctx context.Context, companyID, screenID string) (*entity.CompanyScreen, error) {
+	const query = `
+		SELECT cs.id, cs.company_id, cs.screen_id, s.key, s.name, m.key, m.name, s.frontend_route, s.api_endpoint,
+		       cs.is_active, cs.created_at, cs.updated_at
+		FROM company_screens cs
+		JOIN screens s ON s.id = cs.screen_id
+		JOIN modules m ON m.id = s.module_id
+		WHERE cs.company_id = $1 AND cs.screen_id = $2
+		LIMIT 1`
+	var cs entity.CompanyScreen
+	err := r.pool.QueryRow(ctx, query, companyID, screenID).Scan(
+		&cs.ID,
+		&cs.CompanyID,
+		&cs.ScreenID,
+		&cs.ScreenKey,
+		&cs.ScreenName,
+		&cs.ModuleKey,
+		&cs.ModuleName,
+		&cs.FrontendRoute,
+		&cs.ApiEndpoint,
+		&cs.IsActive,
+		&cs.CreatedAt,
+		&cs.UpdatedAt,
+	)
+	if err != nil {
+		if isNoRows(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get company screen: %w", err)
+	}
+	return &cs, nil
+}
+
+// UpsertScreen crea o actualiza el estado de una pantalla para una empresa.
+func (r *CompanyRepo) UpsertScreen(ctx context.Context, screen *entity.CompanyScreen) error {
+	const query = `
+		INSERT INTO company_screens (id, company_id, screen_id, is_active, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		ON CONFLICT (company_id, screen_id)
+		DO UPDATE SET
+			is_active = EXCLUDED.is_active,
+			updated_at = EXCLUDED.updated_at`
+	_, err := r.pool.Exec(ctx, query,
+		screen.ID,
+		screen.CompanyID,
+		screen.ScreenID,
+		screen.IsActive,
+		screen.CreatedAt,
+		screen.UpdatedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("upsert company screen: %w", err)
+	}
+	return nil
+}
+
+// DeleteScreen desactiva la pantalla para la empresa.
+func (r *CompanyRepo) DeleteScreen(ctx context.Context, companyID, screenID string) error {
+	const query = `
+		UPDATE company_screens
+		SET is_active = false, updated_at = now()
+		WHERE company_id = $1 AND screen_id = $2`
+	if _, err := r.pool.Exec(ctx, query, companyID, screenID); err != nil {
+		return fmt.Errorf("delete company screen: %w", err)
+	}
+	return nil
+}
+
 func isNoRows(err error) bool {
 	return errors.Is(err, pgx.ErrNoRows)
 }

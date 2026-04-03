@@ -6,20 +6,34 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jhoicas/Inventario-api/internal/application/dto"
+	"github.com/jhoicas/Inventario-api/internal/domain/entity"
 )
 
 // rbacAccessChecker es el contrato mínimo para validar rutas dinámicas.
 type rbacAccessChecker interface {
 	CanAccess(ctx context.Context, roleRef, apiEndpoint string) (bool, error)
+	GetScreenByEndpoint(ctx context.Context, apiEndpoint string) (*entity.Screen, error)
+}
+
+type companyScreenAccessChecker interface {
+	HasActiveScreen(ctx context.Context, companyID, screenID string) (bool, error)
 }
 
 // RequirePermission valida que el rol activo pueda acceder a la ruta actual.
 // Debe usarse después de AuthMiddleware y de RequireModule en los módulos SaaS.
-func RequirePermission(checker rbacAccessChecker) fiber.Handler {
+func RequirePermission(checker rbacAccessChecker, companyChecker companyScreenAccessChecker) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		// Regla: admin siempre pasa (evita bloqueos por desincronización de catálogo RBAC en DB).
-		if IsAdmin(c) {
+		// Regla: admin/superadmin siempre pasan (evita bloqueos por desincronización de catálogo RBAC en DB).
+		if IsAdmin(c) || IsSuperAdmin(c) {
 			return c.Next()
+		}
+
+		companyID := GetCompanyID(c)
+		if companyID == "" {
+			return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{
+				Code:    "UNAUTHORIZED",
+				Message: "company_id no encontrado en el token",
+			})
 		}
 
 		roleRef := GetRoleRef(c)
@@ -44,6 +58,35 @@ func RequirePermission(checker rbacAccessChecker) fiber.Handler {
 				Message: "acceso denegado a la ruta " + endpoint,
 			})
 		}
+
+		if companyChecker != nil {
+			screen, err := checker.GetScreenByEndpoint(c.Context(), endpoint)
+			if err != nil {
+				return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{
+					Code:    "SCREEN_LOOKUP_FAILED",
+					Message: "no se pudo verificar la pantalla para la ruta",
+				})
+			}
+			if screen == nil || screen.ID == "" {
+				return c.Status(fiber.StatusForbidden).JSON(dto.ErrorResponse{
+					Code:    "SCREEN_NOT_REGISTERED",
+					Message: "la ruta no está registrada en RBAC",
+				})
+			}
+			active, err := companyChecker.HasActiveScreen(c.Context(), companyID, screen.ID)
+			if err != nil {
+				return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{
+					Code:    "COMPANY_SCREEN_CHECK_FAILED",
+					Message: "no se pudo verificar el acceso de la empresa a la ruta",
+				})
+			}
+			if !active {
+				return c.Status(fiber.StatusForbidden).JSON(dto.ErrorResponse{
+					Code:    "COMPANY_SCREEN_DISABLED",
+					Message: "acceso denegado a la ruta para esta empresa",
+				})
+			}
+		}
 		return c.Next()
 	}
 }
@@ -66,4 +109,3 @@ func normalizeRBACEndpoint(endpoint string) string {
 	}
 	return endpoint
 }
-

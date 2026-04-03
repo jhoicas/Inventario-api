@@ -138,6 +138,75 @@ func (r *RBACRepo) CanAccess(roleID, apiEndpoint string) (bool, error) {
 	return allowed, nil
 }
 
+// GetScreenByID devuelve una pantalla por su ID.
+func (r *RBACRepo) GetScreenByID(ctx context.Context, id string) (*entity.Screen, error) {
+	const query = `
+		SELECT s.id, s.module_id, m.key, m.name, COALESCE(s.module_key_snapshot, ''), s.key, s.name,
+		       s.frontend_route, s.api_endpoint, s."order", s.is_active, s.created_at, s.updated_at
+		FROM screens s
+		JOIN modules m ON m.id = s.module_id
+		WHERE s.id = $1
+		LIMIT 1`
+	var screen entity.Screen
+	err := r.pool.QueryRow(ctx, query, id).Scan(
+		&screen.ID,
+		&screen.ModuleID,
+		&screen.ModuleKey,
+		&screen.ModuleName,
+		&screen.ModuleKeySnapshot,
+		&screen.Key,
+		&screen.Name,
+		&screen.FrontendRoute,
+		&screen.ApiEndpoint,
+		&screen.Order,
+		&screen.IsActive,
+		&screen.CreatedAt,
+		&screen.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get screen by id: %w", err)
+	}
+	return &screen, nil
+}
+
+// GetScreenByEndpoint devuelve una pantalla por su endpoint API.
+func (r *RBACRepo) GetScreenByEndpoint(ctx context.Context, apiEndpoint string) (*entity.Screen, error) {
+	apiEndpoint = normalizeEndpoint(apiEndpoint)
+	const query = `
+		SELECT s.id, s.module_id, m.key, m.name, COALESCE(s.module_key_snapshot, ''), s.key, s.name,
+		       s.frontend_route, s.api_endpoint, s."order", s.is_active, s.created_at, s.updated_at
+		FROM screens s
+		JOIN modules m ON m.id = s.module_id
+		WHERE s.api_endpoint = $1
+		LIMIT 1`
+	var screen entity.Screen
+	err := r.pool.QueryRow(ctx, query, apiEndpoint).Scan(
+		&screen.ID,
+		&screen.ModuleID,
+		&screen.ModuleKey,
+		&screen.ModuleName,
+		&screen.ModuleKeySnapshot,
+		&screen.Key,
+		&screen.Name,
+		&screen.FrontendRoute,
+		&screen.ApiEndpoint,
+		&screen.Order,
+		&screen.IsActive,
+		&screen.CreatedAt,
+		&screen.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get screen by endpoint: %w", err)
+	}
+	return &screen, nil
+}
+
 // ReplaceRoleScreens reemplaza todas las pantallas de un rol.
 func (r *RBACRepo) ReplaceRoleScreens(roleID string, screenIDs []string) error {
 	tx, err := r.pool.Begin(context.Background())

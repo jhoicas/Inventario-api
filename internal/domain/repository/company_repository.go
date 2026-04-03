@@ -30,4 +30,19 @@ type CompanyRepository interface {
 
 	// DeleteModule elimina un módulo asignado a la empresa.
 	DeleteModule(ctx context.Context, companyID, moduleName string) error
+
+	// HasActiveScreen informa si la empresa tiene la pantalla activa.
+	HasActiveScreen(ctx context.Context, companyID, screenID string) (bool, error)
+
+	// ListScreens devuelve las pantallas habilitadas para la empresa.
+	ListScreens(ctx context.Context, companyID string) ([]*entity.CompanyScreen, error)
+
+	// GetScreen devuelve el estado de una pantalla para una empresa.
+	GetScreen(ctx context.Context, companyID, screenID string) (*entity.CompanyScreen, error)
+
+	// UpsertScreen crea o actualiza una pantalla habilitada para una empresa.
+	UpsertScreen(ctx context.Context, screen *entity.CompanyScreen) error
+
+	// DeleteScreen desactiva o elimina una pantalla para una empresa.
+	DeleteScreen(ctx context.Context, companyID, screenID string) error
 }
