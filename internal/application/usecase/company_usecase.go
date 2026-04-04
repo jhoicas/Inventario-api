@@ -118,6 +118,22 @@ func (uc *CompanyUseCase) List(limit, offset int) (*dto.CompanyListResponse, err
 	}, nil
 }
 
+// ListForAdmin lista empresas para superadmin excluyendo la cuenta técnica it@ludoia.com.
+func (uc *CompanyUseCase) ListForAdmin(limit, offset int) (*dto.CompanyListResponse, error) {
+	list, err := uc.repo.ListForAdmin(limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]dto.CompanyResponse, 0, len(list))
+	for _, c := range list {
+		items = append(items, *entityToCompanyResponse(c))
+	}
+	return &dto.CompanyListResponse{
+		Items: items,
+		Page:  dto.PageResponse{Limit: limit, Offset: offset},
+	}, nil
+}
+
 // CreateResolution crea una resolución DIAN para la empresa.
 func (uc *CompanyUseCase) CreateResolution(companyID string, in dto.CreateResolutionRequest) (*dto.ResolutionResponse, error) {
 	if companyID == "" || in.Prefix == "" || in.ResolutionNumber == "" || in.FromNumber <= 0 || in.ToNumber <= 0 || in.ToNumber < in.FromNumber {

@@ -69,6 +69,13 @@ func (f *fakeCompanyUseCase) List(limit, offset int) (*dto.CompanyListResponse, 
 	return nil, errors.New("list not configured")
 }
 
+func (f *fakeCompanyUseCase) ListForAdmin(limit, offset int) (*dto.CompanyListResponse, error) {
+	if f.listFunc != nil {
+		return f.listFunc(limit, offset)
+	}
+	return nil, errors.New("listForAdmin not configured")
+}
+
 func (f *fakeCompanyUseCase) CreateResolution(companyID string, in dto.CreateResolutionRequest) (*dto.ResolutionResponse, error) {
 	if f.createResolutionFunc != nil {
 		return f.createResolutionFunc(companyID, in)

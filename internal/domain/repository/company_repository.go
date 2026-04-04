@@ -14,6 +14,7 @@ type CompanyRepository interface {
 	GetByNIT(nit string) (*entity.Company, error)
 	Update(company *entity.Company) error
 	List(limit, offset int) ([]*entity.Company, error)
+	ListForAdmin(limit, offset int) ([]*entity.Company, error)
 	Delete(id string) error
 
 	// HasActiveModule informa si la empresa tiene el módulo activo y no vencido.

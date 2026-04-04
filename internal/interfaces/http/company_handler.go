@@ -15,6 +15,7 @@ type CompanyUseCase interface {
 	Update(id string, in dto.UpdateCompanyRequest) (*dto.CompanyResponse, error)
 	Delete(id string) error
 	List(limit, offset int) (*dto.CompanyListResponse, error)
+	ListForAdmin(limit, offset int) (*dto.CompanyListResponse, error)
 	CreateResolution(companyID string, in dto.CreateResolutionRequest) (*dto.ResolutionResponse, error)
 	ListResolutions(companyID string) ([]dto.ResolutionResponse, error)
 	ListModules(ctx context.Context, companyID string) (*dto.CompanyModulesResponse, error)
@@ -183,6 +184,33 @@ func (h *CompanyHandler) List(c *fiber.Ctx) error {
 		offset = 0
 	}
 	out, err := h.uc.List(limit, offset)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.JSON(out)
+}
+
+// ListForAdmin godoc
+// @Summary      Listar empresas para super admin
+// @Tags         companies
+// @Produce      json
+// @Param        limit   query  int  false  "Límite"   default(20)
+// @Param        offset  query  int  false  "Offset"   default(0)
+// @Success      200     {object}  dto.CompanyListResponse
+// @Router       /api/admin/companies [get]
+func (h *CompanyHandler) ListForAdmin(c *fiber.Ctx) error {
+	limit := c.QueryInt("limit", 20)
+	offset := c.QueryInt("offset", 0)
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	out, err := h.uc.ListForAdmin(limit, offset)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}

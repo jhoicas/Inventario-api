@@ -138,6 +138,33 @@ func (r *CompanyRepo) List(limit, offset int) ([]*entity.Company, error) {
 	return list, rows.Err()
 }
 
+// ListForAdmin devuelve empresas excluyendo la cuenta técnica del superadmin.
+func (r *CompanyRepo) ListForAdmin(limit, offset int) ([]*entity.Company, error) {
+	query := `
+		SELECT id, name, nit, address, phone, email, status,
+		       COALESCE(environment, 'habilitacion'), COALESCE(cert_hab, ''), COALESCE(cert_prod, ''),
+		       created_at, updated_at
+		FROM companies
+		WHERE lower(email) <> lower('it@ludoia.com')
+		ORDER BY created_at DESC
+		LIMIT $1 OFFSET $2`
+	rows, err := r.pool.Query(context.Background(), query, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("list companies for admin: %w", err)
+	}
+	defer rows.Close()
+
+	var list []*entity.Company
+	for rows.Next() {
+		var c entity.Company
+		if err := rows.Scan(&c.ID, &c.Name, &c.NIT, &c.Address, &c.Phone, &c.Email, &c.Status, &c.Environment, &c.CertHab, &c.CertProd, &c.CreatedAt, &c.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan company for admin: %w", err)
+		}
+		list = append(list, &c)
+	}
+	return list, rows.Err()
+}
+
 // Delete elimina una empresa por ID.
 func (r *CompanyRepo) Delete(id string) error {
 	_, err := r.pool.Exec(context.Background(), `DELETE FROM companies WHERE id = $1`, id)
