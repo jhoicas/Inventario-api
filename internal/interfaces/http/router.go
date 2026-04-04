@@ -100,17 +100,28 @@ func Router(app *fiber.App, deps RouterDeps) {
 		rbacGroup.Post("/roles/:role_id/permissions", RequireRole(entity.RoleAdmin), rbacHandler.AssignRolePermissions)
 	}
 
-	if deps.CompanyScreensUC != nil {
-		companyScreenHandler := NewCompanyScreenHandler(deps.CompanyScreensUC)
+	if deps.CompanyScreensUC != nil || deps.UserRepo != nil {
 		superAdminGroup := protected.Group("/admin", RequireRole(entity.RoleSuperAdmin))
 		adminCompanies := superAdminGroup.Group("/companies")
 		adminCompanies.Get("/", companyHandler.ListForAdmin)
 		adminCompanies.Post("/", companyHandler.Create)
 		adminCompanies.Put("/:id", companyHandler.Update)
-		adminCompanies.Get("/:id/screens", companyScreenHandler.List)
-		adminCompanies.Post("/:id/screens", companyScreenHandler.Upsert)
-		adminCompanies.Put("/:id/screens/:screen_id", companyScreenHandler.Update)
-		adminCompanies.Delete("/:id/screens/:screen_id", companyScreenHandler.Delete)
+
+		if deps.UserRepo != nil {
+			adminUserHandler := NewAdminUserHandler(usecase.NewAdminUserUseCase(deps.UserRepo))
+			companyUsers := adminCompanies.Group("/:company_id/users")
+			companyUsers.Get("/", adminUserHandler.ListByCompany)
+			companyUsers.Post("/", adminUserHandler.CreateForCompany)
+			companyUsers.Put("/:user_id", adminUserHandler.UpdateForCompany)
+		}
+
+		if deps.CompanyScreensUC != nil {
+			companyScreenHandler := NewCompanyScreenHandler(deps.CompanyScreensUC)
+			adminCompanies.Get("/:id/screens", companyScreenHandler.List)
+			adminCompanies.Post("/:id/screens", companyScreenHandler.Upsert)
+			adminCompanies.Put("/:id/screens/:screen_id", companyScreenHandler.Update)
+			adminCompanies.Delete("/:id/screens/:screen_id", companyScreenHandler.Delete)
+		}
 	}
 
 	// ── Catálogos de lectura (JWT solo — todos los roles pueden leer para armar la UI) ──

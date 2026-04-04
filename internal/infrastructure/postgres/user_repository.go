@@ -126,6 +126,9 @@ func (r *UserRepo) Update(user *entity.User) error {
 		user.ID, user.Email, user.PasswordHash, user.Name, user.Roles, user.Status, user.UpdatedAt,
 	)
 	if err != nil {
+		if isUniqueViolation(err) {
+			return domain.ErrEmailAlreadyExists
+		}
 		return fmt.Errorf("update user: %w", err)
 	}
 	return nil
