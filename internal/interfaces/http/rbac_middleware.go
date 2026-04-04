@@ -23,7 +23,7 @@ type companyScreenAccessChecker interface {
 // Debe usarse después de AuthMiddleware y de RequireModule en los módulos SaaS.
 func RequirePermission(checker rbacAccessChecker, companyChecker companyScreenAccessChecker) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		// Regla: admin/superadmin siempre pasan (evita bloqueos por desincronización de catálogo RBAC en DB).
+		// Regla: admin/super_admin siempre pasan (evita bloqueos por desincronización de catálogo RBAC en DB).
 		if IsAdmin(c) || IsSuperAdmin(c) {
 			return c.Next()
 		}

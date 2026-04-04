@@ -5,7 +5,7 @@ import "time"
 // Roles válidos para User.
 const (
 	RoleAdmin      = "admin"
-	RoleSuperAdmin = "superadmin"
+	RoleSuperAdmin = "super_admin"
 	RoleBodeguero  = "bodeguero" // legado inventario
 	RoleVendedor   = "vendedor"  // legado facturación
 
