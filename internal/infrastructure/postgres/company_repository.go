@@ -293,7 +293,7 @@ func (r *CompanyRepo) HasActiveScreen(ctx context.Context, companyID, screenID s
 func (r *CompanyRepo) ListScreens(ctx context.Context, companyID string) ([]*entity.CompanyScreen, error) {
 	const query = `
 		SELECT cs.company_id, cs.screen_id, s.key, s.name, m.key, m.name, s.frontend_route, s.api_endpoint,
-		       cs.is_active, cs.created_at, cs.updated_at
+		       cs.is_active
 		FROM company_screens cs
 		JOIN screens s ON s.id = cs.screen_id
 		JOIN modules m ON m.id = s.module_id
@@ -318,8 +318,6 @@ func (r *CompanyRepo) ListScreens(ctx context.Context, companyID string) ([]*ent
 			&cs.FrontendRoute,
 			&cs.ApiEndpoint,
 			&cs.IsActive,
-			&cs.CreatedAt,
-			&cs.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan company screen: %w", err)
 		}
@@ -335,7 +333,7 @@ func (r *CompanyRepo) ListScreens(ctx context.Context, companyID string) ([]*ent
 func (r *CompanyRepo) GetScreen(ctx context.Context, companyID, screenID string) (*entity.CompanyScreen, error) {
 	const query = `
 		SELECT cs.company_id, cs.screen_id, s.key, s.name, m.key, m.name, s.frontend_route, s.api_endpoint,
-		       cs.is_active, cs.created_at, cs.updated_at
+		       cs.is_active
 		FROM company_screens cs
 		JOIN screens s ON s.id = cs.screen_id
 		JOIN modules m ON m.id = s.module_id
@@ -352,8 +350,6 @@ func (r *CompanyRepo) GetScreen(ctx context.Context, companyID, screenID string)
 		&cs.FrontendRoute,
 		&cs.ApiEndpoint,
 		&cs.IsActive,
-		&cs.CreatedAt,
-		&cs.UpdatedAt,
 	)
 	if err != nil {
 		if isNoRows(err) {
@@ -367,18 +363,15 @@ func (r *CompanyRepo) GetScreen(ctx context.Context, companyID, screenID string)
 // UpsertScreen crea o actualiza el estado de una pantalla para una empresa.
 func (r *CompanyRepo) UpsertScreen(ctx context.Context, screen *entity.CompanyScreen) error {
 	const query = `
-		INSERT INTO company_screens (company_id, screen_id, is_active, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO company_screens (company_id, screen_id, is_active)
+		VALUES ($1, $2, $3)
 		ON CONFLICT (company_id, screen_id)
 		DO UPDATE SET
-			is_active = EXCLUDED.is_active,
-			updated_at = EXCLUDED.updated_at`
+			is_active = EXCLUDED.is_active`
 	_, err := r.pool.Exec(ctx, query,
 		screen.CompanyID,
 		screen.ScreenID,
 		screen.IsActive,
-		screen.CreatedAt,
-		screen.UpdatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("upsert company screen: %w", err)
@@ -390,7 +383,7 @@ func (r *CompanyRepo) UpsertScreen(ctx context.Context, screen *entity.CompanySc
 func (r *CompanyRepo) DeleteScreen(ctx context.Context, companyID, screenID string) error {
 	const query = `
 		UPDATE company_screens
-		SET is_active = false, updated_at = now()
+		SET is_active = false
 		WHERE company_id = $1 AND screen_id = $2`
 	if _, err := r.pool.Exec(ctx, query, companyID, screenID); err != nil {
 		return fmt.Errorf("delete company screen: %w", err)
