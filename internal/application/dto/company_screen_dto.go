@@ -13,6 +13,11 @@ type UpdateCompanyScreenRequest struct {
 	IsActive *bool `json:"is_active,omitempty"`
 }
 
+// ReplaceCompanyScreensRequest reemplaza en bloque las pantallas de una empresa.
+type ReplaceCompanyScreensRequest struct {
+	ScreenIDs []string `json:"screen_ids"`
+}
+
 // CompanyScreenResponse representa una pantalla habilitada para una empresa.
 type CompanyScreenResponse struct {
 	ID            string     `json:"id,omitempty"`

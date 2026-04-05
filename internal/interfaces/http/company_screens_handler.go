@@ -13,6 +13,7 @@ type CompanyScreenUseCase interface {
 	ListScreens(ctx context.Context, companyID string) (*dto.CompanyScreensResponse, error)
 	UpsertScreen(ctx context.Context, companyID string, in dto.CreateCompanyScreenRequest) (*dto.CompanyScreenResponse, error)
 	UpdateScreen(ctx context.Context, companyID, screenID string, in dto.UpdateCompanyScreenRequest) (*dto.CompanyScreenResponse, error)
+	ReplaceScreens(ctx context.Context, companyID string, in dto.ReplaceCompanyScreensRequest) (*dto.CompanyScreensResponse, error)
 	DeleteScreen(ctx context.Context, companyID, screenID string) error
 }
 
@@ -109,4 +110,27 @@ func (h *CompanyScreenHandler) Delete(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}
 	return c.SendStatus(fiber.StatusNoContent)
+}
+
+// Replace reemplaza en bloque las pantallas asignadas a una empresa.
+func (h *CompanyScreenHandler) Replace(c *fiber.Ctx) error {
+	companyID := c.Params("id")
+	if companyID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "MISSING_ID", Message: "id es requerido"})
+	}
+	var in dto.ReplaceCompanyScreensRequest
+	if err := c.BodyParser(&in); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
+	}
+	out, err := h.uc.ReplaceScreens(c.Context(), companyID, in)
+	if err != nil {
+		switch err {
+		case domain.ErrInvalidInput:
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "datos inválidos"})
+		case domain.ErrNotFound:
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "empresa o pantalla no encontrada"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.JSON(out)
 }

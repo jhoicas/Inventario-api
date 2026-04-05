@@ -44,6 +44,9 @@ type CompanyRepository interface {
 	// UpsertScreen crea o actualiza una pantalla habilitada para una empresa.
 	UpsertScreen(ctx context.Context, screen *entity.CompanyScreen) error
 
+	// ReplaceScreens reemplaza todas las pantallas habilitadas de una empresa.
+	ReplaceScreens(ctx context.Context, companyID string, screenIDs []string) error
+
 	// DeleteScreen desactiva o elimina una pantalla para una empresa.
 	DeleteScreen(ctx context.Context, companyID, screenID string) error
 }

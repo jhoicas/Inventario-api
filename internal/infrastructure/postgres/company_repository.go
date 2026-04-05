@@ -379,6 +379,47 @@ func (r *CompanyRepo) UpsertScreen(ctx context.Context, screen *entity.CompanySc
 	return nil
 }
 
+// ReplaceScreens reemplaza todas las pantallas activas de una empresa.
+func (r *CompanyRepo) ReplaceScreens(ctx context.Context, companyID string, screenIDs []string) error {
+	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return fmt.Errorf("begin replace company screens tx: %w", err)
+	}
+	defer func() {
+		if tx != nil {
+			_ = tx.Rollback(ctx)
+		}
+	}()
+
+	if _, err := tx.Exec(ctx, `DELETE FROM company_screens WHERE company_id = $1`, companyID); err != nil {
+		return fmt.Errorf("delete company screens: %w", err)
+	}
+
+	if len(screenIDs) > 0 {
+		seen := make(map[string]struct{}, len(screenIDs))
+		for _, screenID := range screenIDs {
+			if _, ok := seen[screenID]; ok {
+				continue
+			}
+			seen[screenID] = struct{}{}
+			if _, err := tx.Exec(
+				ctx,
+				`INSERT INTO company_screens (company_id, screen_id, is_active) VALUES ($1, $2, true)`,
+				companyID,
+				screenID,
+			); err != nil {
+				return fmt.Errorf("insert company screen %s: %w", screenID, err)
+			}
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit replace company screens tx: %w", err)
+	}
+	tx = nil
+	return nil
+}
+
 // DeleteScreen desactiva la pantalla para la empresa.
 func (r *CompanyRepo) DeleteScreen(ctx context.Context, companyID, screenID string) error {
 	const query = `

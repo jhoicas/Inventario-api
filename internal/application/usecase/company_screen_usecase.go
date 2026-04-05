@@ -166,6 +166,50 @@ func (uc *CompanyScreenUseCase) DeleteScreen(ctx context.Context, companyID, scr
 	return uc.companyRepo.DeleteScreen(ctx, companyID, screenID)
 }
 
+// ReplaceScreens reemplaza en bloque las pantallas de una empresa.
+func (uc *CompanyScreenUseCase) ReplaceScreens(ctx context.Context, companyID string, in dto.ReplaceCompanyScreensRequest) (*dto.CompanyScreensResponse, error) {
+	if companyID == "" {
+		return nil, domain.ErrInvalidInput
+	}
+	company, err := uc.companyRepo.GetByID(companyID)
+	if err != nil {
+		return nil, err
+	}
+	if company == nil {
+		return nil, domain.ErrNotFound
+	}
+
+	for _, screenID := range in.ScreenIDs {
+		if screenID == "" {
+			return nil, domain.ErrInvalidInput
+		}
+		screen, err := uc.rbacRepo.GetScreenByID(ctx, screenID)
+		if err != nil {
+			return nil, err
+		}
+		if screen == nil {
+			return nil, domain.ErrNotFound
+		}
+	}
+
+	if err := uc.companyRepo.ReplaceScreens(ctx, companyID, in.ScreenIDs); err != nil {
+		return nil, err
+	}
+
+	list, err := uc.companyRepo.ListScreens(ctx, companyID)
+	if err != nil {
+		return nil, err
+	}
+	out := &dto.CompanyScreensResponse{
+		CompanyID: companyID,
+		Screens:   make([]dto.CompanyScreenResponse, 0, len(list)),
+	}
+	for _, item := range list {
+		out.Screens = append(out.Screens, companyScreenToDTO(item))
+	}
+	return out, nil
+}
+
 func companyScreenToDTO(in *entity.CompanyScreen) dto.CompanyScreenResponse {
 	if in == nil {
 		return dto.CompanyScreenResponse{}

@@ -118,6 +118,7 @@ func Router(app *fiber.App, deps RouterDeps) {
 	if deps.CompanyScreensUC != nil {
 		companyScreenHandler := NewCompanyScreenHandler(deps.CompanyScreensUC)
 		adminCompanies.Get("/:id/screens", companyScreenHandler.List)
+		adminCompanies.Put("/:id/screens", companyScreenHandler.Replace)
 		adminCompanies.Post("/:id/screens", companyScreenHandler.Upsert)
 		adminCompanies.Put("/:id/screens/:screen_id", companyScreenHandler.Update)
 		adminCompanies.Delete("/:id/screens/:screen_id", companyScreenHandler.Delete)
