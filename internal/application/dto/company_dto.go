@@ -14,6 +14,7 @@ type CreateCompanyRequest struct {
 // UpdateCompanyRequest entrada para actualizar una empresa (campos opcionales).
 type UpdateCompanyRequest struct {
 	Name    *string `json:"name" validate:"omitempty,min=1,max=200"`
+	NIT     *string `json:"nit" validate:"omitempty,min=1,max=20"`
 	Address *string `json:"address"`
 	Phone   *string `json:"phone"`
 	Email   *string `json:"email" validate:"omitempty,email"`

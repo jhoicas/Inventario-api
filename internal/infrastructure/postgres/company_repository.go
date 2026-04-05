@@ -292,7 +292,7 @@ func (r *CompanyRepo) HasActiveScreen(ctx context.Context, companyID, screenID s
 // ListScreens devuelve las pantallas habilitadas para la empresa.
 func (r *CompanyRepo) ListScreens(ctx context.Context, companyID string) ([]*entity.CompanyScreen, error) {
 	const query = `
-		SELECT cs.id, cs.company_id, cs.screen_id, s.key, s.name, m.key, m.name, s.frontend_route, s.api_endpoint,
+		SELECT cs.company_id, cs.screen_id, s.key, s.name, m.key, m.name, s.frontend_route, s.api_endpoint,
 		       cs.is_active, cs.created_at, cs.updated_at
 		FROM company_screens cs
 		JOIN screens s ON s.id = cs.screen_id
@@ -305,11 +305,10 @@ func (r *CompanyRepo) ListScreens(ctx context.Context, companyID string) ([]*ent
 	}
 	defer rows.Close()
 
-	var list []*entity.CompanyScreen
+	list := make([]*entity.CompanyScreen, 0)
 	for rows.Next() {
 		var cs entity.CompanyScreen
 		if err := rows.Scan(
-			&cs.ID,
 			&cs.CompanyID,
 			&cs.ScreenID,
 			&cs.ScreenKey,
@@ -326,13 +325,16 @@ func (r *CompanyRepo) ListScreens(ctx context.Context, companyID string) ([]*ent
 		}
 		list = append(list, &cs)
 	}
+	if list == nil {
+		list = make([]*entity.CompanyScreen, 0)
+	}
 	return list, rows.Err()
 }
 
 // GetScreen devuelve una pantalla específica de la empresa.
 func (r *CompanyRepo) GetScreen(ctx context.Context, companyID, screenID string) (*entity.CompanyScreen, error) {
 	const query = `
-		SELECT cs.id, cs.company_id, cs.screen_id, s.key, s.name, m.key, m.name, s.frontend_route, s.api_endpoint,
+		SELECT cs.company_id, cs.screen_id, s.key, s.name, m.key, m.name, s.frontend_route, s.api_endpoint,
 		       cs.is_active, cs.created_at, cs.updated_at
 		FROM company_screens cs
 		JOIN screens s ON s.id = cs.screen_id
@@ -341,7 +343,6 @@ func (r *CompanyRepo) GetScreen(ctx context.Context, companyID, screenID string)
 		LIMIT 1`
 	var cs entity.CompanyScreen
 	err := r.pool.QueryRow(ctx, query, companyID, screenID).Scan(
-		&cs.ID,
 		&cs.CompanyID,
 		&cs.ScreenID,
 		&cs.ScreenKey,
@@ -366,14 +367,13 @@ func (r *CompanyRepo) GetScreen(ctx context.Context, companyID, screenID string)
 // UpsertScreen crea o actualiza el estado de una pantalla para una empresa.
 func (r *CompanyRepo) UpsertScreen(ctx context.Context, screen *entity.CompanyScreen) error {
 	const query = `
-		INSERT INTO company_screens (id, company_id, screen_id, is_active, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO company_screens (company_id, screen_id, is_active, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5)
 		ON CONFLICT (company_id, screen_id)
 		DO UPDATE SET
 			is_active = EXCLUDED.is_active,
 			updated_at = EXCLUDED.updated_at`
 	_, err := r.pool.Exec(ctx, query,
-		screen.ID,
 		screen.CompanyID,
 		screen.ScreenID,
 		screen.IsActive,

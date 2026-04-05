@@ -74,6 +74,9 @@ func (uc *CompanyUseCase) Update(id string, in dto.UpdateCompanyRequest) (*dto.C
 	if in.Name != nil {
 		company.Name = *in.Name
 	}
+	if in.NIT != nil {
+		company.NIT = *in.NIT
+	}
 	if in.Address != nil {
 		company.Address = *in.Address
 	}
