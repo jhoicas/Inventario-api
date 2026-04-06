@@ -8,7 +8,9 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jhoicas/Inventario-api/internal/domain"
 	"github.com/jhoicas/Inventario-api/internal/domain/entity"
 	"github.com/jhoicas/Inventario-api/internal/domain/repository"
 )
@@ -136,6 +138,100 @@ func (r *RBACRepo) CanAccess(roleID, apiEndpoint string) (bool, error) {
 		return false, fmt.Errorf("check access: %w", err)
 	}
 	return allowed, nil
+}
+
+// GetScreens devuelve todas las pantallas ordenadas por módulo y orden.
+func (r *RBACRepo) GetScreens(ctx context.Context) ([]*entity.Screen, error) {
+	const query = `
+		SELECT id, module_id, COALESCE(module_key_snapshot, ''), key, name, frontend_route, api_endpoint, "order", is_active, created_at, updated_at
+		FROM screens
+		ORDER BY module_key_snapshot, "order"`
+	rows, err := r.pool.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("list screens: %w", err)
+	}
+	defer rows.Close()
+
+	out := make([]*entity.Screen, 0)
+	for rows.Next() {
+		var screen entity.Screen
+		if err := rows.Scan(
+			&screen.ID,
+			&screen.ModuleID,
+			&screen.ModuleKeySnapshot,
+			&screen.Key,
+			&screen.Name,
+			&screen.FrontendRoute,
+			&screen.ApiEndpoint,
+			&screen.Order,
+			&screen.IsActive,
+			&screen.CreatedAt,
+			&screen.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan screen: %w", err)
+		}
+		out = append(out, &screen)
+	}
+	return out, rows.Err()
+}
+
+// CreateScreen crea una pantalla del catálogo.
+func (r *RBACRepo) CreateScreen(ctx context.Context, screen *entity.Screen) error {
+	const query = `
+		INSERT INTO screens (id, module_id, key, name, frontend_route, api_endpoint, "order", is_active, module_key_snapshot)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`
+	if _, err := r.pool.Exec(ctx, query,
+		screen.ID,
+		screen.ModuleID,
+		screen.Key,
+		screen.Name,
+		screen.FrontendRoute,
+		screen.ApiEndpoint,
+		screen.Order,
+		screen.IsActive,
+		screen.ModuleKeySnapshot,
+	); err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return domain.ErrDuplicate
+		}
+		return fmt.Errorf("create screen: %w", err)
+	}
+	return nil
+}
+
+// UpdateScreen actualiza una pantalla del catálogo.
+func (r *RBACRepo) UpdateScreen(ctx context.Context, id string, screen *entity.Screen) error {
+	const query = `
+		UPDATE screens
+		SET module_id = $2,
+		    key = $3,
+		    name = $4,
+		    frontend_route = $5,
+		    api_endpoint = $6,
+		    "order" = $7,
+		    is_active = $8,
+		    module_key_snapshot = $9,
+		    updated_at = now()
+		WHERE id = $1`
+	if _, err := r.pool.Exec(ctx, query,
+		id,
+		screen.ModuleID,
+		screen.Key,
+		screen.Name,
+		screen.FrontendRoute,
+		screen.ApiEndpoint,
+		screen.Order,
+		screen.IsActive,
+		screen.ModuleKeySnapshot,
+	); err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return domain.ErrDuplicate
+		}
+		return fmt.Errorf("update screen: %w", err)
+	}
+	return nil
 }
 
 // GetScreenByID devuelve una pantalla por su ID.

@@ -135,6 +135,115 @@ func (uc *RBACUseCase) ResolveRoleID(ctx context.Context, roleRef string) (strin
 	return role.ID, nil
 }
 
+// GetScreens devuelve todas las pantallas del catálogo para super admin.
+func (uc *RBACUseCase) GetScreens(ctx context.Context) ([]dto.ScreenAdminResponse, error) {
+	if uc.rbacRepo == nil {
+		return nil, fmt.Errorf("rbac repository no configurado")
+	}
+	list, err := uc.rbacRepo.GetScreens(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]dto.ScreenAdminResponse, 0, len(list))
+	for _, s := range list {
+		if s == nil {
+			continue
+		}
+		out = append(out, toScreenAdminResponse(s))
+	}
+	return out, nil
+}
+
+// CreateScreen crea una pantalla del catálogo.
+func (uc *RBACUseCase) CreateScreen(ctx context.Context, in dto.CreateScreenRequest) (*dto.ScreenAdminResponse, error) {
+	if uc.rbacRepo == nil {
+		return nil, fmt.Errorf("rbac repository no configurado")
+	}
+	if _, err := uuid.Parse(strings.TrimSpace(in.ModuleID)); err != nil {
+		return nil, domain.ErrInvalidInput
+	}
+	if strings.TrimSpace(in.Key) == "" || strings.TrimSpace(in.Name) == "" || strings.TrimSpace(in.FrontendRoute) == "" || strings.TrimSpace(in.ApiEndpoint) == "" {
+		return nil, domain.ErrInvalidInput
+	}
+
+	isActive := true
+	if in.IsActive != nil {
+		isActive = *in.IsActive
+	}
+	screen := &entity.Screen{
+		ID:                uuid.NewString(),
+		ModuleID:          strings.TrimSpace(in.ModuleID),
+		Key:               strings.TrimSpace(in.Key),
+		Name:              strings.TrimSpace(in.Name),
+		FrontendRoute:     strings.TrimSpace(in.FrontendRoute),
+		ApiEndpoint:       normalizeAPIEndpoint(strings.TrimSpace(in.ApiEndpoint)),
+		Order:             in.Order,
+		IsActive:          isActive,
+		ModuleKeySnapshot: strings.TrimSpace(in.ModuleKeySnapshot),
+	}
+	if err := uc.rbacRepo.CreateScreen(ctx, screen); err != nil {
+		return nil, err
+	}
+	created, err := uc.rbacRepo.GetScreenByID(ctx, screen.ID)
+	if err != nil {
+		return nil, err
+	}
+	if created == nil {
+		return nil, domain.ErrNotFound
+	}
+	out := toScreenAdminResponse(created)
+	return &out, nil
+}
+
+// UpdateScreen actualiza una pantalla existente del catálogo.
+func (uc *RBACUseCase) UpdateScreen(ctx context.Context, id string, in dto.UpdateScreenRequest) (*dto.ScreenAdminResponse, error) {
+	if uc.rbacRepo == nil {
+		return nil, fmt.Errorf("rbac repository no configurado")
+	}
+	if _, err := uuid.Parse(strings.TrimSpace(id)); err != nil {
+		return nil, domain.ErrInvalidInput
+	}
+	if _, err := uuid.Parse(strings.TrimSpace(in.ModuleID)); err != nil {
+		return nil, domain.ErrInvalidInput
+	}
+	if strings.TrimSpace(in.Key) == "" || strings.TrimSpace(in.Name) == "" || strings.TrimSpace(in.FrontendRoute) == "" || strings.TrimSpace(in.ApiEndpoint) == "" {
+		return nil, domain.ErrInvalidInput
+	}
+	current, err := uc.rbacRepo.GetScreenByID(ctx, strings.TrimSpace(id))
+	if err != nil {
+		return nil, err
+	}
+	if current == nil {
+		return nil, domain.ErrNotFound
+	}
+	isActive := current.IsActive
+	if in.IsActive != nil {
+		isActive = *in.IsActive
+	}
+	update := &entity.Screen{
+		ModuleID:          strings.TrimSpace(in.ModuleID),
+		Key:               strings.TrimSpace(in.Key),
+		Name:              strings.TrimSpace(in.Name),
+		FrontendRoute:     strings.TrimSpace(in.FrontendRoute),
+		ApiEndpoint:       normalizeAPIEndpoint(strings.TrimSpace(in.ApiEndpoint)),
+		Order:             in.Order,
+		IsActive:          isActive,
+		ModuleKeySnapshot: current.ModuleKeySnapshot,
+	}
+	if err := uc.rbacRepo.UpdateScreen(ctx, strings.TrimSpace(id), update); err != nil {
+		return nil, err
+	}
+	updated, err := uc.rbacRepo.GetScreenByID(ctx, strings.TrimSpace(id))
+	if err != nil {
+		return nil, err
+	}
+	if updated == nil {
+		return nil, domain.ErrNotFound
+	}
+	out := toScreenAdminResponse(updated)
+	return &out, nil
+}
+
 func (uc *RBACUseCase) resolveRole(ctx context.Context, roleRef string) (*entity.Role, error) {
 	if uc.roleRepo == nil {
 		return nil, fmt.Errorf("role repository no configurado")
@@ -203,4 +312,32 @@ func deriveModuleClassification(moduleKey string) string {
 	}
 	parts := strings.SplitN(moduleKey, ".", 2)
 	return parts[0]
+}
+
+func toScreenAdminResponse(s *entity.Screen) dto.ScreenAdminResponse {
+	if s == nil {
+		return dto.ScreenAdminResponse{}
+	}
+	return dto.ScreenAdminResponse{
+		ID:                s.ID,
+		ModuleID:          s.ModuleID,
+		Key:               s.Key,
+		Name:              s.Name,
+		FrontendRoute:     s.FrontendRoute,
+		ApiEndpoint:       s.ApiEndpoint,
+		Order:             s.Order,
+		IsActive:          s.IsActive,
+		ModuleKeySnapshot: s.ModuleKeySnapshot,
+	}
+}
+
+func normalizeAPIEndpoint(endpoint string) string {
+	endpoint = strings.TrimSpace(endpoint)
+	if endpoint == "" {
+		return endpoint
+	}
+	if strings.HasSuffix(endpoint, "/") && endpoint != "/" {
+		endpoint = strings.TrimRight(endpoint, "/")
+	}
+	return endpoint
 }
