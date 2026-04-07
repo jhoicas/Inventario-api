@@ -217,7 +217,8 @@ func main() {
 	campaignUC := crm.NewCampaignUseCase(crmCampaignRepo, customerRepo, crmProfileRepo, crmInteractionRepo, mailSender)
 	templateUC := crm.NewCampaignTemplateUseCase(crmTemplateRepo)
 	opportunityUC := crm.NewOpportunityUseCase(crmOpportunityRepo)
-	crmHandler := httpRouter.NewCRMHandler(loyaltyUC, taskUC, pqrUC, aiCRMUC, customerUC, crmInteractionRepo, opportunityUC, invoiceRepo, campaignUC, templateUC)
+	importUC := crm.NewImportUseCase(crmProfileRepo, customerRepo)
+	crmHandler := httpRouter.NewCRMHandler(loyaltyUC, taskUC, pqrUC, aiCRMUC, customerUC, crmInteractionRepo, opportunityUC, invoiceRepo, campaignUC, templateUC, importUC)
 	emailHandler := httpRouter.NewEmailHandler(emailUC)
 
 	// Worker diario de reposición crítica → crea tareas CRM de reabastecimiento.
