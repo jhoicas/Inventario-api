@@ -102,6 +102,9 @@ func Router(app *fiber.App, deps RouterDeps) {
 
 	superAdminGroup := protected.Group("/admin", RequireRole(entity.RoleSuperAdmin))
 	if deps.RBACUC != nil {
+		moduleHandler := NewModuleHandler(deps.RBACUC)
+		superAdminGroup.Get("/modules", moduleHandler.ListModules)
+
 		screenHandler := NewScreenHandler(deps.RBACUC)
 		screens := superAdminGroup.Group("/screens")
 		screens.Get("/", screenHandler.List)
