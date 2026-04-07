@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jhoicas/Inventario-api/internal/application/dto"
 	"github.com/jhoicas/Inventario-api/internal/domain"
 	"github.com/jhoicas/Inventario-api/internal/domain/entity"
@@ -247,13 +248,32 @@ func (uc *ImportUseCase) upsertProfile(
 	companyID string,
 	profile dto.ImportCRMProfileRequest,
 ) (bool, error) {
-	// Busca un cliente existente por email para obtener el customer_id asociado.
+	// Busca cliente por email; si no existe, lo crea automáticamente.
 	customer, err := uc.customerRepo.GetByCompanyAndEmail(companyID, profile.Email)
 	if err != nil {
 		return false, fmt.Errorf("buscar cliente por email: %w", err)
 	}
 	if customer == nil {
-		return false, domain.ErrNotFound
+		now := time.Now()
+		name := strings.TrimSpace(profile.Nombre)
+		if name == "" {
+			name = strings.Split(profile.Email, "@")[0]
+		}
+
+		customer = &entity.Customer{
+			ID:        uuid.NewString(),
+			CompanyID: companyID,
+			Name:      name,
+			TaxID:     uc.buildTempTaxID(),
+			Email:     profile.Email,
+			Phone:     "",
+			IsActive:  true,
+			CreatedAt: now,
+			UpdatedAt: now,
+		}
+		if err := uc.customerRepo.Create(customer); err != nil {
+			return false, fmt.Errorf("crear cliente automático: %w", err)
+		}
 	}
 
 	existingProfile, err := uc.profileRepo.GetByCustomerID(customer.ID)
@@ -289,4 +309,9 @@ func (uc *ImportUseCase) upsertProfile(
 
 	_ = ctx
 	return existingProfile == nil, nil
+}
+
+func (uc *ImportUseCase) buildTempTaxID() string {
+	// Prefijo CF (Cliente Fiscal) + sufijo UUID corto para minimizar colisiones.
+	return "CF-" + strings.ToUpper(strings.ReplaceAll(uuid.NewString(), "-", ""))[:12]
 }
