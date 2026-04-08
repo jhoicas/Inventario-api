@@ -340,22 +340,14 @@ func (uc *ImportUseCase) upsertProfile(
 	userID string,
 	profile dto.ImportCRMProfileRequest,
 ) (bool, error) {
-	// Busca cliente por IDCliente (tax_id) y, si no existe, por email.
+	// Busca cliente únicamente por email. IDCliente se conserva como dato, pero no como clave de coincidencia.
 	var (
 		customer *entity.Customer
 		err      error
 	)
-	if strings.TrimSpace(profile.IDCliente) != "" {
-		customer, err = uc.customerRepo.GetByCompanyAndTaxID(companyID, profile.IDCliente)
-		if err != nil {
-			return false, fmt.Errorf("buscar cliente por idcliente: %w", err)
-		}
-	}
-	if customer == nil {
-		customer, err = uc.customerRepo.GetByCompanyAndEmail(companyID, profile.Email)
-		if err != nil {
-			return false, fmt.Errorf("buscar cliente por email: %w", err)
-		}
+	customer, err = uc.customerRepo.GetByCompanyAndEmail(companyID, profile.Email)
+	if err != nil {
+		return false, fmt.Errorf("buscar cliente por email: %w", err)
 	}
 	if customer == nil {
 		now := time.Now()
