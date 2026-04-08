@@ -194,12 +194,12 @@ func (uc *ImportUseCase) GetJobProgress(jobID string) (JobProgress, bool) {
 func (uc *ImportUseCase) processRowsAsync(ctx context.Context, companyID string, userID string, rows []importValidatedRow, totalRows int, jobID string) {
 	defer func() {
 		if r := recover(); r != nil {
-			uc.setJobProgress(jobID, JobProgress{TotalRows: totalRows, ProcessedRows: len(rows), Status: "error"})
+			uc.updateJobProcessed(jobID, len(rows), "error")
 		}
 	}()
 
 	if len(rows) == 0 {
-		uc.setJobProgress(jobID, JobProgress{TotalRows: totalRows, ProcessedRows: 0, Status: "completed"})
+		uc.updateJobProcessed(jobID, 0, "completed")
 		return
 	}
 
@@ -218,7 +218,7 @@ func (uc *ImportUseCase) processRowsAsync(ctx context.Context, companyID string,
 					defer func() {
 						current := processedCount.Add(1)
 						if current%50 == 0 {
-							uc.setJobProgress(jobID, JobProgress{TotalRows: totalRows, ProcessedRows: int(current), Status: "processing"})
+							uc.updateJobProcessed(jobID, int(current), "processing")
 						}
 					}()
 
@@ -244,16 +244,33 @@ func (uc *ImportUseCase) processRowsAsync(ctx context.Context, companyID string,
 	close(jobs)
 
 	wg.Wait()
-	uc.setJobProgress(jobID, JobProgress{TotalRows: totalRows, ProcessedRows: int(processedCount.Load()), Status: "completed"})
+	uc.updateJobProcessed(jobID, int(processedCount.Load()), "completed")
 }
 
 func (uc *ImportUseCase) updateProcessed(jobID string, totalRows int, processedRows int) {
-	// Actualización en cada iteración para reflejar progreso en tiempo real.
-	uc.setJobProgress(jobID, JobProgress{TotalRows: totalRows, ProcessedRows: processedRows, Status: "processing"})
+	_ = totalRows
+	uc.updateJobProcessed(jobID, processedRows, "processing")
 }
 
 func (uc *ImportUseCase) setJobProgress(jobID string, progress JobProgress) {
 	importJobs.Store(jobID, progress)
+}
+
+// updateJobProcessed conserva los contadores de validación al actualizar el progreso.
+func (uc *ImportUseCase) updateJobProcessed(jobID string, processedRows int, status string) {
+	v, ok := importJobs.Load(jobID)
+	if !ok {
+		importJobs.Store(jobID, JobProgress{ProcessedRows: processedRows, Status: status})
+		return
+	}
+	current, castOK := v.(JobProgress)
+	if !castOK {
+		importJobs.Store(jobID, JobProgress{ProcessedRows: processedRows, Status: status})
+		return
+	}
+	current.ProcessedRows = processedRows
+	current.Status = status
+	importJobs.Store(jobID, current)
 }
 
 // mapHeaders crea un mapa de índices de columnas basado en los encabezados.
