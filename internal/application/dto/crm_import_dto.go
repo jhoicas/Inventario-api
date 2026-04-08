@@ -34,3 +34,31 @@ type ImportError struct {
 	Email   string `json:"email,omitempty"`
 	Message string `json:"message"`
 }
+
+// ImportPreviewRow describe una fila validada del archivo de importación.
+type ImportPreviewRow struct {
+	Row             int      `json:"row"`
+	Email           string   `json:"email,omitempty"`
+	NormalizedEmail string   `json:"normalized_email,omitempty"`
+	Valid           bool     `json:"valid"`
+	Errors          []string `json:"errors,omitempty"`
+	Warnings        []string `json:"warnings,omitempty"`
+	IDCliente       string   `json:"id_cliente,omitempty"`
+	LastPurchase    string   `json:"last_purchase,omitempty"`
+}
+
+// ImportPreviewSummary resume el resultado del análisis previo al submit.
+type ImportPreviewSummary struct {
+	TotalRows        int `json:"total_rows"`
+	ValidRows        int `json:"valid_rows"`
+	InvalidRows      int `json:"invalid_rows"`
+	DuplicateRows    int `json:"duplicate_rows"`
+	MissingEmailRows int `json:"missing_email_rows"`
+	WarningRows      int `json:"warning_rows"`
+}
+
+// CRMImportPreviewResponse devuelve el preview del archivo antes de importar.
+type CRMImportPreviewResponse struct {
+	Summary ImportPreviewSummary `json:"summary"`
+	Rows    []ImportPreviewRow   `json:"rows"`
+}

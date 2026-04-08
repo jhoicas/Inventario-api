@@ -12,6 +12,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode"
 
 	"github.com/google/uuid"
 	"github.com/jhoicas/Inventario-api/internal/application/dto"
@@ -26,9 +27,20 @@ var importJobs = sync.Map{}
 
 // JobProgress representa el estado de un job de importación en background.
 type JobProgress struct {
-	TotalRows     int
-	ProcessedRows int
-	Status        string
+	TotalRows        int
+	ValidRows        int
+	InvalidRows      int
+	DuplicateRows    int
+	MissingEmailRows int
+	WarningRows      int
+	ProcessedRows    int
+	Status           string
+}
+
+type importValidatedRow struct {
+	RowNumber int
+	Profile   dto.ImportCRMProfileRequest
+	Preview   dto.ImportPreviewRow
 }
 
 // ImportUseCase gestiona la importación masiva de perfiles CRM.
@@ -65,43 +77,59 @@ func (uc *ImportUseCase) ImportProfilesFromFile(
 	userID string,
 	file *multipart.FileHeader,
 ) (string, error) {
-	if companyID == "" {
-		return "", domain.ErrInvalidInput
-	}
-	if file == nil {
-		return "", domain.ErrInvalidInput
-	}
-
-	// Abre el archivo subido
-	src, err := file.Open()
+	rows, err := uc.readImportRows(file)
 	if err != nil {
-		return "", fmt.Errorf("abrir archivo: %w", err)
+		return "", err
 	}
-	defer src.Close()
-
-	var rows [][]string
-	filename := strings.ToLower(file.Filename)
-
-	if strings.HasSuffix(filename, ".xlsx") || strings.HasSuffix(filename, ".xls") {
-		rows, err = uc.readExcel(src)
-	} else if strings.HasSuffix(filename, ".csv") {
-		rows, err = uc.readCSV(src)
-	} else {
-		return "", domain.ErrInvalidInput
-	}
-
-	if err != nil {
-		return "", domain.ErrInvalidInput
-	}
+	validatedRows, preview := uc.validateImportRows(rows)
 
 	jobID := uuid.NewString()
-	importJobs.Store(jobID, JobProgress{TotalRows: len(rows), ProcessedRows: 0, Status: "processing"})
+	importJobs.Store(jobID, JobProgress{
+		TotalRows:        preview.Summary.TotalRows,
+		ValidRows:        preview.Summary.ValidRows,
+		InvalidRows:      preview.Summary.InvalidRows,
+		DuplicateRows:    preview.Summary.DuplicateRows,
+		MissingEmailRows: preview.Summary.MissingEmailRows,
+		WarningRows:      preview.Summary.WarningRows,
+		ProcessedRows:    0,
+		Status:           "processing",
+	})
 
 	// Desacoplar del request actual para que el job continúe aunque el cliente cierre conexión.
-	go uc.processRowsAsync(context.Background(), companyID, userID, rows, jobID)
+	go uc.processRowsAsync(context.Background(), companyID, userID, validatedRows, preview.Summary.TotalRows, jobID)
 
 	_ = ctx
 	return jobID, nil
+}
+
+// PreviewProfilesFromFile analiza el archivo y devuelve validaciones por fila sin persistir nada.
+func (uc *ImportUseCase) PreviewProfilesFromFile(file *multipart.FileHeader) (*dto.CRMImportPreviewResponse, error) {
+	rows, err := uc.readImportRows(file)
+	if err != nil {
+		return nil, err
+	}
+	_, preview := uc.validateImportRows(rows)
+	return preview, nil
+}
+
+func (uc *ImportUseCase) readImportRows(file *multipart.FileHeader) ([][]string, error) {
+	if file == nil {
+		return nil, domain.ErrInvalidInput
+	}
+	src, err := file.Open()
+	if err != nil {
+		return nil, fmt.Errorf("abrir archivo: %w", err)
+	}
+	defer src.Close()
+
+	filename := strings.ToLower(file.Filename)
+	if strings.HasSuffix(filename, ".xlsx") || strings.HasSuffix(filename, ".xls") {
+		return uc.readExcel(src)
+	}
+	if strings.HasSuffix(filename, ".csv") {
+		return uc.readCSV(src)
+	}
+	return nil, domain.ErrInvalidInput
 }
 
 // readExcel parsea un archivo Excel.
@@ -163,24 +191,20 @@ func (uc *ImportUseCase) GetJobProgress(jobID string) (JobProgress, bool) {
 }
 
 // processRowsAsync procesa filas en background y actualiza el progreso del job.
-func (uc *ImportUseCase) processRowsAsync(ctx context.Context, companyID string, userID string, rows [][]string, jobID string) {
+func (uc *ImportUseCase) processRowsAsync(ctx context.Context, companyID string, userID string, rows []importValidatedRow, totalRows int, jobID string) {
 	defer func() {
 		if r := recover(); r != nil {
-			uc.setJobProgress(jobID, JobProgress{TotalRows: len(rows), ProcessedRows: len(rows), Status: "error"})
+			uc.setJobProgress(jobID, JobProgress{TotalRows: totalRows, ProcessedRows: len(rows), Status: "error"})
 		}
 	}()
 
 	if len(rows) == 0 {
-		uc.setJobProgress(jobID, JobProgress{TotalRows: 0, ProcessedRows: 0, Status: "completed"})
+		uc.setJobProgress(jobID, JobProgress{TotalRows: totalRows, ProcessedRows: 0, Status: "completed"})
 		return
 	}
 
-	// Primera fila como encabezados
-	headers := rows[0]
-	headerMap := uc.mapHeaders(headers)
-
 	var wg sync.WaitGroup
-	jobs := make(chan []string, len(rows))
+	jobs := make(chan importValidatedRow, len(rows))
 	var processedCount atomic.Int32
 	var emailLocks sync.Map
 
@@ -189,44 +213,38 @@ func (uc *ImportUseCase) processRowsAsync(ctx context.Context, companyID string,
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for row := range jobs {
-				func(row []string) {
+			for item := range jobs {
+				func(item importValidatedRow) {
 					defer func() {
 						current := processedCount.Add(1)
 						if current%50 == 0 {
-							uc.setJobProgress(jobID, JobProgress{TotalRows: len(rows), ProcessedRows: int(current), Status: "processing"})
+							uc.setJobProgress(jobID, JobProgress{TotalRows: totalRows, ProcessedRows: int(current), Status: "processing"})
 						}
 					}()
 
-					if len(row) == 0 || uc.isEmptyRow(row) {
+					if item.Preview.Valid == false {
 						return
 					}
 
-					profile := uc.parseRow(headerMap, row)
-					email := strings.ToLower(strings.TrimSpace(profile.Email))
-					if email == "" {
-						return
-					}
-
+					email := item.Profile.Email
 					muVal, _ := emailLocks.LoadOrStore(email, &sync.Mutex{})
 					mu := muVal.(*sync.Mutex)
 					mu.Lock()
 					defer mu.Unlock()
 
-					profile.Email = email
-					_, _ = uc.upsertProfile(ctx, companyID, userID, profile)
-				}(row)
+					_, _ = uc.upsertProfile(ctx, companyID, userID, item.Profile)
+				}(item)
 			}
 		}()
 	}
 
-	for _, row := range rows[1:] {
+	for _, row := range rows {
 		jobs <- row
 	}
 	close(jobs)
 
 	wg.Wait()
-	uc.setJobProgress(jobID, JobProgress{TotalRows: len(rows), ProcessedRows: int(processedCount.Load()), Status: "completed"})
+	uc.setJobProgress(jobID, JobProgress{TotalRows: totalRows, ProcessedRows: int(processedCount.Load()), Status: "completed"})
 }
 
 func (uc *ImportUseCase) updateProcessed(jobID string, totalRows int, processedRows int) {
@@ -259,7 +277,7 @@ func (uc *ImportUseCase) parseRow(headerMap map[string]int, row []string) dto.Im
 		profile.IDCliente = strings.TrimSpace(row[idx])
 	}
 	if idx, ok := findHeaderIndex(headerMap, "email"); ok && idx < len(row) {
-		profile.Email = strings.TrimSpace(row[idx])
+		profile.Email = normalizeImportEmail(row[idx])
 	}
 	if idx, ok := findHeaderIndex(headerMap, "segmento"); ok && idx < len(row) {
 		profile.Segmento = strings.TrimSpace(row[idx])
@@ -311,6 +329,103 @@ func (uc *ImportUseCase) parseRow(headerMap map[string]int, row []string) dto.Im
 	}
 
 	return profile
+}
+
+func (uc *ImportUseCase) validateImportRows(rows [][]string) ([]importValidatedRow, *dto.CRMImportPreviewResponse) {
+	if len(rows) == 0 {
+		return nil, &dto.CRMImportPreviewResponse{Summary: dto.ImportPreviewSummary{}, Rows: []dto.ImportPreviewRow{}}
+	}
+
+	headers := rows[0]
+	headerMap := uc.mapHeaders(headers)
+	dataRows := rows[1:]
+	items := make([]importValidatedRow, 0, len(dataRows))
+	emailCounts := make(map[string]int)
+
+	for idx, row := range dataRows {
+		rowNumber := idx + 2
+		if len(row) == 0 || uc.isEmptyRow(row) {
+			continue
+		}
+		profile := uc.parseRow(headerMap, row)
+		previewRow := dto.ImportPreviewRow{
+			Row:             rowNumber,
+			Email:           profile.Email,
+			NormalizedEmail: profile.Email,
+			IDCliente:       strings.TrimSpace(profile.IDCliente),
+			LastPurchase:    strings.TrimSpace(profile.UltimaCompra),
+			Valid:           true,
+		}
+		if previewRow.NormalizedEmail != "" {
+			emailCounts[previewRow.NormalizedEmail]++
+		}
+		if previewRow.NormalizedEmail == "" {
+			previewRow.Valid = false
+			previewRow.Errors = append(previewRow.Errors, "email es obligatorio")
+		}
+		if strings.TrimSpace(profile.UltimaCompra) == "" {
+			previewRow.Warnings = append(previewRow.Warnings, "última compra vacía")
+		}
+		items = append(items, importValidatedRow{RowNumber: rowNumber, Profile: profile, Preview: previewRow})
+	}
+
+	for i := range items {
+		if items[i].Preview.NormalizedEmail != "" && emailCounts[items[i].Preview.NormalizedEmail] > 1 {
+			items[i].Preview.Valid = false
+			items[i].Preview.Errors = append(items[i].Preview.Errors, "email duplicado dentro del archivo")
+		}
+	}
+
+	preview := &dto.CRMImportPreviewResponse{Rows: make([]dto.ImportPreviewRow, 0, len(items))}
+	for _, item := range items {
+		preview.Rows = append(preview.Rows, item.Preview)
+		preview.Summary.TotalRows++
+		if item.Preview.Valid {
+			preview.Summary.ValidRows++
+		} else {
+			preview.Summary.InvalidRows++
+		}
+		if containsString(item.Preview.Errors, "email duplicado dentro del archivo") {
+			preview.Summary.DuplicateRows++
+		}
+		if containsString(item.Preview.Errors, "email es obligatorio") {
+			preview.Summary.MissingEmailRows++
+		}
+		if len(item.Preview.Warnings) > 0 {
+			preview.Summary.WarningRows++
+		}
+	}
+
+	return filterValidImportRows(items), preview
+}
+
+func filterValidImportRows(items []importValidatedRow) []importValidatedRow {
+	valid := make([]importValidatedRow, 0, len(items))
+	for _, item := range items {
+		if item.Preview.Valid {
+			valid = append(valid, item)
+		}
+	}
+	return valid
+}
+
+func containsString(values []string, needle string) bool {
+	for _, value := range values {
+		if value == needle {
+			return true
+		}
+	}
+	return false
+}
+
+func normalizeImportEmail(value string) string {
+	value = strings.TrimSpace(strings.ToLower(value))
+	return strings.Map(func(r rune) rune {
+		if unicode.IsSpace(r) {
+			return -1
+		}
+		return r
+	}, value)
 }
 
 func findHeaderIndex(headerMap map[string]int, keys ...string) (int, bool) {

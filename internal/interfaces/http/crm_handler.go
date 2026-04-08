@@ -1964,6 +1964,46 @@ func (h *CRMHandler) Import(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusAccepted).JSON(fiber.Map{"jobID": jobID})
 }
 
+// PreviewImport analiza el archivo antes del submit y devuelve errores/advertencias por fila.
+// @Summary      Previsualizar importación CRM
+// @Description  Valida filas antes de enviar al backend: email obligatorio y único, normalización y advertencias.
+// @Tags         crm
+// @Security     Bearer
+// @Accept       mpfd
+// @Produce      json
+// @Param        file  formData  file  true  "Archivo Excel (.xlsx) o CSV"
+// @Success      200   {object}  dto.CRMImportPreviewResponse
+// @Failure      400   {object}  dto.ErrorResponse
+// @Failure      401   {object}  dto.ErrorResponse
+// @Failure      403   {object}  dto.ErrorResponse
+// @Failure      500   {object}  dto.ErrorResponse
+// @Router       /api/crm/import/preview [post]
+func (h *CRMHandler) PreviewImport(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	userID := GetUserID(c)
+	if companyID == "" || userID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if h.ImportUC == nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: "import use case no configurado"})
+	}
+
+	file, err := c.FormFile("file")
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_REQUEST", Message: "archivo requerido"})
+	}
+
+	preview, err := h.ImportUC.PreviewProfilesFromFile(file)
+	if err != nil {
+		if err == domain.ErrInvalidInput {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "formato de archivo inválido o no soportado (.xlsx o .csv requerido)"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(preview)
+}
+
 // GetImportStatus retorna el progreso actual de un job de importación en background.
 // @Summary      Estado de importación CRM
 // @Description  Consulta el estado de una importación por jobID
