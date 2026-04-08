@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -178,33 +179,54 @@ func (uc *ImportUseCase) processRowsAsync(ctx context.Context, companyID string,
 	headers := rows[0]
 	headerMap := uc.mapHeaders(headers)
 
-	// Procesa datos desde la segunda fila
-	for i := 1; i < len(rows); i++ {
-		row := rows[i]
+	var wg sync.WaitGroup
+	jobs := make(chan []string, len(rows))
+	var processedCount atomic.Int32
+	var emailLocks sync.Map
 
-		// Si la fila está vacía, salta
-		if len(row) == 0 || uc.isEmptyRow(row) {
-			uc.updateProcessed(jobID, len(rows), i+1)
-			continue
-		}
+	workerCount := 20
+	for w := 0; w < workerCount; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for row := range jobs {
+				func(row []string) {
+					defer func() {
+						current := processedCount.Add(1)
+						if current%50 == 0 {
+							uc.setJobProgress(jobID, JobProgress{TotalRows: len(rows), ProcessedRows: int(current), Status: "processing"})
+						}
+					}()
 
-		profile := uc.parseRow(headerMap, row)
+					if len(row) == 0 || uc.isEmptyRow(row) {
+						return
+					}
 
-		// Validación básica
-		if strings.TrimSpace(profile.Email) == "" {
-			uc.updateProcessed(jobID, len(rows), i+1)
-			continue
-		}
+					profile := uc.parseRow(headerMap, row)
+					email := strings.ToLower(strings.TrimSpace(profile.Email))
+					if email == "" {
+						return
+					}
 
-		// Normaliza email
-		profile.Email = strings.ToLower(strings.TrimSpace(profile.Email))
+					muVal, _ := emailLocks.LoadOrStore(email, &sync.Mutex{})
+					mu := muVal.(*sync.Mutex)
+					mu.Lock()
+					defer mu.Unlock()
 
-		// Intenta upsert
-		_, _ = uc.upsertProfile(ctx, companyID, userID, profile)
-		uc.updateProcessed(jobID, len(rows), i+1)
+					profile.Email = email
+					_, _ = uc.upsertProfile(ctx, companyID, userID, profile)
+				}(row)
+			}
+		}()
 	}
 
-	uc.setJobProgress(jobID, JobProgress{TotalRows: len(rows), ProcessedRows: len(rows), Status: "completed"})
+	for _, row := range rows[1:] {
+		jobs <- row
+	}
+	close(jobs)
+
+	wg.Wait()
+	uc.setJobProgress(jobID, JobProgress{TotalRows: len(rows), ProcessedRows: int(processedCount.Load()), Status: "completed"})
 }
 
 func (uc *ImportUseCase) updateProcessed(jobID string, totalRows int, processedRows int) {
