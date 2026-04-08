@@ -342,6 +342,38 @@ type ResolveCampaignRecipientsResponse struct {
 // CRM Analytics Dashboard
 // ──────────────────────────────────────────────────────────────────────────────
 
+// CRMAnalyticsKPIs resume los indicadores principales del CRM.
+type CRMAnalyticsKPIs struct {
+	TotalClientes  int     `json:"total_clientes"`
+	VentasTotales  float64 `json:"ventas_totales"`
+	TicketPromedio float64 `json:"ticket_promedio"`
+	ClientesVIP    int     `json:"clientes_vip"`
+}
+
+// CRMAnalyticsEvolutionItem representa la evolución mensual de ventas.
+type CRMAnalyticsEvolutionItem struct {
+	Mes       string  `json:"mes"`
+	Ventas    float64 `json:"ventas"`
+	Variacion string  `json:"variacion"`
+}
+
+// CRMAnalyticsSegmentItem representa una segmentación CRM agregada.
+type CRMAnalyticsSegmentItem struct {
+	Segmento       string  `json:"segmento"`
+	Clientes       int     `json:"clientes"`
+	Porcentaje     string  `json:"porcentaje"`
+	VentasTotales  float64 `json:"ventas_totales"`
+	TicketPromedio float64 `json:"ticket_promedio"`
+	Accion         string  `json:"accion"`
+}
+
+// CRMAnalyticsResponse agrupa las estadísticas del dashboard CRM.
+type CRMAnalyticsResponse struct {
+	KPIs             CRMAnalyticsKPIs            `json:"kpis"`
+	EvolucionMensual []CRMAnalyticsEvolutionItem `json:"evolucion_mensual"`
+	Segmentacion     []CRMAnalyticsSegmentItem   `json:"segmentacion"`
+}
+
 type CRMAnalyticsKPIsResponse struct {
 	TotalCustomers int64           `json:"total_customers"`
 	TotalSales     decimal.Decimal `json:"total_sales"`

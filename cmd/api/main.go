@@ -207,6 +207,7 @@ func main() {
 	emailSyncWorker := crm.NewEmailSyncWorker(emailUC, 5*time.Minute)
 	go emailSyncWorker.Start(workerCtx)
 	loyaltyUC := crm.NewLoyaltyUseCase(crmProfileRepo, customerRepo, crmCategoryRepo, crmBenefitRepo, crmInteractionRepo)
+	crmAnalyticsUC := crm.NewAnalyticsUseCase(crmProfileRepo)
 	taskUC := crm.NewTaskUseCase(crmTaskRepo)
 	aiCRMUC := crm.NewAICRMUseCase(anthropicSvc)
 	pqrUC := crm.NewPQRUseCase(crmTicketRepo, customerRepo, aiCRMUC, crmInteractionRepo)
@@ -218,7 +219,7 @@ func main() {
 	templateUC := crm.NewCampaignTemplateUseCase(crmTemplateRepo)
 	opportunityUC := crm.NewOpportunityUseCase(crmOpportunityRepo)
 	importUC := crm.NewImportUseCase(crmProfileRepo, customerRepo)
-	crmHandler := httpRouter.NewCRMHandler(loyaltyUC, taskUC, pqrUC, aiCRMUC, customerUC, crmInteractionRepo, opportunityUC, invoiceRepo, campaignUC, templateUC, importUC)
+	crmHandler := httpRouter.NewCRMHandler(loyaltyUC, crmAnalyticsUC, taskUC, pqrUC, aiCRMUC, customerUC, crmInteractionRepo, opportunityUC, invoiceRepo, campaignUC, templateUC, importUC)
 	emailHandler := httpRouter.NewEmailHandler(emailUC)
 
 	// Worker diario de reposición crítica → crea tareas CRM de reabastecimiento.

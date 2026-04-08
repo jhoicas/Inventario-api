@@ -4,12 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jhoicas/Inventario-api/internal/application/dto"
 	"github.com/jhoicas/Inventario-api/internal/domain/entity"
 	"github.com/jhoicas/Inventario-api/internal/domain/repository"
 	"github.com/shopspring/decimal"
@@ -266,6 +268,185 @@ func (r *CRMProfileRepo) ListByCompany(companyID string, limit, offset int) ([]*
 		list = append(list, &p)
 	}
 	return list, rows.Err()
+}
+
+func (r *CRMProfileRepo) GetAnalytics(ctx context.Context, companyID string) (*dto.CRMAnalyticsResponse, error) {
+	if companyID == "" {
+		return nil, fmt.Errorf("company_id requerido")
+	}
+
+	var totalCustomers int64
+	var totalSales float64
+	var averageTicket float64
+	var vipCustomers int64
+
+	const kpisQuery = `
+		SELECT
+			COUNT(DISTINCT c.id)::bigint AS total_customers,
+			COALESCE(SUM(i.grand_total), 0)::double precision AS total_sales,
+			COALESCE(AVG(i.grand_total), 0)::double precision AS average_ticket,
+			COUNT(DISTINCT CASE WHEN LOWER(COALESCE(cat.name, '')) LIKE '%vip%' THEN c.id END)::bigint AS vip_customers
+		FROM customers c
+		LEFT JOIN crm_customer_profiles p ON p.customer_id = c.id
+		LEFT JOIN crm_categories cat ON cat.id = p.category_id
+		LEFT JOIN invoices i ON i.customer_id = c.id AND i.company_id = c.company_id
+		WHERE c.company_id = $1
+		  AND c.is_active = true
+	`
+	if err := r.q.QueryRow(ctx, kpisQuery, companyID).Scan(&totalCustomers, &totalSales, &averageTicket, &vipCustomers); err != nil {
+		return nil, fmt.Errorf("get crm analytics kpis: %w", err)
+	}
+
+	segmentation, err := r.getAnalyticsSegmentation(ctx, companyID, int(totalCustomers))
+	if err != nil {
+		return nil, err
+	}
+
+	evolution, err := r.getAnalyticsEvolution(ctx, companyID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &dto.CRMAnalyticsResponse{
+		KPIs: dto.CRMAnalyticsKPIs{
+			TotalClientes:  int(totalCustomers),
+			VentasTotales:  totalSales,
+			TicketPromedio: averageTicket,
+			ClientesVIP:    int(vipCustomers),
+		},
+		EvolucionMensual: evolution,
+		Segmentacion:     segmentation,
+	}, nil
+}
+
+func (r *CRMProfileRepo) getAnalyticsSegmentation(ctx context.Context, companyID string, totalCustomers int) ([]dto.CRMAnalyticsSegmentItem, error) {
+	rows, err := r.q.Query(ctx, `
+		SELECT
+			COALESCE(NULLIF(TRIM(cat.name), ''), 'SIN_SEGMENTO') AS segmento,
+			COUNT(DISTINCT c.id)::bigint AS clientes,
+			COALESCE(SUM(i.grand_total), 0)::double precision AS ventas_totales,
+			COALESCE(AVG(i.grand_total), 0)::double precision AS ticket_promedio
+		FROM customers c
+		LEFT JOIN crm_customer_profiles p ON p.customer_id = c.id
+		LEFT JOIN crm_categories cat ON cat.id = p.category_id
+		LEFT JOIN invoices i ON i.customer_id = c.id AND i.company_id = c.company_id
+		WHERE c.company_id = $1
+		  AND c.is_active = true
+		GROUP BY 1
+		ORDER BY clientes DESC, segmento ASC
+	`, companyID)
+	if err != nil {
+		return nil, fmt.Errorf("get crm analytics segmentation: %w", err)
+	}
+	defer rows.Close()
+
+	items := make([]dto.CRMAnalyticsSegmentItem, 0)
+	for rows.Next() {
+		var item dto.CRMAnalyticsSegmentItem
+		if err := rows.Scan(&item.Segmento, &item.Clientes, &item.VentasTotales, &item.TicketPromedio); err != nil {
+			return nil, fmt.Errorf("scan crm analytics segmentation: %w", err)
+		}
+		if totalCustomers > 0 {
+			item.Porcentaje = fmt.Sprintf("%.2f%%", (float64(item.Clientes)/float64(totalCustomers))*100)
+		} else {
+			item.Porcentaje = "0.00%"
+		}
+		item.Accion = analyticsActionForSegment(item.Segmento, item.Porcentaje)
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate crm analytics segmentation: %w", err)
+	}
+	return items, nil
+}
+
+func (r *CRMProfileRepo) getAnalyticsEvolution(ctx context.Context, companyID string) ([]dto.CRMAnalyticsEvolutionItem, error) {
+	rows, err := r.q.Query(ctx, `
+		WITH month_series AS (
+			SELECT date_trunc('month', now()) - (interval '1 month' * gs.i) AS month_start
+			FROM generate_series(0, 11) AS gs(i)
+		),
+		invoice_totals AS (
+			SELECT date_trunc('month', i.date) AS month_start, COALESCE(SUM(i.grand_total), 0)::double precision AS sales
+			FROM invoices i
+			WHERE i.company_id = $1
+			  AND i.date >= date_trunc('month', now()) - interval '11 months'
+			GROUP BY 1
+		)
+		SELECT
+			to_char(ms.month_start, 'MM/YYYY') AS mes,
+			COALESCE(it.sales, 0)::double precision AS ventas
+		FROM month_series ms
+		LEFT JOIN invoice_totals it ON it.month_start = ms.month_start
+		ORDER BY ms.month_start ASC
+	`, companyID)
+	if err != nil {
+		return nil, fmt.Errorf("get crm analytics evolution: %w", err)
+	}
+	defer rows.Close()
+
+	type rawEvolution struct {
+		Mes    string
+		Ventas float64
+	}
+	rawItems := make([]rawEvolution, 0, 12)
+	for rows.Next() {
+		var item rawEvolution
+		if err := rows.Scan(&item.Mes, &item.Ventas); err != nil {
+			return nil, fmt.Errorf("scan crm analytics evolution: %w", err)
+		}
+		rawItems = append(rawItems, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate crm analytics evolution: %w", err)
+	}
+
+	out := make([]dto.CRMAnalyticsEvolutionItem, 0, len(rawItems))
+	for i, item := range rawItems {
+		variacion := "-"
+		if i > 0 {
+			prev := rawItems[i-1].Ventas
+			variacion = formatVariation(item.Ventas, prev)
+		}
+		out = append(out, dto.CRMAnalyticsEvolutionItem{
+			Mes:       item.Mes,
+			Ventas:    item.Ventas,
+			Variacion: variacion,
+		})
+	}
+
+	return out, nil
+}
+
+func analyticsActionForSegment(segmento, porcentaje string) string {
+	lower := strings.ToLower(strings.TrimSpace(segmento))
+	switch {
+	case strings.Contains(lower, "vip"):
+		return "Fidelización premium"
+	case strings.Contains(lower, "sin_segmento"):
+		return "Clasificar clientes"
+	case strings.HasSuffix(porcentaje, "%"):
+		return "Activar campañas segmentadas"
+	default:
+		return "Mantener relación"
+	}
+}
+
+func formatVariation(current, previous float64) string {
+	if previous <= 0 {
+		if current <= 0 {
+			return "0.00%"
+		}
+		return "-"
+	}
+	variation := ((current - previous) / previous) * 100
+	if math.IsNaN(variation) || math.IsInf(variation, 0) {
+		return "-"
+	}
+	if variation >= 0 {
+		return fmt.Sprintf("+%.2f%%", variation)
+	}
+	return fmt.Sprintf("%.2f%%", variation)
 }
 
 func (r *CRMProfileRepo) GetDashboardKPIs(companyID string) (*repository.CRMDashboardKPIs, error) {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/jhoicas/Inventario-api/internal/application/dto"
 	"github.com/jhoicas/Inventario-api/internal/domain/entity"
 	"github.com/shopspring/decimal"
 )
@@ -33,6 +34,7 @@ type CRMProfileRepository interface {
 	GetProfile360(ctx context.Context, companyID, customerID string) (*entity.Profile360, error)
 	Upsert(profile *entity.CRMCustomerProfile) error
 	ListByCompany(companyID string, limit, offset int) ([]*entity.CRMCustomerProfile, error)
+	GetAnalytics(ctx context.Context, companyID string) (*dto.CRMAnalyticsResponse, error)
 
 	// GetDashboardKPIs retorna KPIs agregados del dashboard CRM para una empresa.
 	GetDashboardKPIs(companyID string) (*CRMDashboardKPIs, error)

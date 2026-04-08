@@ -30,6 +30,7 @@ type customerListUseCase interface {
 // CRMHandler maneja las peticiones HTTP del módulo CRM (protegido + RequireModule crm).
 type CRMHandler struct {
 	LoyaltyUC       *crm.LoyaltyUseCase
+	AnalyticsUC     *crm.AnalyticsUseCase
 	TaskUC          *crm.TaskUseCase
 	PQRUC           *crm.PQRUseCase
 	AICRMUC         *crm.AICRMUseCase
@@ -50,6 +51,7 @@ type CRMHandler struct {
 // NewCRMHandler construye el handler.
 func NewCRMHandler(
 	loyaltyUC *crm.LoyaltyUseCase,
+	analyticsUC *crm.AnalyticsUseCase,
 	taskUC *crm.TaskUseCase,
 	pqrUC *crm.PQRUseCase,
 	aiCRMUC *crm.AICRMUseCase,
@@ -67,6 +69,7 @@ func NewCRMHandler(
 ) *CRMHandler {
 	return &CRMHandler{
 		LoyaltyUC:       loyaltyUC,
+		AnalyticsUC:     analyticsUC,
 		TaskUC:          taskUC,
 		PQRUC:           pqrUC,
 		AICRMUC:         aiCRMUC,
@@ -79,6 +82,40 @@ func NewCRMHandler(
 		ImportUC:        importUC,
 		InteractionRepo: interactionRepo,
 	}
+}
+
+// GetAnalytics retorna el dashboard CRM filtrado por la empresa autenticada.
+// @Summary      Analytics CRM
+// @Description  Devuelve KPIs, evolución mensual y segmentación del CRM para la empresa actual
+// @Tags         crm
+// @Security     Bearer
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  dto.CRMAnalyticsResponse
+// @Failure      401  {object}  dto.ErrorResponse
+// @Failure      503  {object}  dto.ErrorResponse
+// @Router       /api/crm/analytics [get]
+func (h *CRMHandler) GetAnalytics(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	if companyID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if h.AnalyticsUC == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "analytics no configurado"})
+	}
+
+	out, err := h.AnalyticsUC.GetAnalytics(c.Context(), companyID)
+	if err != nil {
+		if err == domain.ErrInvalidInput {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: err.Error()})
+		}
+		if err == domain.ErrForbidden {
+			return c.Status(fiber.StatusForbidden).JSON(dto.ErrorResponse{Code: "FORBIDDEN", Message: err.Error()})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(out)
 }
 
 // ListCustomers lista los clientes disponibles en CRM.
