@@ -184,6 +184,9 @@ func (uc *RBACUseCase) CreateScreen(ctx context.Context, in dto.CreateScreenRequ
 	if err := uc.rbacRepo.CreateScreen(ctx, screen); err != nil {
 		return nil, err
 	}
+	if err := uc.rbacRepo.AssignScreenToRolesByKeys(ctx, screen.ID, []string{"admin", "super_admin"}); err != nil {
+		return nil, err
+	}
 	created, err := uc.rbacRepo.GetScreenByID(ctx, screen.ID)
 	if err != nil {
 		return nil, err

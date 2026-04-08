@@ -24,4 +24,5 @@ type RBACRepository interface {
 	GetScreenByID(ctx context.Context, id string) (*entity.Screen, error)
 	GetScreenByEndpoint(ctx context.Context, apiEndpoint string) (*entity.Screen, error)
 	ReplaceRoleScreens(roleID string, screenIDs []string) error
+	AssignScreenToRolesByKeys(ctx context.Context, screenID string, roleKeys []string) error
 }

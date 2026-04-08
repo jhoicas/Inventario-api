@@ -200,6 +200,25 @@ func (r *RBACRepo) CreateScreen(ctx context.Context, screen *entity.Screen) erro
 	return nil
 }
 
+// AssignScreenToRolesByKeys asigna una pantalla a los roles indicados por key.
+func (r *RBACRepo) AssignScreenToRolesByKeys(ctx context.Context, screenID string, roleKeys []string) error {
+	if strings.TrimSpace(screenID) == "" || len(roleKeys) == 0 {
+		return nil
+	}
+
+	const query = `
+		INSERT INTO role_screens (role_id, screen_id)
+		SELECT id, $1
+		FROM roles
+		WHERE key = ANY($2)
+		ON CONFLICT DO NOTHING`
+
+	if _, err := r.pool.Exec(ctx, query, screenID, roleKeys); err != nil {
+		return fmt.Errorf("assign screen to roles: %w", err)
+	}
+	return nil
+}
+
 // UpdateScreen actualiza una pantalla del catálogo.
 func (r *RBACRepo) UpdateScreen(ctx context.Context, id string, screen *entity.Screen) error {
 	const query = `
