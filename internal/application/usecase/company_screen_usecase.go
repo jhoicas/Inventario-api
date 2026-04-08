@@ -132,7 +132,11 @@ func (uc *CompanyScreenUseCase) UpdateScreen(ctx context.Context, companyID, scr
 		return nil, err
 	}
 	if current == nil {
-		return nil, domain.ErrNotFound
+		// En lugar de devolver error, inicializamos el modelo para que el Upsert lo inserte
+		current = &entity.CompanyScreen{
+			CompanyID: companyID,
+			ScreenID:  screenID,
+		}
 	}
 	if in.IsActive != nil {
 		current.IsActive = *in.IsActive
