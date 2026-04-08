@@ -2,6 +2,7 @@ package http
 
 import (
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -1874,13 +1875,13 @@ func (h *CRMHandler) EscalateTicket(c *fiber.Ctx) error {
 
 // Import procesa la importación masiva de perfiles CRM desde un archivo Excel/CSV.
 // @Summary      Importar perfiles CRM
-// @Description  Carga perfiles de clientes desde un archivo Excel o CSV, creando o actualizando registros
+// @Description  Carga perfiles de clientes en background y retorna un jobID para consultar progreso
 // @Tags         crm
 // @Security     Bearer
 // @Accept       mpfd
 // @Produce      json
 // @Param        file  formData  file  true  "Archivo Excel (.xlsx) o CSV"
-// @Success      200   {object}  dto.CRMImportResponse
+// @Success      202   {object}  map[string]string
 // @Failure      400   {object}  dto.ErrorResponse
 // @Failure      401   {object}  dto.ErrorResponse
 // @Failure      403   {object}  dto.ErrorResponse
@@ -1906,7 +1907,7 @@ func (h *CRMHandler) Import(c *fiber.Ctx) error {
 	}
 
 	// Llamar al caso de uso de importación
-	result, err := h.ImportUC.ImportProfilesFromFile(c.Context(), companyID, userID, file)
+	jobID, err := h.ImportUC.ImportProfilesFromFile(c.Context(), companyID, userID, file)
 	if err != nil {
 		if err == domain.ErrInvalidInput {
 			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "formato de archivo inválido o no soportado (.xlsx o .csv requerido)"})
@@ -1917,7 +1918,34 @@ func (h *CRMHandler) Import(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}
 
-	return c.Status(fiber.StatusOK).JSON(result)
+	return c.Status(fiber.StatusAccepted).JSON(fiber.Map{"jobID": jobID})
+}
+
+// GetImportStatus retorna el progreso actual de un job de importación en background.
+// @Summary      Estado de importación CRM
+// @Description  Consulta el estado de una importación por jobID
+// @Tags         crm
+// @Security     Bearer
+// @Produce      json
+// @Param        jobID  path  string  true  "Job ID"
+// @Success      200    {object}  crm.JobProgress
+// @Failure      404    {object}  dto.ErrorResponse
+// @Router       /api/crm/import/status/{jobID} [get]
+func (h *CRMHandler) GetImportStatus(c *fiber.Ctx) error {
+	jobID := strings.TrimSpace(c.Params("jobID"))
+	if jobID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "jobID requerido"})
+	}
+	if h.ImportUC == nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: "import use case no configurado"})
+	}
+
+	progress, ok := h.ImportUC.GetJobProgress(jobID)
+	if !ok {
+		return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "job no encontrado"})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(progress)
 }
 
 // ListOverdueTickets lista los tickets en estado OVERDUE de la empresa.

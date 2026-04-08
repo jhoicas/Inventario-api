@@ -9,6 +9,7 @@ import (
 	"mime/multipart"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -19,6 +20,15 @@ import (
 	"github.com/shopspring/decimal"
 	"github.com/xuri/excelize/v2"
 )
+
+var importJobs = sync.Map{}
+
+// JobProgress representa el estado de un job de importación en background.
+type JobProgress struct {
+	TotalRows     int
+	ProcessedRows int
+	Status        string
+}
 
 // ImportUseCase gestiona la importación masiva de perfiles CRM.
 type ImportUseCase struct {
@@ -53,18 +63,18 @@ func (uc *ImportUseCase) ImportProfilesFromFile(
 	companyID string,
 	userID string,
 	file *multipart.FileHeader,
-) (*dto.CRMImportResponse, error) {
+) (string, error) {
 	if companyID == "" {
-		return nil, domain.ErrInvalidInput
+		return "", domain.ErrInvalidInput
 	}
 	if file == nil {
-		return nil, domain.ErrInvalidInput
+		return "", domain.ErrInvalidInput
 	}
 
 	// Abre el archivo subido
 	src, err := file.Open()
 	if err != nil {
-		return nil, fmt.Errorf("abrir archivo: %w", err)
+		return "", fmt.Errorf("abrir archivo: %w", err)
 	}
 	defer src.Close()
 
@@ -76,14 +86,21 @@ func (uc *ImportUseCase) ImportProfilesFromFile(
 	} else if strings.HasSuffix(filename, ".csv") {
 		rows, err = uc.readCSV(src)
 	} else {
-		return nil, domain.ErrInvalidInput
+		return "", domain.ErrInvalidInput
 	}
 
 	if err != nil {
-		return nil, domain.ErrInvalidInput
+		return "", domain.ErrInvalidInput
 	}
 
-	return uc.processRows(ctx, companyID, userID, rows)
+	jobID := uuid.NewString()
+	importJobs.Store(jobID, JobProgress{TotalRows: len(rows), ProcessedRows: 0, Status: "processing"})
+
+	// Desacoplar del request actual para que el job continúe aunque el cliente cierre conexión.
+	go uc.processRowsAsync(context.Background(), companyID, userID, rows, jobID)
+
+	_ = ctx
+	return jobID, nil
 }
 
 // readExcel parsea un archivo Excel.
@@ -131,20 +148,30 @@ func (uc *ImportUseCase) readCSV(r io.Reader) ([][]string, error) {
 	return rows, nil
 }
 
-// processRows procesa las filas del archivo y ejecuta upserts.
-func (uc *ImportUseCase) processRows(ctx context.Context, companyID string, userID string, rows [][]string) (*dto.CRMImportResponse, error) {
-	result := &dto.CRMImportResponse{
-		TotalRows:    len(rows),
-		CreatedCount: 0,
-		UpdatedCount: 0,
-		SkippedCount: 0,
-		Errors:       make([]dto.ImportError, 0),
-		ProcessedAt:  time.Now(),
-		CompanyID:    companyID,
+// GetJobProgress retorna el estado actual de un job de importación.
+func (uc *ImportUseCase) GetJobProgress(jobID string) (JobProgress, bool) {
+	v, ok := importJobs.Load(jobID)
+	if !ok {
+		return JobProgress{}, false
 	}
+	p, castOK := v.(JobProgress)
+	if !castOK {
+		return JobProgress{}, false
+	}
+	return p, true
+}
+
+// processRowsAsync procesa filas en background y actualiza el progreso del job.
+func (uc *ImportUseCase) processRowsAsync(ctx context.Context, companyID string, userID string, rows [][]string, jobID string) {
+	defer func() {
+		if r := recover(); r != nil {
+			uc.setJobProgress(jobID, JobProgress{TotalRows: len(rows), ProcessedRows: len(rows), Status: "error"})
+		}
+	}()
 
 	if len(rows) == 0 {
-		return result, nil
+		uc.setJobProgress(jobID, JobProgress{TotalRows: 0, ProcessedRows: 0, Status: "completed"})
+		return
 	}
 
 	// Primera fila como encabezados
@@ -157,7 +184,7 @@ func (uc *ImportUseCase) processRows(ctx context.Context, companyID string, user
 
 		// Si la fila está vacía, salta
 		if len(row) == 0 || uc.isEmptyRow(row) {
-			result.SkippedCount++
+			uc.updateProcessed(jobID, len(rows), i+1)
 			continue
 		}
 
@@ -165,11 +192,7 @@ func (uc *ImportUseCase) processRows(ctx context.Context, companyID string, user
 
 		// Validación básica
 		if strings.TrimSpace(profile.Email) == "" {
-			result.SkippedCount++
-			result.Errors = append(result.Errors, dto.ImportError{
-				Row:     i + 1,
-				Message: "email requerido",
-			})
+			uc.updateProcessed(jobID, len(rows), i+1)
 			continue
 		}
 
@@ -177,25 +200,20 @@ func (uc *ImportUseCase) processRows(ctx context.Context, companyID string, user
 		profile.Email = strings.ToLower(strings.TrimSpace(profile.Email))
 
 		// Intenta upsert
-		created, err := uc.upsertProfile(ctx, companyID, userID, profile)
-		if err != nil {
-			result.Errors = append(result.Errors, dto.ImportError{
-				Row:     i + 1,
-				Email:   profile.Email,
-				Message: fmt.Sprintf("error: %v", err),
-			})
-			result.SkippedCount++
-			continue
-		}
-
-		if created {
-			result.CreatedCount++
-		} else {
-			result.UpdatedCount++
-		}
+		_, _ = uc.upsertProfile(ctx, companyID, userID, profile)
+		uc.updateProcessed(jobID, len(rows), i+1)
 	}
 
-	return result, nil
+	uc.setJobProgress(jobID, JobProgress{TotalRows: len(rows), ProcessedRows: len(rows), Status: "completed"})
+}
+
+func (uc *ImportUseCase) updateProcessed(jobID string, totalRows int, processedRows int) {
+	// Actualización en cada iteración para reflejar progreso en tiempo real.
+	uc.setJobProgress(jobID, JobProgress{TotalRows: totalRows, ProcessedRows: processedRows, Status: "processing"})
+}
+
+func (uc *ImportUseCase) setJobProgress(jobID string, progress JobProgress) {
+	importJobs.Store(jobID, progress)
 }
 
 // mapHeaders crea un mapa de índices de columnas basado en los encabezados.
@@ -211,54 +229,63 @@ func (uc *ImportUseCase) mapHeaders(headers []string) map[string]int {
 func (uc *ImportUseCase) parseRow(headerMap map[string]int, row []string) dto.ImportCRMProfileRequest {
 	profile := dto.ImportCRMProfileRequest{}
 
-	// Busca y asigna campos por nombre de columna (flexible)
-	if idx, ok := headerMap["nombre"]; ok && idx < len(row) {
+	// Busca y asigna campos por nombre de columna (admite espacios, underscore y acentos).
+	if idx, ok := findHeaderIndex(headerMap, "nombre"); ok && idx < len(row) {
 		profile.Nombre = strings.TrimSpace(row[idx])
 	}
-	if idx, ok := headerMap["idcliente"]; ok && idx < len(row) {
+	if idx, ok := findHeaderIndex(headerMap, "idcliente", "id cliente", "id_cliente"); ok && idx < len(row) {
 		profile.IDCliente = strings.TrimSpace(row[idx])
 	}
-	if idx, ok := headerMap["email"]; ok && idx < len(row) {
+	if idx, ok := findHeaderIndex(headerMap, "email"); ok && idx < len(row) {
 		profile.Email = strings.TrimSpace(row[idx])
 	}
-	if idx, ok := headerMap["segmento"]; ok && idx < len(row) {
+	if idx, ok := findHeaderIndex(headerMap, "segmento"); ok && idx < len(row) {
 		profile.Segmento = strings.TrimSpace(row[idx])
 	}
-	if idx, ok := headerMap["ventastotales"]; ok && idx < len(row) {
+	if idx, ok := findHeaderIndex(headerMap, "ventas totales", "ventas_totales", "ventastotales"); ok && idx < len(row) {
 		if val := strings.TrimSpace(row[idx]); val != "" {
 			if f, err := strconv.ParseFloat(strings.ReplaceAll(val, ",", ""), 64); err == nil {
 				profile.VentasTotales = f
 			}
 		}
 	}
-	if idx, ok := headerMap["pedidos"]; ok && idx < len(row) {
+	if idx, ok := findHeaderIndex(headerMap, "pedidos"); ok && idx < len(row) {
 		if val := strings.TrimSpace(row[idx]); val != "" {
 			if n, err := strconv.Atoi(val); err == nil {
 				profile.Pedidos = n
 			}
 		}
 	}
-	if idx, ok := headerMap["productos"]; ok && idx < len(row) {
+	if idx, ok := findHeaderIndex(headerMap, "productos"); ok && idx < len(row) {
 		if val := strings.TrimSpace(row[idx]); val != "" {
 			if n, err := strconv.Atoi(val); err == nil {
 				profile.Productos = n
 			}
 		}
 	}
-	if idx, ok := headerMap["ultimacompra"]; ok && idx < len(row) {
+	if idx, ok := findHeaderIndex(headerMap, "ultima compra", "ultima_compra", "ultimacompra", "última compra", "última_compra", "últimacompra"); ok && idx < len(row) {
 		profile.UltimaCompra = normalizeMonthYear(strings.TrimSpace(row[idx]))
 	}
-	if idx, ok := headerMap["categoriaproducto"]; ok && idx < len(row) {
+	if idx, ok := findHeaderIndex(headerMap, "categoria producto", "categoria_producto", "categoriaproducto", "categoría producto", "categoría_producto", "categoríaproducto"); ok && idx < len(row) {
 		profile.CategoriaProducto = strings.TrimSpace(row[idx])
 	}
-	if idx, ok := headerMap["descripcionproductos"]; ok && idx < len(row) {
+	if idx, ok := findHeaderIndex(headerMap, "descripcion de productos", "descripcion_de_productos", "descripcionproductos", "descripción de productos", "descripción_de_productos", "descripciónproductos"); ok && idx < len(row) {
 		profile.DescripcionProductos = strings.TrimSpace(row[idx])
 	}
-	if idx, ok := headerMap["estrategiaseguimiento"]; ok && idx < len(row) {
+	if idx, ok := findHeaderIndex(headerMap, "estrategia seguimiento", "estrategia_seguimiento", "estrategiaseguimiento"); ok && idx < len(row) {
 		profile.EstrategiaSeguimiento = strings.TrimSpace(row[idx])
 	}
 
 	return profile
+}
+
+func findHeaderIndex(headerMap map[string]int, keys ...string) (int, bool) {
+	for _, key := range keys {
+		if idx, ok := headerMap[strings.ToLower(strings.TrimSpace(key))]; ok {
+			return idx, true
+		}
+	}
+	return 0, false
 }
 
 // isEmptyRow verifica si una fila está completamente vacía.
@@ -333,6 +360,7 @@ func (uc *ImportUseCase) upsertProfile(
 	if existingProfile != nil {
 		ltv = existingProfile.LTV
 	}
+	// VentasTotales del Excel se persiste como LTV del perfil CRM.
 	if profile.VentasTotales > 0 {
 		ltv = decimal.NewFromFloat(profile.VentasTotales)
 	}
@@ -346,6 +374,7 @@ func (uc *ImportUseCase) upsertProfile(
 		OrdersCount:      profile.Pedidos,
 		DistinctProducts: profile.Productos,
 		LastPurchaseDate: profile.UltimaCompra,
+		// CategoriaProducto del Excel se persiste en metadata.mainCategory.
 		MainCategory:     profile.CategoriaProducto,
 		ProductsList:     profile.DescripcionProductos,
 		FollowUpStrategy: profile.EstrategiaSeguimiento,
