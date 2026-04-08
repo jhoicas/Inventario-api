@@ -1888,7 +1888,11 @@ func (h *CRMHandler) EscalateTicket(c *fiber.Ctx) error {
 // @Router       /api/crm/import [post]
 func (h *CRMHandler) Import(c *fiber.Ctx) error {
 	companyID := GetCompanyID(c)
+	userID := GetUserID(c)
 	if companyID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if userID == "" {
 		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
 	}
 	if h.ImportUC == nil {
@@ -1902,7 +1906,7 @@ func (h *CRMHandler) Import(c *fiber.Ctx) error {
 	}
 
 	// Llamar al caso de uso de importación
-	result, err := h.ImportUC.ImportProfilesFromFile(c.Context(), companyID, file)
+	result, err := h.ImportUC.ImportProfilesFromFile(c.Context(), companyID, userID, file)
 	if err != nil {
 		if err == domain.ErrInvalidInput {
 			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "formato de archivo inválido o no soportado (.xlsx o .csv requerido)"})

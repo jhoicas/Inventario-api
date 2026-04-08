@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -188,9 +189,10 @@ func NewCRMProfileRepository(q Querier) *CRMProfileRepo { return &CRMProfileRepo
 func (r *CRMProfileRepo) GetByCustomerID(customerID string) (*entity.CRMCustomerProfile, error) {
 	var p entity.CRMCustomerProfile
 	var catID *string
+	var metadataRaw []byte
 	err := r.q.QueryRow(context.Background(), `
-		SELECT id, customer_id, company_id, category_id, ltv, created_at, updated_at FROM crm_customer_profiles WHERE customer_id = $1`, customerID,
-	).Scan(&p.ID, &p.CustomerID, &p.CompanyID, &catID, &p.LTV, &p.CreatedAt, &p.UpdatedAt)
+		SELECT id, customer_id, company_id, category_id, ltv, metadata, created_at, updated_at FROM crm_customer_profiles WHERE customer_id = $1`, customerID,
+	).Scan(&p.ID, &p.CustomerID, &p.CompanyID, &catID, &p.LTV, &metadataRaw, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
@@ -199,6 +201,9 @@ func (r *CRMProfileRepo) GetByCustomerID(customerID string) (*entity.CRMCustomer
 	}
 	if catID != nil {
 		p.CategoryID = *catID
+	}
+	if len(metadataRaw) > 0 {
+		_ = json.Unmarshal(metadataRaw, &p.Metadata)
 	}
 	return &p, nil
 }
@@ -237,18 +242,22 @@ func (r *CRMProfileRepo) Upsert(p *entity.CRMCustomerProfile) error {
 	if p.ID == "" {
 		p.ID = uuid.New().String()
 	}
-	_, err := r.q.Exec(context.Background(), `
-		INSERT INTO crm_customer_profiles (id, customer_id, company_id, category_id, ltv, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		ON CONFLICT (customer_id) DO UPDATE SET category_id = EXCLUDED.category_id, ltv = EXCLUDED.ltv, updated_at = EXCLUDED.updated_at`,
-		p.ID, p.CustomerID, p.CompanyID, nullIfEmpty(p.CategoryID), p.LTV, p.CreatedAt, p.UpdatedAt,
+	metadataJSON, err := json.Marshal(p.Metadata)
+	if err != nil {
+		return fmt.Errorf("marshal profile metadata: %w", err)
+	}
+	_, err = r.q.Exec(context.Background(), `
+		INSERT INTO crm_customer_profiles (id, customer_id, company_id, category_id, ltv, metadata, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		ON CONFLICT (customer_id) DO UPDATE SET category_id = EXCLUDED.category_id, ltv = EXCLUDED.ltv, metadata = EXCLUDED.metadata, updated_at = EXCLUDED.updated_at`,
+		p.ID, p.CustomerID, p.CompanyID, nullIfEmpty(p.CategoryID), p.LTV, metadataJSON, p.CreatedAt, p.UpdatedAt,
 	)
 	return err
 }
 
 func (r *CRMProfileRepo) ListByCompany(companyID string, limit, offset int) ([]*entity.CRMCustomerProfile, error) {
 	rows, err := r.q.Query(context.Background(), `
-		SELECT id, customer_id, company_id, category_id, ltv, created_at, updated_at FROM crm_customer_profiles WHERE company_id = $1 ORDER BY updated_at DESC LIMIT $2 OFFSET $3`,
+		SELECT id, customer_id, company_id, category_id, ltv, metadata, created_at, updated_at FROM crm_customer_profiles WHERE company_id = $1 ORDER BY updated_at DESC LIMIT $2 OFFSET $3`,
 		companyID, limit, offset,
 	)
 	if err != nil {
@@ -259,11 +268,15 @@ func (r *CRMProfileRepo) ListByCompany(companyID string, limit, offset int) ([]*
 	for rows.Next() {
 		var p entity.CRMCustomerProfile
 		var catID *string
-		if err := rows.Scan(&p.ID, &p.CustomerID, &p.CompanyID, &catID, &p.LTV, &p.CreatedAt, &p.UpdatedAt); err != nil {
+		var metadataRaw []byte
+		if err := rows.Scan(&p.ID, &p.CustomerID, &p.CompanyID, &catID, &p.LTV, &metadataRaw, &p.CreatedAt, &p.UpdatedAt); err != nil {
 			return nil, err
 		}
 		if catID != nil {
 			p.CategoryID = *catID
+		}
+		if len(metadataRaw) > 0 {
+			_ = json.Unmarshal(metadataRaw, &p.Metadata)
 		}
 		list = append(list, &p)
 	}

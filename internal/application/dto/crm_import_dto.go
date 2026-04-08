@@ -4,13 +4,17 @@ import "time"
 
 // ImportCRMProfileRequest es la fila de datos parseada del archivo de importación.
 type ImportCRMProfileRequest struct {
+	IDCliente             string  `json:"idCliente"`
 	Nombre                string  `json:"nombre"`
 	Email                 string  `json:"email"`
 	Segmento              string  `json:"segmento"`
-	TotalComprado         float64 `json:"total_comprado"`
-	CategoriaPrincipal    string  `json:"categoria_principal"`
-	ProductosComprados    string  `json:"productos_comprados"`
-	AccionRemarketingType string  `json:"accion_remarketing"`
+	VentasTotales         float64 `json:"ventasTotales"`
+	Pedidos               int     `json:"pedidos"`
+	Productos             int     `json:"productos"`
+	UltimaCompra          string  `json:"ultimaCompra"`
+	CategoriaProducto     string  `json:"categoriaProducto"`
+	DescripcionProductos  string  `json:"descripcionProductos"`
+	EstrategiaSeguimiento string  `json:"estrategiaSeguimiento"`
 }
 
 // CRMImportResponse resume el resultado de la importación masiva.

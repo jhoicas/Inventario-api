@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"mime/multipart"
+	"strconv"
 	"strings"
 	"time"
 
@@ -21,18 +22,27 @@ import (
 
 // ImportUseCase gestiona la importación masiva de perfiles CRM.
 type ImportUseCase struct {
-	profileRepo  repository.CRMProfileRepository
-	customerRepo repository.CustomerRepository
+	profileRepo     repository.CRMProfileRepository
+	customerRepo    repository.CustomerRepository
+	categoryRepo    repository.CRMCategoryRepository
+	taskRepo        repository.CRMTaskRepository
+	opportunityRepo repository.CRMOpportunityRepository
 }
 
 // NewImportUseCase construye el caso de uso de importación.
 func NewImportUseCase(
 	profileRepo repository.CRMProfileRepository,
 	customerRepo repository.CustomerRepository,
+	categoryRepo repository.CRMCategoryRepository,
+	taskRepo repository.CRMTaskRepository,
+	opportunityRepo repository.CRMOpportunityRepository,
 ) *ImportUseCase {
 	return &ImportUseCase{
-		profileRepo:  profileRepo,
-		customerRepo: customerRepo,
+		profileRepo:     profileRepo,
+		customerRepo:    customerRepo,
+		categoryRepo:    categoryRepo,
+		taskRepo:        taskRepo,
+		opportunityRepo: opportunityRepo,
 	}
 }
 
@@ -41,6 +51,7 @@ func NewImportUseCase(
 func (uc *ImportUseCase) ImportProfilesFromFile(
 	ctx context.Context,
 	companyID string,
+	userID string,
 	file *multipart.FileHeader,
 ) (*dto.CRMImportResponse, error) {
 	if companyID == "" {
@@ -72,7 +83,7 @@ func (uc *ImportUseCase) ImportProfilesFromFile(
 		return nil, domain.ErrInvalidInput
 	}
 
-	return uc.processRows(ctx, companyID, rows)
+	return uc.processRows(ctx, companyID, userID, rows)
 }
 
 // readExcel parsea un archivo Excel.
@@ -121,7 +132,7 @@ func (uc *ImportUseCase) readCSV(r io.Reader) ([][]string, error) {
 }
 
 // processRows procesa las filas del archivo y ejecuta upserts.
-func (uc *ImportUseCase) processRows(ctx context.Context, companyID string, rows [][]string) (*dto.CRMImportResponse, error) {
+func (uc *ImportUseCase) processRows(ctx context.Context, companyID string, userID string, rows [][]string) (*dto.CRMImportResponse, error) {
 	result := &dto.CRMImportResponse{
 		TotalRows:    len(rows),
 		CreatedCount: 0,
@@ -166,7 +177,7 @@ func (uc *ImportUseCase) processRows(ctx context.Context, companyID string, rows
 		profile.Email = strings.ToLower(strings.TrimSpace(profile.Email))
 
 		// Intenta upsert
-		created, err := uc.upsertProfile(ctx, companyID, profile)
+		created, err := uc.upsertProfile(ctx, companyID, userID, profile)
 		if err != nil {
 			result.Errors = append(result.Errors, dto.ImportError{
 				Row:     i + 1,
@@ -204,28 +215,47 @@ func (uc *ImportUseCase) parseRow(headerMap map[string]int, row []string) dto.Im
 	if idx, ok := headerMap["nombre"]; ok && idx < len(row) {
 		profile.Nombre = strings.TrimSpace(row[idx])
 	}
+	if idx, ok := headerMap["idcliente"]; ok && idx < len(row) {
+		profile.IDCliente = strings.TrimSpace(row[idx])
+	}
 	if idx, ok := headerMap["email"]; ok && idx < len(row) {
 		profile.Email = strings.TrimSpace(row[idx])
 	}
 	if idx, ok := headerMap["segmento"]; ok && idx < len(row) {
 		profile.Segmento = strings.TrimSpace(row[idx])
 	}
-	if idx, ok := headerMap["total_comprado"]; ok && idx < len(row) {
+	if idx, ok := headerMap["ventastotales"]; ok && idx < len(row) {
 		if val := strings.TrimSpace(row[idx]); val != "" {
-			// Convierte a float si es posible
-			var f float64
-			fmt.Sscanf(val, "%f", &f)
-			profile.TotalComprado = f
+			if f, err := strconv.ParseFloat(strings.ReplaceAll(val, ",", ""), 64); err == nil {
+				profile.VentasTotales = f
+			}
 		}
 	}
-	if idx, ok := headerMap["categoria_principal"]; ok && idx < len(row) {
-		profile.CategoriaPrincipal = strings.TrimSpace(row[idx])
+	if idx, ok := headerMap["pedidos"]; ok && idx < len(row) {
+		if val := strings.TrimSpace(row[idx]); val != "" {
+			if n, err := strconv.Atoi(val); err == nil {
+				profile.Pedidos = n
+			}
+		}
 	}
-	if idx, ok := headerMap["productos_comprados"]; ok && idx < len(row) {
-		profile.ProductosComprados = strings.TrimSpace(row[idx])
+	if idx, ok := headerMap["productos"]; ok && idx < len(row) {
+		if val := strings.TrimSpace(row[idx]); val != "" {
+			if n, err := strconv.Atoi(val); err == nil {
+				profile.Productos = n
+			}
+		}
 	}
-	if idx, ok := headerMap["accion_remarketing"]; ok && idx < len(row) {
-		profile.AccionRemarketingType = strings.TrimSpace(row[idx])
+	if idx, ok := headerMap["ultimacompra"]; ok && idx < len(row) {
+		profile.UltimaCompra = normalizeMonthYear(strings.TrimSpace(row[idx]))
+	}
+	if idx, ok := headerMap["categoriaproducto"]; ok && idx < len(row) {
+		profile.CategoriaProducto = strings.TrimSpace(row[idx])
+	}
+	if idx, ok := headerMap["descripcionproductos"]; ok && idx < len(row) {
+		profile.DescripcionProductos = strings.TrimSpace(row[idx])
+	}
+	if idx, ok := headerMap["estrategiaseguimiento"]; ok && idx < len(row) {
+		profile.EstrategiaSeguimiento = strings.TrimSpace(row[idx])
 	}
 
 	return profile
@@ -246,12 +276,25 @@ func (uc *ImportUseCase) isEmptyRow(row []string) bool {
 func (uc *ImportUseCase) upsertProfile(
 	ctx context.Context,
 	companyID string,
+	userID string,
 	profile dto.ImportCRMProfileRequest,
 ) (bool, error) {
-	// Busca cliente por email; si no existe, lo crea automáticamente.
-	customer, err := uc.customerRepo.GetByCompanyAndEmail(companyID, profile.Email)
-	if err != nil {
-		return false, fmt.Errorf("buscar cliente por email: %w", err)
+	// Busca cliente por IDCliente (tax_id) y, si no existe, por email.
+	var (
+		customer *entity.Customer
+		err      error
+	)
+	if strings.TrimSpace(profile.IDCliente) != "" {
+		customer, err = uc.customerRepo.GetByCompanyAndTaxID(companyID, profile.IDCliente)
+		if err != nil {
+			return false, fmt.Errorf("buscar cliente por idcliente: %w", err)
+		}
+	}
+	if customer == nil {
+		customer, err = uc.customerRepo.GetByCompanyAndEmail(companyID, profile.Email)
+		if err != nil {
+			return false, fmt.Errorf("buscar cliente por email: %w", err)
+		}
 	}
 	if customer == nil {
 		now := time.Now()
@@ -259,12 +302,16 @@ func (uc *ImportUseCase) upsertProfile(
 		if name == "" {
 			name = strings.Split(profile.Email, "@")[0]
 		}
+		taxID := strings.TrimSpace(profile.IDCliente)
+		if taxID == "" {
+			taxID = uc.buildTempTaxID()
+		}
 
 		customer = &entity.Customer{
 			ID:        uuid.NewString(),
 			CompanyID: companyID,
 			Name:      name,
-			TaxID:     uc.buildTempTaxID(),
+			TaxID:     taxID,
 			Email:     profile.Email,
 			Phone:     "",
 			IsActive:  true,
@@ -286,20 +333,35 @@ func (uc *ImportUseCase) upsertProfile(
 	if existingProfile != nil {
 		ltv = existingProfile.LTV
 	}
-	if profile.TotalComprado > 0 {
-		ltv = decimal.NewFromFloat(profile.TotalComprado)
+	if profile.VentasTotales > 0 {
+		ltv = decimal.NewFromFloat(profile.VentasTotales)
+	}
+
+	categoryID, err := uc.resolveCategoryID(companyID, profile.Segmento)
+	if err != nil {
+		return false, fmt.Errorf("resolver categoría por segmento: %w", err)
+	}
+
+	metadata := entity.ProfileMetadata{
+		OrdersCount:      profile.Pedidos,
+		DistinctProducts: profile.Productos,
+		LastPurchaseDate: profile.UltimaCompra,
+		MainCategory:     profile.CategoriaProducto,
+		ProductsList:     profile.DescripcionProductos,
+		FollowUpStrategy: profile.EstrategiaSeguimiento,
 	}
 
 	upsertProfile := &entity.CRMCustomerProfile{
 		CustomerID: customer.ID,
 		CompanyID:  companyID,
+		CategoryID: categoryID,
 		LTV:        ltv,
+		Metadata:   metadata,
 		CreatedAt:  now,
 		UpdatedAt:  now,
 	}
 	if existingProfile != nil {
 		upsertProfile.ID = existingProfile.ID
-		upsertProfile.CategoryID = existingProfile.CategoryID
 		upsertProfile.CreatedAt = existingProfile.CreatedAt
 	}
 
@@ -307,8 +369,104 @@ func (uc *ImportUseCase) upsertProfile(
 		return false, fmt.Errorf("upsert perfil: %w", err)
 	}
 
-	_ = ctx
+	if err := uc.createAutomationArtifacts(ctx, companyID, userID, customer.ID, profile); err != nil {
+		return false, err
+	}
+
 	return existingProfile == nil, nil
+}
+
+func (uc *ImportUseCase) resolveCategoryID(companyID, segment string) (string, error) {
+	segment = strings.TrimSpace(segment)
+	if segment == "" || uc.categoryRepo == nil {
+		return "", nil
+	}
+	categories, err := uc.categoryRepo.ListByCompany(companyID, 200, 0)
+	if err != nil {
+		return "", err
+	}
+	for _, cat := range categories {
+		if strings.EqualFold(strings.TrimSpace(cat.Name), segment) {
+			return cat.ID, nil
+		}
+	}
+	return "", nil
+}
+
+func (uc *ImportUseCase) createAutomationArtifacts(ctx context.Context, companyID, userID, customerID string, profile dto.ImportCRMProfileRequest) error {
+	segment := strings.ToUpper(strings.TrimSpace(profile.Segmento))
+	if segment != "VIP" && segment != "PREMIUM" {
+		return nil
+	}
+
+	if uc.taskRepo != nil {
+		desc := strings.TrimSpace(profile.EstrategiaSeguimiento)
+		if desc == "" {
+			desc = "Seguimiento recomendado tras importación masiva."
+		}
+		task := &entity.CRMTask{
+			ID:          uuid.NewString(),
+			CompanyID:   companyID,
+			CustomerID:  customerID,
+			Title:       "Seguimiento post-importación",
+			Description: desc,
+			Status:      entity.TaskStatusPending,
+			CreatedBy:   userID,
+			CreatedAt:   time.Now(),
+			UpdatedAt:   time.Now(),
+		}
+		if err := uc.taskRepo.Create(task); err != nil {
+			return fmt.Errorf("crear tarea automática: %w", err)
+		}
+	}
+
+	if uc.opportunityRepo != nil {
+		titleCategory := strings.TrimSpace(profile.CategoriaProducto)
+		if titleCategory == "" {
+			titleCategory = "categoría principal"
+		}
+		desc := profile.DescripcionProductos
+		if strings.TrimSpace(desc) == "" {
+			desc = fmt.Sprintf("Oportunidad de Up-Sell basada en %s.", titleCategory)
+		}
+		opp := &entity.Opportunity{
+			ID:          uuid.NewString(),
+			CompanyID:   companyID,
+			CustomerID:  customerID,
+			Title:       fmt.Sprintf("Up-Sell: %s", titleCategory),
+			Amount:      decimal.NewFromFloat(profile.VentasTotales),
+			Probability: 25,
+			Stage:       entity.OpportunityStageProspecto,
+			CreatedBy:   userID,
+			CreatedAt:   time.Now(),
+			UpdatedAt:   time.Now(),
+		}
+		_ = desc
+		if err := uc.opportunityRepo.Create(ctx, opp); err != nil {
+			return fmt.Errorf("crear oportunidad automática: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func normalizeMonthYear(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	parts := strings.Split(value, "/")
+	if len(parts) == 2 {
+		month := strings.TrimSpace(parts[0])
+		year := strings.TrimSpace(parts[1])
+		if len(month) == 1 {
+			month = "0" + month
+		}
+		if len(month) == 2 && len(year) == 4 {
+			return month + "/" + year
+		}
+	}
+	return value
 }
 
 func (uc *ImportUseCase) buildTempTaxID() string {

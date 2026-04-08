@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS crm_customer_profiles (
     company_id  UUID         NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
     category_id UUID        REFERENCES crm_categories(id) ON DELETE SET NULL,
     ltv        DECIMAL(15,2) NOT NULL DEFAULT 0,
+    metadata   JSONB         NOT NULL DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ   NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ   NOT NULL DEFAULT now()
 );
