@@ -328,6 +328,7 @@ func Router(app *fiber.App, deps RouterDeps) {
 		crmGroup := protected.Group("/crm", RequireModule(entity.ModuleCRM, deps.ModuleService), screenAccess)
 		h := deps.CRMHandler
 		crmGroup.Get("/analytics", h.GetAnalytics)
+		crmGroup.Get("/remarketing", h.GetRemarketing)
 		crmGroup.Get("/customers", h.ListCustomers)
 		crmGroup.Post("/customers", h.CreateCustomer)
 		crmGroup.Put("/customers/:id", h.UpdateCustomer)

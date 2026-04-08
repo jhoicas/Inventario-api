@@ -35,6 +35,7 @@ type CRMProfileRepository interface {
 	Upsert(profile *entity.CRMCustomerProfile) error
 	ListByCompany(companyID string, limit, offset int) ([]*entity.CRMCustomerProfile, error)
 	GetAnalytics(ctx context.Context, companyID string) (*dto.CRMAnalyticsResponse, error)
+	GetRemarketingProspects(ctx context.Context, companyID string) ([]dto.RemarketingProspect, error)
 
 	// GetDashboardKPIs retorna KPIs agregados del dashboard CRM para una empresa.
 	GetDashboardKPIs(companyID string) (*CRMDashboardKPIs, error)

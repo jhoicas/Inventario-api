@@ -374,6 +374,17 @@ type CRMAnalyticsResponse struct {
 	Segmentacion     []CRMAnalyticsSegmentItem   `json:"segmentacion"`
 }
 
+// RemarketingProspect representa un cliente/prospecto ideal para campañas de remarketing.
+type RemarketingProspect struct {
+	ID              string  `json:"id"`
+	Segmento        string  `json:"segmento"`
+	Nombre          string  `json:"nombre"`
+	Email           string  `json:"email"`
+	TotalComprado   float64 `json:"totalComprado"`
+	Categoria       string  `json:"categoria"`
+	MensajeSugerido string  `json:"mensajeSugerido"`
+}
+
 type CRMAnalyticsKPIsResponse struct {
 	TotalCustomers int64           `json:"total_customers"`
 	TotalSales     decimal.Decimal `json:"total_sales"`

@@ -319,6 +319,58 @@ func (r *CRMProfileRepo) GetAnalytics(ctx context.Context, companyID string) (*d
 	}, nil
 }
 
+func (r *CRMProfileRepo) GetRemarketingProspects(ctx context.Context, companyID string) ([]dto.RemarketingProspect, error) {
+	if companyID == "" {
+		return nil, fmt.Errorf("company_id requerido")
+	}
+
+	rows, err := r.q.Query(ctx, `
+		WITH totals AS (
+			SELECT i.customer_id, COALESCE(SUM(i.grand_total), 0)::double precision AS total_comprado
+			FROM invoices i
+			WHERE i.company_id = $1
+			GROUP BY i.customer_id
+		)
+		SELECT
+			c.id,
+			COALESCE(c.name, '') AS nombre,
+			COALESCE(c.email, '') AS email,
+			COALESCE(t.total_comprado, 0)::double precision AS total_comprado,
+			COALESCE(NULLIF(TRIM(cat.name), ''), 'SIN_CATEGORIA') AS categoria,
+			CASE
+				WHEN COALESCE(t.total_comprado, 0) >= 1000000 THEN 'VIP'
+				WHEN COALESCE(t.total_comprado, 0) >= 500000 THEN 'PREMIUM'
+				WHEN COALESCE(t.total_comprado, 0) > 0 THEN 'RECURRENTE'
+				ELSE 'OCASIONAL'
+			END AS segmento
+		FROM customers c
+		INNER JOIN crm_customer_profiles p ON p.customer_id = c.id
+		LEFT JOIN crm_categories cat ON cat.id = p.category_id
+		LEFT JOIN totals t ON t.customer_id = c.id
+		WHERE c.company_id = $1
+		  AND c.is_active = true
+		ORDER BY COALESCE(t.total_comprado, 0) DESC, c.name ASC
+	`, companyID)
+	if err != nil {
+		return nil, fmt.Errorf("get crm remarketing prospects: %w", err)
+	}
+	defer rows.Close()
+
+	out := make([]dto.RemarketingProspect, 0)
+	for rows.Next() {
+		var item dto.RemarketingProspect
+		if err := rows.Scan(&item.ID, &item.Nombre, &item.Email, &item.TotalComprado, &item.Categoria, &item.Segmento); err != nil {
+			return nil, fmt.Errorf("scan crm remarketing prospect: %w", err)
+		}
+		out = append(out, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate crm remarketing prospects: %w", err)
+	}
+
+	return out, nil
+}
+
 func (r *CRMProfileRepo) getAnalyticsSegmentation(ctx context.Context, companyID string, totalCustomers int) ([]dto.CRMAnalyticsSegmentItem, error) {
 	rows, err := r.q.Query(ctx, `
 		SELECT

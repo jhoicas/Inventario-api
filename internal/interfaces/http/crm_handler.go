@@ -118,6 +118,40 @@ func (h *CRMHandler) GetAnalytics(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(out)
 }
 
+// GetRemarketing devuelve prospectos ideales para campañas de remarketing.
+// @Summary      Remarketing CRM
+// @Description  Devuelve una lista de clientes/prospectos ideales filtrados por la empresa autenticada
+// @Tags         crm
+// @Security     Bearer
+// @Accept       json
+// @Produce      json
+// @Success      200  {array}   dto.RemarketingProspect
+// @Failure      401  {object}  dto.ErrorResponse
+// @Failure      503  {object}  dto.ErrorResponse
+// @Router       /api/crm/remarketing [get]
+func (h *CRMHandler) GetRemarketing(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	if companyID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if h.AnalyticsUC == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "remarketing no configurado"})
+	}
+
+	out, err := h.AnalyticsUC.GetRemarketingProspects(c.Context(), companyID)
+	if err != nil {
+		if err == domain.ErrInvalidInput {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: err.Error()})
+		}
+		if err == domain.ErrForbidden {
+			return c.Status(fiber.StatusForbidden).JSON(dto.ErrorResponse{Code: "FORBIDDEN", Message: err.Error()})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(out)
+}
+
 // ListCustomers lista los clientes disponibles en CRM.
 // @Summary      Listar clientes CRM
 // @Description  Lista los clientes de la empresa autenticada para uso en CRM
