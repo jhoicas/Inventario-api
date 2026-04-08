@@ -12,12 +12,14 @@ type CreateCustomerRequest struct {
 
 // CustomerResponse cliente en respuestas.
 type CustomerResponse struct {
-	ID        string `json:"id"`
-	CompanyID string `json:"company_id"`
-	Name      string `json:"name"`
-	TaxID     string `json:"tax_id"`
-	Email     string `json:"email,omitempty"`
-	Phone     string `json:"phone,omitempty"`
+	ID           string          `json:"id"`
+	CompanyID    string          `json:"company_id"`
+	Name         string          `json:"name"`
+	TaxID        string          `json:"tax_id"`
+	Email        string          `json:"email,omitempty"`
+	Phone        string          `json:"phone,omitempty"`
+	LTV          decimal.Decimal `json:"ltv"`
+	CategoryName string          `json:"category_name,omitempty"`
 }
 
 // UpdateCustomerRequest body para actualizar un cliente.

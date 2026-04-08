@@ -45,12 +45,14 @@ func (uc *CustomerUseCase) Create(companyID string, in dto.CreateCustomerRequest
 		return nil, err
 	}
 	return &dto.CustomerResponse{
-		ID:        customer.ID,
-		CompanyID: customer.CompanyID,
-		Name:      customer.Name,
-		TaxID:     customer.TaxID,
-		Email:     customer.Email,
-		Phone:     customer.Phone,
+		ID:           customer.ID,
+		CompanyID:    customer.CompanyID,
+		Name:         customer.Name,
+		TaxID:        customer.TaxID,
+		Email:        customer.Email,
+		Phone:        customer.Phone,
+		LTV:          customer.LTV,
+		CategoryName: customer.CategoryName,
 	}, nil
 }
 
@@ -87,12 +89,14 @@ func (uc *CustomerUseCase) List(companyID string, search string, limit, offset i
 	out := make([]*dto.CustomerResponse, 0, len(list))
 	for _, c := range list {
 		out = append(out, &dto.CustomerResponse{
-			ID:        c.ID,
-			CompanyID: c.CompanyID,
-			Name:      c.Name,
-			TaxID:     c.TaxID,
-			Email:     c.Email,
-			Phone:     c.Phone,
+			ID:           c.ID,
+			CompanyID:    c.CompanyID,
+			Name:         c.Name,
+			TaxID:        c.TaxID,
+			Email:        c.Email,
+			Phone:        c.Phone,
+			LTV:          c.LTV,
+			CategoryName: c.CategoryName,
 		})
 	}
 	return out, nil
@@ -131,11 +135,13 @@ func (uc *CustomerUseCase) Update(companyID, customerID string, in dto.UpdateCus
 		return nil, err
 	}
 	return &dto.CustomerResponse{
-		ID:        current.ID,
-		CompanyID: current.CompanyID,
-		Name:      current.Name,
-		TaxID:     current.TaxID,
-		Email:     current.Email,
-		Phone:     current.Phone,
+		ID:           current.ID,
+		CompanyID:    current.CompanyID,
+		Name:         current.Name,
+		TaxID:        current.TaxID,
+		Email:        current.Email,
+		Phone:        current.Phone,
+		LTV:          current.LTV,
+		CategoryName: current.CategoryName,
 	}, nil
 }

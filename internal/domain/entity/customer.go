@@ -1,16 +1,22 @@
 package entity
 
-import "time"
+import (
+	"time"
+
+	"github.com/shopspring/decimal"
+)
 
 // Customer representa un cliente de la empresa (facturación).
 type Customer struct {
-	ID        string
-	CompanyID string
-	Name      string
-	TaxID     string // NIT o Cédula (Colombia)
-	Email     string
-	Phone     string
-	IsActive  bool
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID           string
+	CompanyID    string
+	Name         string
+	TaxID        string // NIT o Cédula (Colombia)
+	Email        string
+	Phone        string
+	LTV          decimal.Decimal
+	CategoryName string
+	IsActive     bool
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }

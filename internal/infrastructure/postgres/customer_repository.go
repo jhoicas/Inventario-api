@@ -6,9 +6,11 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jhoicas/Inventario-api/internal/domain"
 	"github.com/jhoicas/Inventario-api/internal/domain/entity"
 	"github.com/jhoicas/Inventario-api/internal/domain/repository"
+	"github.com/shopspring/decimal"
 )
 
 var _ repository.CustomerRepository = (*CustomerRepo)(nil)
@@ -99,17 +101,30 @@ func (r *CustomerRepo) GetByCompanyAndEmail(companyID, email string) (*entity.Cu
 // ListByCompany lista clientes de la empresa con paginación.
 func (r *CustomerRepo) ListByCompany(companyID string, search string, limit, offset int) ([]*entity.Customer, error) {
 	base := `
-		SELECT id, company_id, name, tax_id, COALESCE(email, ''), COALESCE(phone, ''), is_active, created_at, updated_at
-		FROM customers
-		WHERE company_id = $1 AND is_active = true`
+		SELECT
+			c.id,
+			c.company_id,
+			c.name,
+			c.tax_id,
+			COALESCE(c.email, ''),
+			COALESCE(c.phone, ''),
+			c.is_active,
+			c.created_at,
+			c.updated_at,
+			COALESCE(cp.ltv, 0) AS ltv,
+			COALESCE(cat.name, '') AS category_name
+		FROM customers c
+		LEFT JOIN crm_customer_profiles cp ON c.id = cp.customer_id
+		LEFT JOIN crm_categories cat ON cp.category_id = cat.id
+		WHERE c.company_id = $1 AND c.is_active = true`
 	args := []any{companyID}
 	argIdx := 2
 	if search != "" {
-		base += fmt.Sprintf(" AND (name ILIKE $%d OR tax_id ILIKE $%d)", argIdx, argIdx)
+		base += fmt.Sprintf(" AND (c.name ILIKE $%d OR c.tax_id ILIKE $%d)", argIdx, argIdx)
 		args = append(args, "%"+search+"%")
 		argIdx++
 	}
-	base += fmt.Sprintf(" ORDER BY name LIMIT $%d OFFSET $%d", argIdx, argIdx+1)
+	base += fmt.Sprintf(" ORDER BY c.name LIMIT $%d OFFSET $%d", argIdx, argIdx+1)
 	args = append(args, limit, offset)
 
 	rows, err := r.q.Query(context.Background(), base, args...)
@@ -120,8 +135,14 @@ func (r *CustomerRepo) ListByCompany(companyID string, search string, limit, off
 	var list []*entity.Customer
 	for rows.Next() {
 		var c entity.Customer
-		if err := rows.Scan(&c.ID, &c.CompanyID, &c.Name, &c.TaxID, &c.Email, &c.Phone, &c.IsActive, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		var ltv pgtype.Numeric
+		if err := rows.Scan(&c.ID, &c.CompanyID, &c.Name, &c.TaxID, &c.Email, &c.Phone, &c.IsActive, &c.CreatedAt, &c.UpdatedAt, &ltv, &c.CategoryName); err != nil {
 			return nil, fmt.Errorf("scan customer: %w", err)
+		}
+		if ltv.Valid && ltv.Int != nil {
+			c.LTV = decimal.NewFromBigInt(ltv.Int, ltv.Exp)
+		} else {
+			c.LTV = decimal.Zero
 		}
 		list = append(list, &c)
 	}

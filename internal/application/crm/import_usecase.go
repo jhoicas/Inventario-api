@@ -294,7 +294,19 @@ func (uc *ImportUseCase) parseRow(headerMap map[string]int, row []string) dto.Im
 	if idx, ok := findHeaderIndex(headerMap, "descripcion de productos", "descripcion_de_productos", "descripcionproductos", "descripción de productos", "descripción_de_productos", "descripciónproductos"); ok && idx < len(row) {
 		profile.DescripcionProductos = strings.TrimSpace(row[idx])
 	}
-	if idx, ok := findHeaderIndex(headerMap, "estrategia seguimiento", "estrategia_seguimiento", "estrategiaseguimiento"); ok && idx < len(row) {
+	if idx, ok := findHeaderIndex(
+		headerMap,
+		"estrategia seguimiento",
+		"estrategia de seguimiento",
+		"estrategia_seguimiento",
+		"estrategia_de_seguimiento",
+		"estrategiaseguimiento",
+		"estrategiadeseguimiento",
+		"accion remarketing",
+		"accion_remarketing",
+		"acción remarketing",
+		"acción_remarketing",
+	); ok && idx < len(row) {
 		profile.EstrategiaSeguimiento = strings.TrimSpace(row[idx])
 	}
 
