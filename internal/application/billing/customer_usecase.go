@@ -75,20 +75,20 @@ func (uc *CustomerUseCase) Deactivate(companyID, customerID string) error {
 }
 
 // List lista clientes de la empresa.
-func (uc *CustomerUseCase) List(companyID string, search string, limit, offset int) ([]*dto.CustomerResponse, error) {
+func (uc *CustomerUseCase) List(companyID string, search string, limit, offset int) (*dto.CustomerListResponse, error) {
 	if limit <= 0 {
 		limit = 20
 	}
 	if offset < 0 {
 		offset = 0
 	}
-	list, err := uc.repo.ListByCompany(companyID, search, limit, offset)
+	list, total, err := uc.repo.ListByCompany(companyID, search, limit, offset)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]*dto.CustomerResponse, 0, len(list))
+	out := make([]dto.CustomerResponse, 0, len(list))
 	for _, c := range list {
-		out = append(out, &dto.CustomerResponse{
+		out = append(out, dto.CustomerResponse{
 			ID:           c.ID,
 			CompanyID:    c.CompanyID,
 			Name:         c.Name,
@@ -99,7 +99,7 @@ func (uc *CustomerUseCase) List(companyID string, search string, limit, offset i
 			CategoryName: c.CategoryName,
 		})
 	}
-	return out, nil
+	return &dto.CustomerListResponse{Items: out, Total: int(total), Limit: limit, Offset: offset}, nil
 }
 
 // Update actualiza un cliente existente de la empresa.

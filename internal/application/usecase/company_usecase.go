@@ -107,7 +107,7 @@ func (uc *CompanyUseCase) Delete(id string) error {
 
 // List lista empresas con paginación.
 func (uc *CompanyUseCase) List(limit, offset int) (*dto.CompanyListResponse, error) {
-	list, err := uc.repo.List(limit, offset)
+	list, total, err := uc.repo.List(limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -116,14 +116,16 @@ func (uc *CompanyUseCase) List(limit, offset int) (*dto.CompanyListResponse, err
 		items = append(items, *entityToCompanyResponse(c))
 	}
 	return &dto.CompanyListResponse{
-		Items: items,
-		Page:  dto.PageResponse{Limit: limit, Offset: offset},
+		Items:  items,
+		Total:  int(total),
+		Limit:  limit,
+		Offset: offset,
 	}, nil
 }
 
 // ListForAdmin lista empresas para superadmin excluyendo la cuenta técnica it@ludoia.com.
 func (uc *CompanyUseCase) ListForAdmin(limit, offset int) (*dto.CompanyListResponse, error) {
-	list, err := uc.repo.ListForAdmin(limit, offset)
+	list, total, err := uc.repo.ListForAdmin(limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -132,8 +134,10 @@ func (uc *CompanyUseCase) ListForAdmin(limit, offset int) (*dto.CompanyListRespo
 		items = append(items, *entityToCompanyResponse(c))
 	}
 	return &dto.CompanyListResponse{
-		Items: items,
-		Page:  dto.PageResponse{Limit: limit, Offset: offset},
+		Items:  items,
+		Total:  int(total),
+		Limit:  limit,
+		Offset: offset,
 	}, nil
 }
 

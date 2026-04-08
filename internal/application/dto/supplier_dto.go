@@ -45,6 +45,8 @@ type SupplierResponse struct {
 
 // SupplierListResponse respuesta paginada para listado de proveedores.
 type SupplierListResponse struct {
-	Items []SupplierResponse `json:"items"`
-	Page  PageResponse       `json:"page"`
+	Items  []SupplierResponse `json:"items"`
+	Total  int                `json:"total"`
+	Limit  int                `json:"limit"`
+	Offset int                `json:"offset"`
 }

@@ -187,7 +187,7 @@ func (h *CompanyHandler) List(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}
-	return c.JSON(out)
+	return respondPaginated(c, "companies.list", out)
 }
 
 // ListForAdmin godoc
@@ -214,7 +214,7 @@ func (h *CompanyHandler) ListForAdmin(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}
-	return c.JSON(out)
+	return respondPaginated(c, "admin.companies.list", out)
 }
 
 // CreateResolution godoc
@@ -252,6 +252,7 @@ func (h *CompanyHandler) CreateResolution(c *fiber.Ctx) error {
 
 // ListResolutions godoc
 // @Summary      Listar resoluciones DIAN de una empresa
+// @Description  [LEGACY_ARRAY] Devuelve array plano (no paginado).
 // @Tags         companies
 // @Produce      json
 // @Param        id   path      string  true  "ID de la empresa"
@@ -278,6 +279,7 @@ func (h *CompanyHandler) ListResolutions(c *fiber.Ctx) error {
 
 // ListMyResolutions godoc
 // @Summary      Listar resoluciones DIAN de la empresa del token
+// @Description  [LEGACY_ARRAY] Devuelve array plano (no paginado).
 // @Tags         companies
 // @Security     Bearer
 // @Produce      json

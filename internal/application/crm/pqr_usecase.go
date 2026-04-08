@@ -189,7 +189,7 @@ func (uc *PQRUseCase) Update(ctx context.Context, companyID, userID, id string, 
 
 // ListByCompany lista tickets de la empresa con filtros opcionales.
 func (uc *PQRUseCase) ListByCompany(ctx context.Context, companyID string, search string, status string, sort string, limit, offset int) (*dto.TicketResponseList, error) {
-	list, err := uc.ticketRepo.ListByCompany(companyID, search, status, sort, limit, offset)
+	list, total, err := uc.ticketRepo.ListByCompany(companyID, search, status, sort, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -197,7 +197,7 @@ func (uc *PQRUseCase) ListByCompany(ctx context.Context, companyID string, searc
 	for _, t := range list {
 		items = append(items, *toTicketResponse(t))
 	}
-	return &dto.TicketResponseList{Items: items, Limit: limit, Offset: offset}, nil
+	return &dto.TicketResponseList{Items: items, Total: total, Limit: limit, Offset: offset}, nil
 }
 
 // EscalateTicket marca un ticket como ESCALATED y registra la razón.

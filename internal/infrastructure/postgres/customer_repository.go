@@ -99,8 +99,36 @@ func (r *CustomerRepo) GetByCompanyAndEmail(companyID, email string) (*entity.Cu
 }
 
 // ListByCompany lista clientes de la empresa con paginación.
-func (r *CustomerRepo) ListByCompany(companyID string, search string, limit, offset int) ([]*entity.Customer, error) {
-	base := `
+func (r *CustomerRepo) ListByCompany(companyID string, search string, limit, offset int) ([]*entity.Customer, int64, error) {
+	joins, where, args := r.buildFilters(companyID, search)
+	items, err := r.list(joins, where, args, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	total, err := r.count(joins, where, args)
+	if err != nil {
+		return nil, 0, err
+	}
+	return items, total, nil
+}
+
+func (r *CustomerRepo) buildFilters(companyID, search string) (string, string, []any) {
+	joins := `
+		LEFT JOIN crm_customer_profiles cp ON c.id = cp.customer_id
+		LEFT JOIN crm_categories cat ON cp.category_id = cat.id`
+	where := `
+		WHERE c.company_id = $1 AND c.is_active = true`
+	args := []any{companyID}
+	if search != "" {
+		where += ` AND (c.name ILIKE $2 OR c.tax_id ILIKE $2)`
+		args = append(args, "%"+search+"%")
+	}
+	return joins, where, args
+}
+
+func (r *CustomerRepo) list(joins, where string, args []any, limit, offset int) ([]*entity.Customer, error) {
+	argPos := len(args) + 1
+	query := `
 		SELECT
 			c.id,
 			c.company_id,
@@ -114,25 +142,15 @@ func (r *CustomerRepo) ListByCompany(companyID string, search string, limit, off
 			COALESCE(cp.ltv, 0) AS ltv,
 			COALESCE(cat.name, '') AS category_name
 		FROM customers c
-		LEFT JOIN crm_customer_profiles cp ON c.id = cp.customer_id
-		LEFT JOIN crm_categories cat ON cp.category_id = cat.id
-		WHERE c.company_id = $1 AND c.is_active = true`
-	args := []any{companyID}
-	argIdx := 2
-	if search != "" {
-		base += fmt.Sprintf(" AND (c.name ILIKE $%d OR c.tax_id ILIKE $%d)", argIdx, argIdx)
-		args = append(args, "%"+search+"%")
-		argIdx++
-	}
-	base += fmt.Sprintf(" ORDER BY c.name LIMIT $%d OFFSET $%d", argIdx, argIdx+1)
-	args = append(args, limit, offset)
+		` + joins + "\n" + where + fmt.Sprintf(" ORDER BY c.name LIMIT $%d OFFSET $%d", argPos, argPos+1)
+	qArgs := append(args, limit, offset)
 
-	rows, err := r.q.Query(context.Background(), base, args...)
+	rows, err := r.q.Query(context.Background(), query, qArgs...)
 	if err != nil {
 		return nil, fmt.Errorf("list customers: %w", err)
 	}
 	defer rows.Close()
-	var list []*entity.Customer
+	items := make([]*entity.Customer, 0)
 	for rows.Next() {
 		var c entity.Customer
 		var ltv pgtype.Numeric
@@ -144,9 +162,24 @@ func (r *CustomerRepo) ListByCompany(companyID string, search string, limit, off
 		} else {
 			c.LTV = decimal.Zero
 		}
-		list = append(list, &c)
+		items = append(items, &c)
 	}
-	return list, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+func (r *CustomerRepo) count(joins, where string, args []any) (int64, error) {
+	query := `
+		SELECT COUNT(DISTINCT c.id)
+		FROM customers c
+		` + joins + "\n" + where
+	var total int64
+	if err := r.q.QueryRow(context.Background(), query, args...).Scan(&total); err != nil {
+		return 0, fmt.Errorf("count customers: %w", err)
+	}
+	return total, nil
 }
 
 // Update actualiza un cliente.

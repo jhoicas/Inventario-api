@@ -11,7 +11,7 @@ import (
 // CustomerUseCase interfaz local para permitir mocking en tests.
 type CustomerUseCase interface {
 	Create(companyID string, in dto.CreateCustomerRequest) (*dto.CustomerResponse, error)
-	List(companyID string, search string, limit, offset int) ([]*dto.CustomerResponse, error)
+	List(companyID string, search string, limit, offset int) (*dto.CustomerListResponse, error)
 	Update(companyID, customerID string, in dto.UpdateCustomerRequest) (*dto.CustomerResponse, error)
 	Deactivate(companyID, customerID string) error
 }
@@ -72,7 +72,7 @@ func (h *CustomerHandler) Create(c *fiber.Ctx) error {
 // @Param        search  query     string  false  "Buscar por nombre o NIT (tax_id)"
 // @Param        limit   query     int   false  "Límite de resultados"
 // @Param        offset  query     int   false  "Desplazamiento"
-// @Success      200     {array}   dto.CustomerResponse
+// @Success      200     {object}  dto.CustomerListResponse
 // @Failure      401     {object}  dto.ErrorResponse
 // @Failure      500     {object}  dto.ErrorResponse
 // @Router       /api/customers [get]
@@ -88,7 +88,7 @@ func (h *CustomerHandler) List(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}
-	return c.JSON(list)
+	return respondPaginated(c, "customers.list", list)
 }
 
 // Update godoc

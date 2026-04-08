@@ -30,7 +30,7 @@ func NewUserHandler(repo repository.UserRepository) *UserHandler {
 // @Produce      json
 // @Param        limit   query     int   false  "Límite"   default(20)
 // @Param        offset  query     int   false  "Offset"   default(0)
-// @Success      200     {array}   dto.UserResponse
+// @Success      200     {object}  dto.UserListResponse
 // @Failure      401     {object}  dto.ErrorResponse
 // @Failure      500     {object}  dto.ErrorResponse
 // @Router       /api/users [get]
@@ -50,7 +50,7 @@ func (h *UserHandler) List(c *fiber.Ctx) error {
 	if offset < 0 {
 		offset = 0
 	}
-	list, err := h.repo.ListByCompany(companyID, limit, offset)
+	list, total, err := h.repo.ListByCompany(companyID, limit, offset)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}
@@ -67,7 +67,7 @@ func (h *UserHandler) List(c *fiber.Ctx) error {
 			UpdatedAt: u.UpdatedAt,
 		})
 	}
-	return c.JSON(out)
+	return respondPaginated(c, "users.list", dto.UserListResponse{Items: out, Total: int(total), Limit: limit, Offset: offset})
 }
 
 // Create godoc
@@ -210,4 +210,3 @@ func (h *UserHandler) Update(c *fiber.Ctx) error {
 		UpdatedAt: user.UpdatedAt,
 	})
 }
-

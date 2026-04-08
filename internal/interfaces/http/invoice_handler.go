@@ -148,7 +148,7 @@ func (h *InvoiceHandler) GetInvoices(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}
-	return c.JSON(out)
+	return respondPaginated(c, "billing.invoices.list", out)
 }
 
 // GetCreditNotes godoc
@@ -189,7 +189,7 @@ func (h *InvoiceHandler) GetCreditNotes(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}
-	return c.JSON(out)
+	return respondPaginated(c, "billing.credit_notes.list", out)
 }
 
 // GetDebitNotes godoc
@@ -230,7 +230,7 @@ func (h *InvoiceHandler) GetDebitNotes(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}
-	return c.JSON(out)
+	return respondPaginated(c, "billing.debit_notes.list", out)
 }
 
 // GetDIANSummary godoc

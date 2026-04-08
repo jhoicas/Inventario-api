@@ -4,11 +4,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/shopspring/decimal"
 	"github.com/jhoicas/Inventario-api/internal/application/dto"
 	"github.com/jhoicas/Inventario-api/internal/domain"
 	"github.com/jhoicas/Inventario-api/internal/domain/entity"
 	"github.com/jhoicas/Inventario-api/internal/domain/repository"
+	"github.com/shopspring/decimal"
 )
 
 // ProductUseCase casos de uso CRUD para productos. Cost y Stock se manejan vía movimientos.
@@ -35,19 +35,19 @@ func (uc *ProductUseCase) Create(companyID string, in dto.CreateProductRequest) 
 	// UnitMeasure e información DIAN provienen exclusivamente del DTO (parametrización manual).
 	now := time.Now()
 	product := &entity.Product{
-		ID:           uuid.New().String(),
-		CompanyID:    companyID,
-		SKU:          in.SKU,
-		Name:         in.Name,
-		Description:  in.Description,
-		Price:        in.Price,
-		Cost:         decimal.Zero,
-		TaxRate:      in.TaxRate,
-		UNSPSC_Code:  in.UNSPSC_Code,
-		UnitMeasure:  in.UnitMeasure,
-		Attributes:   in.Attributes,
-		CreatedAt:    now,
-		UpdatedAt:    now,
+		ID:          uuid.New().String(),
+		CompanyID:   companyID,
+		SKU:         in.SKU,
+		Name:        in.Name,
+		Description: in.Description,
+		Price:       in.Price,
+		Cost:        decimal.Zero,
+		TaxRate:     in.TaxRate,
+		UNSPSC_Code: in.UNSPSC_Code,
+		UnitMeasure: in.UnitMeasure,
+		Attributes:  in.Attributes,
+		CreatedAt:   now,
+		UpdatedAt:   now,
 	}
 	if err := uc.repo.Create(product); err != nil {
 		return nil, err
@@ -109,7 +109,7 @@ func (uc *ProductUseCase) Update(id string, in dto.UpdateProductRequest) (*dto.P
 
 // List lista productos por empresa con paginación.
 func (uc *ProductUseCase) List(companyID string, limit, offset int) (*dto.ProductListResponse, error) {
-	list, err := uc.repo.ListByCompany(companyID, limit, offset)
+	list, total, err := uc.repo.ListByCompany(companyID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -118,8 +118,10 @@ func (uc *ProductUseCase) List(companyID string, limit, offset int) (*dto.Produc
 		items = append(items, *toProductResponse(p))
 	}
 	return &dto.ProductListResponse{
-		Items: items,
-		Page:  dto.PageResponse{Limit: limit, Offset: offset},
+		Items:  items,
+		Total:  int(total),
+		Limit:  limit,
+		Offset: offset,
 	}, nil
 }
 

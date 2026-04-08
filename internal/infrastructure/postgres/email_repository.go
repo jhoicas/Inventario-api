@@ -105,19 +105,40 @@ func (r *EmailAccountRepo) GetByID(companyID, id string) (*entity.EmailAccount, 
 	return &acc, nil
 }
 
-func (r *EmailAccountRepo) ListByCompany(companyID string, limit, offset int) ([]*entity.EmailAccount, error) {
-	rows, err := r.q.Query(context.Background(), `
-		SELECT id, company_id, email_address, imap_server, imap_port, password, is_active, created_at, updated_at
+func (r *EmailAccountRepo) ListByCompany(companyID string, limit, offset int) ([]*entity.EmailAccount, int64, error) {
+	where, args := r.buildFilters(companyID)
+	items, err := r.list(where, args, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	total, err := r.count(where, args)
+	if err != nil {
+		return nil, 0, err
+	}
+	return items, total, nil
+}
+
+func (r *EmailAccountRepo) buildFilters(companyID string) (string, []any) {
+	where := `
 		FROM email_accounts
-		WHERE company_id = $1
-		ORDER BY created_at DESC
-		LIMIT $2 OFFSET $3`, companyID, limit, offset)
+		WHERE company_id = $1`
+	return where, []any{companyID}
+}
+
+func (r *EmailAccountRepo) list(where string, args []any, limit, offset int) ([]*entity.EmailAccount, error) {
+	argPos := len(args) + 1
+	query := `
+		SELECT id, company_id, email_address, imap_server, imap_port, password, is_active, created_at, updated_at
+		` + where + fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, argPos, argPos+1)
+	qArgs := append(args, limit, offset)
+
+	rows, err := r.q.Query(context.Background(), query, qArgs...)
 	if err != nil {
 		return nil, fmt.Errorf("list email accounts: %w", err)
 	}
 	defer rows.Close()
 
-	list := make([]*entity.EmailAccount, 0)
+	items := make([]*entity.EmailAccount, 0)
 	for rows.Next() {
 		var acc entity.EmailAccount
 		if err := rows.Scan(
@@ -133,9 +154,21 @@ func (r *EmailAccountRepo) ListByCompany(companyID string, limit, offset int) ([
 		); err != nil {
 			return nil, fmt.Errorf("scan email account: %w", err)
 		}
-		list = append(list, &acc)
+		items = append(items, &acc)
 	}
-	return list, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+func (r *EmailAccountRepo) count(where string, args []any) (int64, error) {
+	query := `SELECT COUNT(*) ` + where
+	var total int64
+	if err := r.q.QueryRow(context.Background(), query, args...).Scan(&total); err != nil {
+		return 0, fmt.Errorf("count email accounts: %w", err)
+	}
+	return total, nil
 }
 
 func (r *EmailAccountRepo) ListActive() ([]*entity.EmailAccount, error) {

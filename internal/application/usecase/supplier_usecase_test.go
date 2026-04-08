@@ -18,7 +18,7 @@ type fakeSupplierRepository struct {
 	getByIDFunc           func(id string) (*entity.Supplier, error)
 	getByCompanyAndNITFun func(companyID, nit string) (*entity.Supplier, error)
 	updateFunc            func(supplier *entity.Supplier) error
-	listByCompanyFunc     func(companyID, search string, limit, offset int) ([]*entity.Supplier, error)
+	listByCompanyFunc     func(companyID, search string, limit, offset int) ([]*entity.Supplier, int64, error)
 	setActiveFunc         func(companyID, id string, isActive bool) error
 }
 
@@ -50,11 +50,11 @@ func (f *fakeSupplierRepository) Update(supplier *entity.Supplier) error {
 	return nil
 }
 
-func (f *fakeSupplierRepository) ListByCompany(companyID, search string, limit, offset int) ([]*entity.Supplier, error) {
+func (f *fakeSupplierRepository) ListByCompany(companyID, search string, limit, offset int) ([]*entity.Supplier, int64, error) {
 	if f.listByCompanyFunc != nil {
 		return f.listByCompanyFunc(companyID, search, limit, offset)
 	}
-	return nil, nil
+	return nil, 0, nil
 }
 
 func (f *fakeSupplierRepository) SetActive(companyID, id string, isActive bool) error {
@@ -271,12 +271,12 @@ func TestSupplierUseCase_List(t *testing.T) {
 			filters:   dto.SupplierFilters{Search: "prov", Limit: 20, Offset: 0},
 			repoSetup: func() *fakeSupplierRepository {
 				return &fakeSupplierRepository{
-					listByCompanyFunc: func(companyID, search string, limit, offset int) ([]*entity.Supplier, error) {
+					listByCompanyFunc: func(companyID, search string, limit, offset int) ([]*entity.Supplier, int64, error) {
 						assert.Equal(t, supplierTestCompanyID, companyID)
 						assert.Equal(t, "prov", search)
 						assert.Equal(t, 20, limit)
 						assert.Equal(t, 0, offset)
-						return []*entity.Supplier{validSupplierEntity("sup-1", supplierTestCompanyID)}, nil
+						return []*entity.Supplier{validSupplierEntity("sup-1", supplierTestCompanyID)}, 7, nil
 					},
 				}
 			},
@@ -287,10 +287,10 @@ func TestSupplierUseCase_List(t *testing.T) {
 			filters:   dto.SupplierFilters{Search: "", Limit: 0, Offset: -1},
 			repoSetup: func() *fakeSupplierRepository {
 				return &fakeSupplierRepository{
-					listByCompanyFunc: func(_ string, _ string, limit, offset int) ([]*entity.Supplier, error) {
+					listByCompanyFunc: func(_ string, _ string, limit, offset int) ([]*entity.Supplier, int64, error) {
 						assert.Equal(t, 20, limit)
 						assert.Equal(t, 0, offset)
-						return []*entity.Supplier{}, nil
+						return []*entity.Supplier{}, 0, nil
 					},
 				}
 			},
@@ -300,8 +300,8 @@ func TestSupplierUseCase_List(t *testing.T) {
 			companyID: supplierTestCompanyID,
 			filters:   dto.SupplierFilters{Limit: 10, Offset: 0},
 			repoSetup: func() *fakeSupplierRepository {
-				return &fakeSupplierRepository{listByCompanyFunc: func(_, _ string, _, _ int) ([]*entity.Supplier, error) {
-					return nil, errors.New("db error")
+				return &fakeSupplierRepository{listByCompanyFunc: func(_, _ string, _, _ int) ([]*entity.Supplier, int64, error) {
+					return nil, 0, errors.New("db error")
 				}}
 			},
 			wantErr: true,
@@ -320,6 +320,16 @@ func TestSupplierUseCase_List(t *testing.T) {
 			}
 			require.NoError(t, err)
 			require.NotNil(t, out)
+			if tt.name == "Success" {
+				assert.Equal(t, 7, out.Total)
+				assert.Equal(t, 20, out.Limit)
+				assert.Equal(t, 0, out.Offset)
+			}
+			if tt.name == "AppliesDefaultLimitAndOffset" {
+				assert.Equal(t, 0, out.Total)
+				assert.Equal(t, 20, out.Limit)
+				assert.Equal(t, 0, out.Offset)
+			}
 		})
 	}
 }

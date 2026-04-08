@@ -118,7 +118,7 @@ func (h *SupplierHandler) List(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}
 
-	return c.JSON(out)
+	return respondPaginated(c, "suppliers.list", out)
 }
 
 // Update godoc

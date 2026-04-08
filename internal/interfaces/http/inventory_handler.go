@@ -155,12 +155,7 @@ func (h *InventoryHandler) GetPurchaseOrders(c *fiber.Ctx) error {
 		})
 	}
 
-	return c.JSON(fiber.Map{
-		"items":  outItems,
-		"total":  total,
-		"limit":  limit,
-		"offset": offset,
-	})
+	return respondPaginatedValues(c, "inventory.purchase_orders.list", outItems, total, limit, offset)
 }
 
 // CreatePurchaseOrder godoc
@@ -551,6 +546,8 @@ func (h *InventoryHandler) UpdateReorderConfig(c *fiber.Ctx) error {
 //
 //	de pedido, ordenados por margen histórico y volumen de ventas.
 //
+// @Description  [LEGACY_ARRAY] Devuelve array plano en `replenishments` (usa `total` separado).
+//
 // @Tags         inventory
 // @Security     Bearer
 // @Produce      json
@@ -659,14 +656,17 @@ func (h *InventoryHandler) ListMovements(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "end_date inválida (use YYYY-MM-DD)"})
 	}
 
+	limit := c.QueryInt("limit", 20)
+	offset := c.QueryInt("offset", 0)
+
 	out, err := h.listMovements.Execute(c.Context(), companyID, dto.MovementFiltersDTO{
 		ProductID:   c.Query("product_id"),
 		WarehouseID: c.Query("warehouse_id"),
 		Type:        c.Query("type"),
 		StartDate:   startDate,
 		EndDate:     endDate,
-		Limit:       c.QueryInt("limit", 20),
-		Offset:      c.QueryInt("offset", 0),
+		Limit:       limit,
+		Offset:      offset,
 	})
 	if err != nil {
 		if err == domain.ErrInvalidInput {
@@ -675,5 +675,5 @@ func (h *InventoryHandler) ListMovements(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}
 
-	return c.JSON(out)
+	return respondPaginatedValues(c, "inventory.movements.list", out.Items, out.Total, limit, offset)
 }

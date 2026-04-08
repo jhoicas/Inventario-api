@@ -62,19 +62,38 @@ func (r *CRMCategoryRepo) GetByID(id string) (*entity.CRMCategory, error) {
 	return &c, nil
 }
 
-func (r *CRMCategoryRepo) ListByCompany(companyID string, limit, offset int) ([]*entity.CRMCategory, error) {
-	rows, err := r.q.Query(context.Background(), `
-		SELECT id, company_id, name, min_ltv, is_active, created_at, updated_at
+func (r *CRMCategoryRepo) ListByCompany(companyID string, limit, offset int) ([]*entity.CRMCategory, int64, error) {
+	where, args := r.buildFilters(companyID)
+	items, err := r.list(where, args, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	total, err := r.count(where, args)
+	if err != nil {
+		return nil, 0, err
+	}
+	return items, total, nil
+}
+
+func (r *CRMCategoryRepo) buildFilters(companyID string) (string, []any) {
+	where := `
 		FROM crm_categories
-		WHERE company_id = $1 AND is_active = true
-		ORDER BY name LIMIT $2 OFFSET $3`,
-		companyID, limit, offset,
-	)
+		WHERE company_id = $1 AND is_active = true`
+	return where, []any{companyID}
+}
+
+func (r *CRMCategoryRepo) list(where string, args []any, limit, offset int) ([]*entity.CRMCategory, error) {
+	argPos := len(args) + 1
+	query := `
+		SELECT id, company_id, name, min_ltv, is_active, created_at, updated_at
+		` + where + fmt.Sprintf(` ORDER BY name LIMIT $%d OFFSET $%d`, argPos, argPos+1)
+	qArgs := append(args, limit, offset)
+	rows, err := r.q.Query(context.Background(), query, qArgs...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var list []*entity.CRMCategory
+	items := make([]*entity.CRMCategory, 0)
 	for rows.Next() {
 		var c entity.CRMCategory
 		var minLtv pgtype.Numeric
@@ -84,9 +103,21 @@ func (r *CRMCategoryRepo) ListByCompany(companyID string, limit, offset int) ([]
 		if minLtv.Valid && minLtv.Int != nil {
 			c.MinLTV = decimal.NewFromBigInt(minLtv.Int, minLtv.Exp)
 		}
-		list = append(list, &c)
+		items = append(items, &c)
 	}
-	return list, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+func (r *CRMCategoryRepo) count(where string, args []any) (int64, error) {
+	query := `SELECT COUNT(*) ` + where
+	var total int64
+	if err := r.q.QueryRow(context.Background(), query, args...).Scan(&total); err != nil {
+		return 0, err
+	}
+	return total, nil
 }
 
 func (r *CRMCategoryRepo) Update(c *entity.CRMCategory) error {
@@ -142,27 +173,58 @@ func (r *CRMBenefitRepo) GetByID(id string) (*entity.CRMBenefit, error) {
 	return &b, nil
 }
 
-func (r *CRMBenefitRepo) ListByCategory(categoryID string, limit, offset int) ([]*entity.CRMBenefit, error) {
-	rows, err := r.q.Query(context.Background(), `
-		SELECT id, company_id, category_id, name, description, is_active, created_at, updated_at
+func (r *CRMBenefitRepo) ListByCategory(categoryID string, limit, offset int) ([]*entity.CRMBenefit, int64, error) {
+	where, args := r.buildFilters(categoryID)
+	items, err := r.list(where, args, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	total, err := r.count(where, args)
+	if err != nil {
+		return nil, 0, err
+	}
+	return items, total, nil
+}
+
+func (r *CRMBenefitRepo) buildFilters(categoryID string) (string, []any) {
+	where := `
 		FROM crm_benefits
-		WHERE category_id = $1 AND is_active = true
-		ORDER BY name LIMIT $2 OFFSET $3`,
-		categoryID, limit, offset,
-	)
+		WHERE category_id = $1 AND is_active = true`
+	return where, []any{categoryID}
+}
+
+func (r *CRMBenefitRepo) list(where string, args []any, limit, offset int) ([]*entity.CRMBenefit, error) {
+	argPos := len(args) + 1
+	query := `
+		SELECT id, company_id, category_id, name, description, is_active, created_at, updated_at
+		` + where + fmt.Sprintf(` ORDER BY name LIMIT $%d OFFSET $%d`, argPos, argPos+1)
+	qArgs := append(args, limit, offset)
+	rows, err := r.q.Query(context.Background(), query, qArgs...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var list []*entity.CRMBenefit
+	items := make([]*entity.CRMBenefit, 0)
 	for rows.Next() {
 		var b entity.CRMBenefit
 		if err := rows.Scan(&b.ID, &b.CompanyID, &b.CategoryID, &b.Name, &b.Description, &b.IsActive, &b.CreatedAt, &b.UpdatedAt); err != nil {
 			return nil, err
 		}
-		list = append(list, &b)
+		items = append(items, &b)
 	}
-	return list, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+func (r *CRMBenefitRepo) count(where string, args []any) (int64, error) {
+	query := `SELECT COUNT(*) ` + where
+	var total int64
+	if err := r.q.QueryRow(context.Background(), query, args...).Scan(&total); err != nil {
+		return 0, err
+	}
+	return total, nil
 }
 
 func (r *CRMBenefitRepo) Update(b *entity.CRMBenefit) error {
@@ -685,51 +747,79 @@ func (r *CRMInteractionRepo) ListInteractions(customerID string, f repository.In
 	if offset < 0 {
 		offset = 0
 	}
+	where, args := r.buildFilters(customerID, f)
+	items, err := r.list(where, args, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	total, err := r.count(where, args)
+	if err != nil {
+		return nil, 0, err
+	}
+	return items, total, nil
+}
 
-	query := `SELECT id, company_id, customer_id, type, subject, body, created_by, created_at,
-			COUNT(*) OVER() AS total
+func (r *CRMInteractionRepo) buildFilters(customerID string, f repository.InteractionFilters) (string, []any) {
+	where := `
 		FROM crm_interactions
 		WHERE customer_id = $1`
 	args := []any{customerID}
 	idx := 2
 
 	if f.Type != "" {
-		query += fmt.Sprintf(" AND type = $%d", idx)
+		where += fmt.Sprintf(" AND type = $%d", idx)
 		args = append(args, f.Type)
 		idx++
 	}
 	if !f.StartDate.IsZero() {
-		query += fmt.Sprintf(" AND created_at >= $%d", idx)
+		where += fmt.Sprintf(" AND created_at >= $%d", idx)
 		args = append(args, f.StartDate)
 		idx++
 	}
 	if !f.EndDate.IsZero() {
-		query += fmt.Sprintf(" AND created_at <= $%d", idx)
+		where += fmt.Sprintf(" AND created_at <= $%d", idx)
 		args = append(args, f.EndDate)
-		idx++
 	}
 
-	query += fmt.Sprintf(" ORDER BY created_at DESC LIMIT $%d OFFSET $%d", idx, idx+1)
-	args = append(args, limit, offset)
+	return where, args
+}
 
-	rows, err := r.q.Query(context.Background(), query, args...)
+func (r *CRMInteractionRepo) list(where string, args []any, limit, offset int) ([]*entity.CRMInteraction, error) {
+	idx := len(args) + 1
+	query := `
+		SELECT id, company_id, customer_id, type, subject, body, created_by, created_at
+		` + where + fmt.Sprintf(" ORDER BY created_at DESC LIMIT $%d OFFSET $%d", idx, idx+1)
+	qArgs := append(args, limit, offset)
+
+	rows, err := r.q.Query(context.Background(), query, qArgs...)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 	defer rows.Close()
 
-	var list []*entity.CRMInteraction
-	var total int64
+	items := make([]*entity.CRMInteraction, 0)
 	for rows.Next() {
 		var m entity.CRMInteraction
 		var typ string
-		if err := rows.Scan(&m.ID, &m.CompanyID, &m.CustomerID, &typ, &m.Subject, &m.Body, &m.CreatedBy, &m.CreatedAt, &total); err != nil {
-			return nil, 0, err
+		if err := rows.Scan(&m.ID, &m.CompanyID, &m.CustomerID, &typ, &m.Subject, &m.Body, &m.CreatedBy, &m.CreatedAt); err != nil {
+			return nil, err
 		}
 		m.Type = entity.InteractionType(typ)
-		list = append(list, &m)
+		items = append(items, &m)
 	}
-	return list, total, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+func (r *CRMInteractionRepo) count(where string, args []any) (int64, error) {
+	query := `SELECT COUNT(*) ` + where
+	var total int64
+	if err := r.q.QueryRow(context.Background(), query, args...).Scan(&total); err != nil {
+		return 0, err
+	}
+	return total, nil
 }
 
 // CRMTaskRepo implementación de CRMTaskRepository.
@@ -781,27 +871,45 @@ func (r *CRMTaskRepo) Update(t *entity.CRMTask) error {
 	return err
 }
 
-func (r *CRMTaskRepo) ListByCompany(companyID string, status string, limit, offset int) ([]*entity.CRMTask, error) {
-	var rows pgx.Rows
-	var err error
-	if status != "" {
-		rows, err = r.q.Query(context.Background(), `
-			SELECT id, company_id, customer_id, title, description, due_at, status, created_by, created_at, updated_at
-			FROM crm_tasks WHERE company_id = $1 AND status = $2 ORDER BY due_at ASC NULLS LAST LIMIT $3 OFFSET $4`,
-			companyID, status, limit, offset,
-		)
-	} else {
-		rows, err = r.q.Query(context.Background(), `
-			SELECT id, company_id, customer_id, title, description, due_at, status, created_by, created_at, updated_at
-			FROM crm_tasks WHERE company_id = $1 ORDER BY due_at ASC NULLS LAST LIMIT $2 OFFSET $3`,
-			companyID, limit, offset,
-		)
+func (r *CRMTaskRepo) ListByCompany(companyID string, status string, limit, offset int) ([]*entity.CRMTask, int64, error) {
+	where, args := r.buildFilters(companyID, status)
+	items, err := r.list(where, args, limit, offset)
+	if err != nil {
+		return nil, 0, err
 	}
+	total, err := r.count(where, args)
+	if err != nil {
+		return nil, 0, err
+	}
+	return items, total, nil
+}
+
+func (r *CRMTaskRepo) buildFilters(companyID, status string) (string, []any) {
+	where := `
+		FROM crm_tasks
+		WHERE company_id = $1`
+	args := []any{companyID}
+	if status != "" {
+		where += ` AND status = $2`
+		args = append(args, status)
+	}
+	return where, args
+}
+
+func (r *CRMTaskRepo) list(where string, args []any, limit, offset int) ([]*entity.CRMTask, error) {
+	idx := len(args) + 1
+	query := `
+		SELECT id, company_id, customer_id, title, description, due_at, status, created_by, created_at, updated_at
+		` + where + fmt.Sprintf(" ORDER BY due_at ASC NULLS LAST LIMIT $%d OFFSET $%d", idx, idx+1)
+	qArgs := append(args, limit, offset)
+
+	rows, err := r.q.Query(context.Background(), query, qArgs...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var list []*entity.CRMTask
+
+	items := make([]*entity.CRMTask, 0)
 	for rows.Next() {
 		var t entity.CRMTask
 		var st string
@@ -817,9 +925,21 @@ func (r *CRMTaskRepo) ListByCompany(companyID string, status string, limit, offs
 		if createdBy != nil {
 			t.CreatedBy = *createdBy
 		}
-		list = append(list, &t)
+		items = append(items, &t)
 	}
-	return list, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+func (r *CRMTaskRepo) count(where string, args []any) (int64, error) {
+	query := `SELECT COUNT(*) ` + where
+	var total int64
+	if err := r.q.QueryRow(context.Background(), query, args...).Scan(&total); err != nil {
+		return 0, err
+	}
+	return total, nil
 }
 
 // CRMCampaignTemplateRepo implementación de CRMCampaignTemplateRepository.
@@ -924,25 +1044,8 @@ func (r *CRMTicketRepo) Update(t *entity.CRMTicket) error {
 	return err
 }
 
-func (r *CRMTicketRepo) ListByCompany(companyID string, search string, status string, sort string, limit, offset int) ([]*entity.CRMTicket, error) {
-	query := `
-		SELECT id, company_id, customer_id, subject, description, status, sentiment, escalation_reason, created_by, created_at, updated_at
-		FROM crm_tickets
-		WHERE company_id = $1`
-	args := []any{companyID}
-	argIdx := 2
-
-	if search != "" {
-		query += fmt.Sprintf(" AND subject ILIKE $%d", argIdx)
-		args = append(args, "%"+search+"%")
-		argIdx++
-	}
-	if status != "" {
-		query += fmt.Sprintf(" AND status = $%d", argIdx)
-		args = append(args, status)
-		argIdx++
-	}
-
+func (r *CRMTicketRepo) ListByCompany(companyID string, search string, status string, sort string, limit, offset int) ([]*entity.CRMTicket, int64, error) {
+	where, args := r.buildFilters(companyID, search, status)
 	orderDir := "DESC"
 	switch strings.ToLower(strings.TrimSpace(sort)) {
 	case "asc", "created_at_asc":
@@ -951,16 +1054,50 @@ func (r *CRMTicketRepo) ListByCompany(companyID string, search string, status st
 		orderDir = "DESC"
 	}
 
-	query += " ORDER BY created_at " + orderDir
-	query += fmt.Sprintf(" LIMIT $%d OFFSET $%d", argIdx, argIdx+1)
-	args = append(args, limit, offset)
+	items, err := r.list(where, args, orderDir, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	total, err := r.count(where, args)
+	if err != nil {
+		return nil, 0, err
+	}
+	return items, total, nil
+}
 
-	rows, err := r.q.Query(context.Background(), query, args...)
+func (r *CRMTicketRepo) buildFilters(companyID, search, status string) (string, []any) {
+	where := `
+		FROM crm_tickets
+		WHERE company_id = $1`
+	args := []any{companyID}
+	argIdx := 2
+
+	if search != "" {
+		where += fmt.Sprintf(" AND subject ILIKE $%d", argIdx)
+		args = append(args, "%"+search+"%")
+		argIdx++
+	}
+	if status != "" {
+		where += fmt.Sprintf(" AND status = $%d", argIdx)
+		args = append(args, status)
+	}
+	return where, args
+}
+
+func (r *CRMTicketRepo) list(where string, args []any, orderDir string, limit, offset int) ([]*entity.CRMTicket, error) {
+	argIdx := len(args) + 1
+	query := `
+		SELECT id, company_id, customer_id, subject, description, status, sentiment, escalation_reason, created_by, created_at, updated_at
+		` + where + " ORDER BY created_at " + orderDir + fmt.Sprintf(" LIMIT $%d OFFSET $%d", argIdx, argIdx+1)
+	qArgs := append(args, limit, offset)
+
+	rows, err := r.q.Query(context.Background(), query, qArgs...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var list []*entity.CRMTicket
+
+	items := make([]*entity.CRMTicket, 0)
 	for rows.Next() {
 		var t entity.CRMTicket
 		var sentiment *string
@@ -978,9 +1115,21 @@ func (r *CRMTicketRepo) ListByCompany(companyID string, search string, status st
 		if escalationReason != nil {
 			t.EscalationReason = *escalationReason
 		}
-		list = append(list, &t)
+		items = append(items, &t)
 	}
-	return list, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+func (r *CRMTicketRepo) count(where string, args []any) (int64, error) {
+	query := `SELECT COUNT(*) ` + where
+	var total int64
+	if err := r.q.QueryRow(context.Background(), query, args...).Scan(&total); err != nil {
+		return 0, err
+	}
+	return total, nil
 }
 
 // UpdateStatus actualiza únicamente el estado y el timestamp de un ticket.
@@ -1322,6 +1471,81 @@ func (r *CRMOpportunityRepo) ListByCompany(ctx context.Context, companyID string
 		list = append(list, &o)
 	}
 	return list, rows.Err()
+}
+
+func (r *CRMOpportunityRepo) ListByCompanyPage(ctx context.Context, companyID string, limit, offset int) ([]*entity.Opportunity, error) {
+	where, args := r.buildFilters(companyID)
+	return r.list(ctx, where, args, limit, offset)
+}
+
+func (r *CRMOpportunityRepo) CountByCompany(ctx context.Context, companyID string) (int64, error) {
+	where, args := r.buildFilters(companyID)
+	return r.count(ctx, where, args)
+}
+
+func (r *CRMOpportunityRepo) buildFilters(companyID string) (string, []any) {
+	where := `
+		FROM crm_opportunities
+		WHERE company_id = $1`
+	return where, []any{companyID}
+}
+
+func (r *CRMOpportunityRepo) list(ctx context.Context, where string, args []any, limit, offset int) ([]*entity.Opportunity, error) {
+	idx := len(args) + 1
+	query := `
+		SELECT id, company_id, customer_id, title, amount, probability, stage, expected_close_date, created_by, created_at, updated_at
+		` + where + fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, idx, idx+1)
+	qArgs := append(args, limit, offset)
+
+	rows, err := r.q.Query(ctx, query, qArgs...)
+	if err != nil {
+		if isUndefinedTable(err) {
+			return []*entity.Opportunity{}, nil
+		}
+		return nil, err
+	}
+	defer rows.Close()
+	items := make([]*entity.Opportunity, 0)
+	for rows.Next() {
+		var o entity.Opportunity
+		var customerID, createdBy *string
+		var stage string
+		var amount pgtype.Numeric
+		var expectedCloseDate *time.Time
+		if err := rows.Scan(&o.ID, &o.CompanyID, &customerID, &o.Title, &amount, &o.Probability, &stage, &expectedCloseDate, &createdBy, &o.CreatedAt, &o.UpdatedAt); err != nil {
+			return nil, err
+		}
+		if amount.Valid && amount.Int != nil {
+			o.Amount = decimal.NewFromBigInt(amount.Int, amount.Exp)
+		}
+		if customerID != nil {
+			o.CustomerID = *customerID
+		}
+		if createdBy != nil {
+			o.CreatedBy = *createdBy
+		}
+		o.Stage = entity.OpportunityStage(stage)
+		if expectedCloseDate != nil {
+			o.ExpectedCloseDate = *expectedCloseDate
+		}
+		items = append(items, &o)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+func (r *CRMOpportunityRepo) count(ctx context.Context, where string, args []any) (int64, error) {
+	query := `SELECT COUNT(*) ` + where
+	var total int64
+	if err := r.q.QueryRow(ctx, query, args...).Scan(&total); err != nil {
+		if isUndefinedTable(err) {
+			return 0, nil
+		}
+		return 0, err
+	}
+	return total, nil
 }
 
 func nullIfZeroTime(t time.Time) *time.Time {

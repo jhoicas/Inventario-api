@@ -98,7 +98,7 @@ func (uc *SupplierUseCase) List(companyID string, filters dto.SupplierFilters) (
 		filters.Offset = 0
 	}
 
-	list, err := uc.repo.ListByCompany(companyID, filters.Search, filters.Limit, filters.Offset)
+	list, total, err := uc.repo.ListByCompany(companyID, filters.Search, filters.Limit, filters.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -109,8 +109,10 @@ func (uc *SupplierUseCase) List(companyID string, filters dto.SupplierFilters) (
 	}
 
 	return &dto.SupplierListResponse{
-		Items: items,
-		Page:  dto.PageResponse{Limit: filters.Limit, Offset: filters.Offset},
+		Items:  items,
+		Total:  int(total),
+		Limit:  filters.Limit,
+		Offset: filters.Offset,
 	}, nil
 }
 

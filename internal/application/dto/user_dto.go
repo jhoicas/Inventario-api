@@ -4,19 +4,19 @@ import "time"
 
 // CreateUserRequest entrada para crear un usuario (password en texto, se hashea en use case).
 type CreateUserRequest struct {
-	CompanyID string `json:"company_id" validate:"required,uuid"`
-	Email     string `json:"email" validate:"required,email"`
-	Password  string `json:"password" validate:"required,min=8"`
-	Name      string `json:"name" validate:"required,min=1,max=200"`
+	CompanyID string   `json:"company_id" validate:"required,uuid"`
+	Email     string   `json:"email" validate:"required,email"`
+	Password  string   `json:"password" validate:"required,min=8"`
+	Name      string   `json:"name" validate:"required,min=1,max=200"`
 	Roles     []string `json:"roles"` // roles asignados al usuario
 }
 
 // RegisterRequest entrada para registro (auth): email, password, company_id.
 type RegisterRequest struct {
-	Email     string `json:"email" validate:"required,email"`
-	Password  string `json:"password" validate:"required,min=8"`
-	CompanyID string `json:"company_id" validate:"required,uuid"`
-	Name      string `json:"name" validate:"omitempty,max=200"`
+	Email     string   `json:"email" validate:"required,email"`
+	Password  string   `json:"password" validate:"required,min=8"`
+	CompanyID string   `json:"company_id" validate:"required,uuid"`
+	Name      string   `json:"name" validate:"omitempty,max=200"`
 	Roles     []string `json:"roles"` // opcional; si se omite se usa rol por defecto
 }
 
@@ -30,6 +30,14 @@ type UserResponse struct {
 	Status    string    `json:"status"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// UserListResponse respuesta paginada de usuarios.
+type UserListResponse struct {
+	Items  []UserResponse `json:"items"`
+	Total  int            `json:"total"`
+	Limit  int            `json:"limit"`
+	Offset int            `json:"offset"`
 }
 
 // LoginRequest entrada para login (email + company context opcional después).

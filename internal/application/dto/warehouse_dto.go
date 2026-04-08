@@ -26,6 +26,8 @@ type WarehouseResponse struct {
 
 // WarehouseListResponse lista paginada de bodegas.
 type WarehouseListResponse struct {
-	Items []WarehouseResponse `json:"items"`
-	Page  PageResponse        `json:"page"`
+	Items  []WarehouseResponse `json:"items"`
+	Total  int                 `json:"total"`
+	Limit  int                 `json:"limit"`
+	Offset int                 `json:"offset"`
 }

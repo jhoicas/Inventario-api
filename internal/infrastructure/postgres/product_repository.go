@@ -132,7 +132,28 @@ func (r *ProductRepo) UpdateCost(productID string, cost decimal.Decimal) error {
 }
 
 // ListByCompany lista productos por empresa con paginación.
-func (r *ProductRepo) ListByCompany(companyID string, limit, offset int) ([]*entity.Product, error) {
+func (r *ProductRepo) ListByCompany(companyID string, limit, offset int) ([]*entity.Product, int64, error) {
+	where, args := r.buildFilters(companyID)
+	items, err := r.list(where, args, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	total, err := r.count(where, args)
+	if err != nil {
+		return nil, 0, err
+	}
+	return items, total, nil
+}
+
+func (r *ProductRepo) buildFilters(companyID string) (string, []any) {
+	where := `
+		FROM products
+		WHERE company_id = $1`
+	return where, []any{companyID}
+}
+
+func (r *ProductRepo) list(where string, args []any, limit, offset int) ([]*entity.Product, error) {
+	argPos := len(args) + 1
 	query := `
 		SELECT id, company_id, sku, name,
 		       COALESCE(description, ''),
@@ -145,22 +166,36 @@ func (r *ProductRepo) ListByCompany(companyID string, limit, offset int) ([]*ent
 		       COALESCE(cogs, 0),
 		       COALESCE(reorder_point, 0),
 		       created_at, updated_at
-		FROM products WHERE company_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`
-	rows, err := r.q.Query(context.Background(), query, companyID, limit, offset)
+		` + where + fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, argPos, argPos+1)
+	qArgs := append(args, limit, offset)
+
+	rows, err := r.q.Query(context.Background(), query, qArgs...)
 	if err != nil {
 		return nil, fmt.Errorf("list products: %w", err)
 	}
 	defer rows.Close()
-	var list []*entity.Product
+	items := make([]*entity.Product, 0)
 	for rows.Next() {
 		var p entity.Product
 		if err := rows.Scan(&p.ID, &p.CompanyID, &p.SKU, &p.Name, &p.Description, &p.Price, &p.Cost, &p.TaxRate,
 			&p.UNSPSC_Code, &p.UnitMeasure, &p.Attributes, &p.COGS, &p.ReorderPoint, &p.CreatedAt, &p.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan product: %w", err)
 		}
-		list = append(list, &p)
+		items = append(items, &p)
 	}
-	return list, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+func (r *ProductRepo) count(where string, args []any) (int64, error) {
+	query := `SELECT COUNT(*) ` + where
+	var total int64
+	if err := r.q.QueryRow(context.Background(), query, args...).Scan(&total); err != nil {
+		return 0, fmt.Errorf("count products: %w", err)
+	}
+	return total, nil
 }
 
 // Delete elimina un producto por ID.

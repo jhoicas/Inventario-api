@@ -18,7 +18,7 @@ type EmailUseCase interface {
 	UpdateAccount(companyID, id string, in dto.UpdateEmailAccountRequest) (*dto.EmailAccountResponse, error)
 	DeleteAccount(companyID, id string) error
 	GetAccount(companyID, id string) (*dto.EmailAccountResponse, error)
-	ListAccounts(companyID string, limit, offset int) ([]dto.EmailAccountResponse, error)
+	ListAccounts(companyID string, limit, offset int) (*dto.EmailAccountListResponse, error)
 	TestConnectionBeforeSave(companyID string, in dto.CreateEmailAccountRequest) (*dto.TestIMAPConnectionResponse, error)
 	TestConnection(companyID, id string) (*dto.TestIMAPConnectionResponse, error)
 	GetAccountEmails(companyID, accountID string) (*dto.AccountEmailListResponse, error)
@@ -35,6 +35,18 @@ func NewEmailHandler(uc EmailUseCase) *EmailHandler {
 	return &EmailHandler{uc: uc}
 }
 
+// ListEmailAccounts godoc
+// @Summary      Listar cuentas de email
+// @Description  Respuesta paginada estandar: {items,total,limit,offset}
+// @Tags         email
+// @Security     Bearer
+// @Produce      json
+// @Param        limit   query     int  false  "Limite"   default(20)
+// @Param        offset  query     int  false  "Offset"   default(0)
+// @Success      200     {object}  dto.EmailAccountListResponse
+// @Failure      401     {object}  dto.ErrorResponse
+// @Failure      500     {object}  dto.ErrorResponse
+// @Router       /api/settings/email-accounts [get]
 func (h *EmailHandler) ListEmailAccounts(c *fiber.Ctx) error {
 	companyID := GetCompanyID(c)
 	if companyID == "" {
@@ -42,11 +54,11 @@ func (h *EmailHandler) ListEmailAccounts(c *fiber.Ctx) error {
 	}
 	limit, _ := strconv.Atoi(c.Query("limit", "20"))
 	offset, _ := strconv.Atoi(c.Query("offset", "0"))
-	items, err := h.uc.ListAccounts(companyID, limit, offset)
+	out, err := h.uc.ListAccounts(companyID, limit, offset)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}
-	return c.JSON(items)
+	return respondPaginated(c, "email.accounts.list", out)
 }
 
 func (h *EmailHandler) CreateEmailAccount(c *fiber.Ctx) error {
@@ -342,6 +354,20 @@ func (h *EmailHandler) GetEmailAccountInbox(c *fiber.Ctx) error {
 	return c.JSON(out)
 }
 
+// ListEmails godoc
+// @Summary      Listar emails
+// @Description  Respuesta paginada estandar: {items,total,limit,offset}
+// @Tags         email
+// @Security     Bearer
+// @Produce      json
+// @Param        customer_id  query     string  false  "Filtrar por cliente"
+// @Param        is_read      query     bool    false  "Filtrar por leidos/no leidos"
+// @Param        limit        query     int     false  "Limite"   default(20)
+// @Param        offset       query     int     false  "Offset"   default(0)
+// @Success      200          {object}  dto.EmailListResponse
+// @Failure      401          {object}  dto.ErrorResponse
+// @Failure      500          {object}  dto.ErrorResponse
+// @Router       /api/emails [get]
 func (h *EmailHandler) ListEmails(c *fiber.Ctx) error {
 	companyID := GetCompanyID(c)
 	if companyID == "" {
@@ -364,7 +390,7 @@ func (h *EmailHandler) ListEmails(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}
-	return c.JSON(out)
+	return respondPaginated(c, "email.messages.list", out)
 }
 
 func (h *EmailHandler) GetEmail(c *fiber.Ctx) error {

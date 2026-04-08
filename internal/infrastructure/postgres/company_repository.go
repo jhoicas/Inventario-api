@@ -115,54 +115,79 @@ func (r *CompanyRepo) Update(company *entity.Company) error {
 }
 
 // List devuelve empresas con paginación.
-func (r *CompanyRepo) List(limit, offset int) ([]*entity.Company, error) {
+func (r *CompanyRepo) List(limit, offset int) ([]*entity.Company, int64, error) {
+	where, args := r.buildFilters(false)
+	items, err := r.list(where, args, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	total, err := r.count(where, args)
+	if err != nil {
+		return nil, 0, err
+	}
+	return items, total, nil
+}
+
+// ListForAdmin devuelve empresas excluyendo la cuenta técnica del superadmin.
+func (r *CompanyRepo) ListForAdmin(limit, offset int) ([]*entity.Company, int64, error) {
+	where, args := r.buildFilters(true)
+	items, err := r.list(where, args, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	total, err := r.count(where, args)
+	if err != nil {
+		return nil, 0, err
+	}
+	return items, total, nil
+}
+
+func (r *CompanyRepo) buildFilters(excludeTechAccount bool) (string, []any) {
+	where := `
+		FROM companies`
+	if excludeTechAccount {
+		where += `
+		WHERE lower(email) <> lower('it@ludoia.com')`
+	}
+	return where, []any{}
+}
+
+func (r *CompanyRepo) list(where string, args []any, limit, offset int) ([]*entity.Company, error) {
+	argPos := len(args) + 1
 	query := `
 		SELECT id, name, nit, address, phone, email, status,
 		       COALESCE(environment, 'habilitacion'), COALESCE(cert_hab, ''), COALESCE(cert_prod, ''),
 		       created_at, updated_at
-		FROM companies ORDER BY created_at DESC LIMIT $1 OFFSET $2`
-	rows, err := r.pool.Query(context.Background(), query, limit, offset)
+		` + where + fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, argPos, argPos+1)
+	qArgs := append(args, limit, offset)
+
+	rows, err := r.pool.Query(context.Background(), query, qArgs...)
 	if err != nil {
 		return nil, fmt.Errorf("list companies: %w", err)
 	}
 	defer rows.Close()
 
-	var list []*entity.Company
+	items := make([]*entity.Company, 0)
 	for rows.Next() {
 		var c entity.Company
 		if err := rows.Scan(&c.ID, &c.Name, &c.NIT, &c.Address, &c.Phone, &c.Email, &c.Status, &c.Environment, &c.CertHab, &c.CertProd, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan company: %w", err)
 		}
-		list = append(list, &c)
+		items = append(items, &c)
 	}
-	return list, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
-// ListForAdmin devuelve empresas excluyendo la cuenta técnica del superadmin.
-func (r *CompanyRepo) ListForAdmin(limit, offset int) ([]*entity.Company, error) {
-	query := `
-		SELECT id, name, nit, address, phone, email, status,
-		       COALESCE(environment, 'habilitacion'), COALESCE(cert_hab, ''), COALESCE(cert_prod, ''),
-		       created_at, updated_at
-		FROM companies
-		WHERE lower(email) <> lower('it@ludoia.com')
-		ORDER BY created_at DESC
-		LIMIT $1 OFFSET $2`
-	rows, err := r.pool.Query(context.Background(), query, limit, offset)
-	if err != nil {
-		return nil, fmt.Errorf("list companies for admin: %w", err)
+func (r *CompanyRepo) count(where string, args []any) (int64, error) {
+	query := `SELECT COUNT(*) ` + where
+	var total int64
+	if err := r.pool.QueryRow(context.Background(), query, args...).Scan(&total); err != nil {
+		return 0, fmt.Errorf("count companies: %w", err)
 	}
-	defer rows.Close()
-
-	var list []*entity.Company
-	for rows.Next() {
-		var c entity.Company
-		if err := rows.Scan(&c.ID, &c.Name, &c.NIT, &c.Address, &c.Phone, &c.Email, &c.Status, &c.Environment, &c.CertHab, &c.CertProd, &c.CreatedAt, &c.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("scan company for admin: %w", err)
-		}
-		list = append(list, &c)
-	}
-	return list, rows.Err()
+	return total, nil
 }
 
 // Delete elimina una empresa por ID.

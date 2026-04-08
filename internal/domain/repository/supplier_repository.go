@@ -8,6 +8,6 @@ type SupplierRepository interface {
 	GetByID(id string) (*entity.Supplier, error)
 	GetByCompanyAndNIT(companyID, nit string) (*entity.Supplier, error)
 	Update(supplier *entity.Supplier) error
-	ListByCompany(companyID, search string, limit, offset int) ([]*entity.Supplier, error)
+	ListByCompany(companyID, search string, limit, offset int) ([]*entity.Supplier, int64, error)
 	SetActive(companyID, id string, isActive bool) error
 }

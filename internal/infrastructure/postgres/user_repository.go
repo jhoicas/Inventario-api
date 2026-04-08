@@ -135,24 +135,58 @@ func (r *UserRepo) Update(user *entity.User) error {
 }
 
 // ListByCompany lista usuarios por company con paginación.
-func (r *UserRepo) ListByCompany(companyID string, limit, offset int) ([]*entity.User, error) {
+func (r *UserRepo) ListByCompany(companyID string, limit, offset int) ([]*entity.User, int64, error) {
+	where, args := r.buildFilters(companyID)
+	items, err := r.list(where, args, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	total, err := r.count(where, args)
+	if err != nil {
+		return nil, 0, err
+	}
+	return items, total, nil
+}
+
+func (r *UserRepo) buildFilters(companyID string) (string, []any) {
+	where := `
+		FROM users
+		WHERE company_id = $1`
+	return where, []any{companyID}
+}
+
+func (r *UserRepo) list(where string, args []any, limit, offset int) ([]*entity.User, error) {
+	argPos := len(args) + 1
 	query := `
 		SELECT id, company_id, email, password_hash, name, roles, status, created_at, updated_at
-		FROM users WHERE company_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`
-	rows, err := r.pool.Query(context.Background(), query, companyID, limit, offset)
+		` + where + fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, argPos, argPos+1)
+	qArgs := append(args, limit, offset)
+	rows, err := r.pool.Query(context.Background(), query, qArgs...)
 	if err != nil {
 		return nil, fmt.Errorf("list users: %w", err)
 	}
 	defer rows.Close()
-	var list []*entity.User
+	items := make([]*entity.User, 0)
 	for rows.Next() {
 		var u entity.User
 		if err := rows.Scan(&u.ID, &u.CompanyID, &u.Email, &u.PasswordHash, &u.Name, &u.Roles, &u.Status, &u.CreatedAt, &u.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan user: %w", err)
 		}
-		list = append(list, &u)
+		items = append(items, &u)
 	}
-	return list, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+func (r *UserRepo) count(where string, args []any) (int64, error) {
+	query := `SELECT COUNT(*) ` + where
+	var total int64
+	if err := r.pool.QueryRow(context.Background(), query, args...).Scan(&total); err != nil {
+		return 0, fmt.Errorf("count users: %w", err)
+	}
+	return total, nil
 }
 
 // Delete elimina un usuario por ID.

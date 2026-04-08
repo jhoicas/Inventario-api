@@ -16,11 +16,11 @@ import (
 
 // CampaignUseCase gestión de campañas de marketing CRM.
 type CampaignUseCase struct {
-	repo           repository.CRMCampaignRepository
-	customerRepo   repository.CustomerRepository
-	profileRepo    repository.CRMProfileRepository
+	repo            repository.CRMCampaignRepository
+	customerRepo    repository.CustomerRepository
+	profileRepo     repository.CRMProfileRepository
 	interactionRepo repository.CRMInteractionRepository
-	mailSender     inframail.Sender
+	mailSender      inframail.Sender
 }
 
 // NewCampaignUseCase construye el caso de uso.
@@ -118,7 +118,7 @@ func (uc *CampaignUseCase) SendCampaign(ctx context.Context, companyID, userID s
 		offset := 0
 		limit := 200
 		for {
-			customers, err := uc.customerRepo.ListByCompany(companyID, "", limit, offset)
+			customers, _, err := uc.customerRepo.ListByCompany(companyID, "", limit, offset)
 			if err != nil {
 				return err
 			}

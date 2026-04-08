@@ -1,8 +1,8 @@
 package repository
 
 import (
-	"github.com/shopspring/decimal"
 	"github.com/jhoicas/Inventario-api/internal/domain/entity"
+	"github.com/shopspring/decimal"
 )
 
 // ProductRepository define el puerto de persistencia para Product (DIP).
@@ -12,6 +12,6 @@ type ProductRepository interface {
 	GetByCompanyAndSKU(companyID, sku string) (*entity.Product, error)
 	Update(product *entity.Product) error
 	UpdateCost(productID string, cost decimal.Decimal) error
-	ListByCompany(companyID string, limit, offset int) ([]*entity.Product, error)
+	ListByCompany(companyID string, limit, offset int) ([]*entity.Product, int64, error)
 	Delete(id string) error
 }

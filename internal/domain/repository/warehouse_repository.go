@@ -7,6 +7,6 @@ type WarehouseRepository interface {
 	Create(warehouse *entity.Warehouse) error
 	GetByID(id string) (*entity.Warehouse, error)
 	Update(warehouse *entity.Warehouse) error
-	ListByCompany(companyID string, limit, offset int) ([]*entity.Warehouse, error)
+	ListByCompany(companyID string, limit, offset int) ([]*entity.Warehouse, int64, error)
 	Delete(id string) error
 }

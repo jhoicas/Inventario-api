@@ -9,7 +9,7 @@ type CustomerRepository interface {
 	GetByCompanyAndTaxID(companyID, taxID string) (*entity.Customer, error)
 	GetByCompanyAndEmail(companyID, email string) (*entity.Customer, error)
 	// ListByCompany lista clientes por empresa. Si search no es vacío, filtra por nombre o NIT (tax_id).
-	ListByCompany(companyID string, search string, limit, offset int) ([]*entity.Customer, error)
+	ListByCompany(companyID string, search string, limit, offset int) ([]*entity.Customer, int64, error)
 	Update(customer *entity.Customer) error
 	Delete(id string) error
 	SetActive(companyID, id string, isActive bool) error

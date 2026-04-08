@@ -17,7 +17,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/jhoicas/Inventario-api/internal/application/dto"
+	appinventory "github.com/jhoicas/Inventario-api/internal/application/inventory"
 	"github.com/jhoicas/Inventario-api/internal/domain"
+	"github.com/jhoicas/Inventario-api/internal/domain/entity"
 )
 
 // ── Fakes para los casos de uso de inventario ──────────────────────────────────
@@ -89,6 +91,29 @@ func (f *fakeReorderConfigUseCase) Execute(ctx context.Context, companyID string
 		return f.executeFunc(ctx, companyID, in)
 	}
 	return errors.New("Execute not configured")
+}
+
+type fakePurchaseOrderUseCase struct {
+	listByCompanyFunc func(ctx context.Context, companyID string, limit, offset int) ([]*entity.PurchaseOrder, int64, error)
+}
+
+func (f *fakePurchaseOrderUseCase) Create(ctx context.Context, companyID string, in appinventory.CreatePurchaseOrderInput) (string, error) {
+	return "", errors.New("Create not configured")
+}
+
+func (f *fakePurchaseOrderUseCase) ListByCompany(ctx context.Context, companyID string, limit, offset int) ([]*entity.PurchaseOrder, int64, error) {
+	if f != nil && f.listByCompanyFunc != nil {
+		return f.listByCompanyFunc(ctx, companyID, limit, offset)
+	}
+	return nil, 0, errors.New("ListByCompany not configured")
+}
+
+func (f *fakePurchaseOrderUseCase) UpdateStatus(ctx context.Context, companyID, purchaseOrderID, status string) error {
+	return errors.New("UpdateStatus not configured")
+}
+
+func (f *fakePurchaseOrderUseCase) Receive(ctx context.Context, companyID, userID, purchaseOrderID, warehouseID string) error {
+	return errors.New("Receive not configured")
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -725,6 +750,63 @@ func TestInventoryHandler_ListMovements(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestInventoryHandler_GetPurchaseOrders_TotalInvariantAcrossPagination(t *testing.T) {
+	h := NewInventoryHandler(
+		&fakeRegisterMovementUseCase{},
+		&fakeReplenishmentUseCase{},
+		&fakeGetStockUseCase{},
+		nil,
+		&fakePurchaseOrderUseCase{
+			listByCompanyFunc: func(_ context.Context, companyID string, limit, offset int) ([]*entity.PurchaseOrder, int64, error) {
+				require.Equal(t, inventoryTestCompanyID, companyID)
+				items := []*entity.PurchaseOrder{}
+				if offset < 9 {
+					items = append(items, &entity.PurchaseOrder{ID: "po-1", CompanyID: companyID, Number: "PO-001"})
+				}
+				return items, 9, nil
+			},
+		},
+	)
+
+	app := fiber.New(fiber.Config{DisableStartupMessage: true})
+	app.Use(mockInventoryCompanyOnly(inventoryTestCompanyID))
+	app.Get("/purchase-orders", h.GetPurchaseOrders)
+
+	req1 := httptest.NewRequest(http.MethodGet, "/purchase-orders?limit=5&offset=0", nil)
+	resp1, err := app.Test(req1, -1)
+	require.NoError(t, err)
+	defer resp1.Body.Close()
+	require.Equal(t, http.StatusOK, resp1.StatusCode)
+
+	var out1 struct {
+		Total  int64 `json:"total"`
+		Limit  int   `json:"limit"`
+		Offset int   `json:"offset"`
+	}
+	require.NoError(t, json.NewDecoder(resp1.Body).Decode(&out1))
+
+	req2 := httptest.NewRequest(http.MethodGet, "/purchase-orders?limit=2&offset=7", nil)
+	resp2, err := app.Test(req2, -1)
+	require.NoError(t, err)
+	defer resp2.Body.Close()
+	require.Equal(t, http.StatusOK, resp2.StatusCode)
+
+	var out2 struct {
+		Total  int64 `json:"total"`
+		Limit  int   `json:"limit"`
+		Offset int   `json:"offset"`
+	}
+	require.NoError(t, json.NewDecoder(resp2.Body).Decode(&out2))
+
+	assert.Equal(t, int64(9), out1.Total)
+	assert.Equal(t, int64(9), out2.Total)
+	assert.Equal(t, out1.Total, out2.Total)
+	assert.Equal(t, 5, out1.Limit)
+	assert.Equal(t, 0, out1.Offset)
+	assert.Equal(t, 2, out2.Limit)
+	assert.Equal(t, 7, out2.Offset)
 }
 
 func TestInventoryHandler_UpdateReorderConfig(t *testing.T) {

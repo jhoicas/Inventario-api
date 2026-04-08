@@ -122,7 +122,7 @@ func (uc *OpportunityUseCase) GetFunnel(ctx context.Context, companyID string) (
 }
 
 // ListByCompany lista oportunidades de la empresa con paginación básica.
-func (uc *OpportunityUseCase) ListByCompany(ctx context.Context, companyID string, limit, offset int) ([]dto.OpportunityResponse, error) {
+func (uc *OpportunityUseCase) ListByCompany(ctx context.Context, companyID string, limit, offset int) (*dto.OpportunityListResponse, error) {
 	if limit <= 0 {
 		limit = 20
 	}
@@ -133,23 +133,20 @@ func (uc *OpportunityUseCase) ListByCompany(ctx context.Context, companyID strin
 		offset = 0
 	}
 
-	opps, err := uc.oppRepo.ListByCompany(ctx, companyID)
+	opps, err := uc.oppRepo.ListByCompanyPage(ctx, companyID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
-	if offset >= len(opps) {
-		return []dto.OpportunityResponse{}, nil
+	total, err := uc.oppRepo.CountByCompany(ctx, companyID)
+	if err != nil {
+		return nil, err
 	}
-	end := offset + limit
-	if end > len(opps) {
-		end = len(opps)
-	}
-	out := make([]dto.OpportunityResponse, 0, end-offset)
-	for _, o := range opps[offset:end] {
+	out := make([]dto.OpportunityResponse, 0, len(opps))
+	for _, o := range opps {
 		resp := toOpportunityResponse(o)
 		out = append(out, *resp)
 	}
-	return out, nil
+	return &dto.OpportunityListResponse{Items: out, Total: total, Limit: limit, Offset: offset}, nil
 }
 
 func isValidOpportunityStage(s entity.OpportunityStage) bool {

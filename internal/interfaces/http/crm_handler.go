@@ -23,7 +23,7 @@ type invoiceHistoryRepo interface {
 // customerListUseCase define el listado de clientes reutilizando el caso de uso de facturación.
 type customerListUseCase interface {
 	Create(companyID string, in dto.CreateCustomerRequest) (*dto.CustomerResponse, error)
-	List(companyID string, search string, limit, offset int) ([]*dto.CustomerResponse, error)
+	List(companyID string, search string, limit, offset int) (*dto.CustomerListResponse, error)
 	Update(companyID, customerID string, in dto.UpdateCustomerRequest) (*dto.CustomerResponse, error)
 	Deactivate(companyID, customerID string) error
 }
@@ -121,7 +121,7 @@ func (h *CRMHandler) GetAnalytics(c *fiber.Ctx) error {
 
 // GetRemarketing devuelve prospectos ideales para campañas de remarketing.
 // @Summary      Remarketing CRM
-// @Description  Devuelve una lista de clientes/prospectos ideales filtrados por la empresa autenticada
+// @Description  [LEGACY_ARRAY] Devuelve array plano. Devuelve una lista de clientes/prospectos ideales filtrados por la empresa autenticada
 // @Tags         crm
 // @Security     Bearer
 // @Accept       json
@@ -163,7 +163,7 @@ func (h *CRMHandler) GetRemarketing(c *fiber.Ctx) error {
 // @Param        search  query     string  false  "Buscar por nombre o NIT (tax_id)"
 // @Param        limit   query     int     false  "Límite de resultados"
 // @Param        offset  query     int     false  "Desplazamiento"
-// @Success      200     {array}   dto.CustomerResponse
+// @Success      200     {object}  dto.CustomerListResponse
 // @Failure      401     {object}  dto.ErrorResponse
 // @Failure      500     {object}  dto.ErrorResponse
 // @Router       /api/crm/customers [get]
@@ -178,6 +178,15 @@ func (h *CRMHandler) ListCustomers(c *fiber.Ctx) error {
 	search := c.Query("search")
 	limit, _ := strconv.Atoi(c.Query("limit", "20"))
 	offset, _ := strconv.Atoi(c.Query("offset", "0"))
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	if offset < 0 {
+		offset = 0
+	}
 	list, err := h.CustomerUC.List(companyID, search, limit, offset)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
@@ -492,7 +501,7 @@ func (h *CRMHandler) RedeemPoints(c *fiber.Ctx) error {
 // @Produce      json
 // @Param        limit  query     int  false  "Limit"
 // @Param        offset query     int  false  "Offset"
-// @Success      200    {array}   dto.CategoryResponse
+// @Success      200    {object}  dto.CategoryListResponse
 // @Router       /api/crm/categories [get]
 func (h *CRMHandler) ListCategories(c *fiber.Ctx) error {
 	companyID := GetCompanyID(c)
@@ -501,6 +510,15 @@ func (h *CRMHandler) ListCategories(c *fiber.Ctx) error {
 	}
 	limit, _ := strconv.Atoi(c.Query("limit", "50"))
 	offset, _ := strconv.Atoi(c.Query("offset", "0"))
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	if offset < 0 {
+		offset = 0
+	}
 	list, err := h.LoyaltyUC.ListCategories(c.Context(), companyID, limit, offset)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
@@ -627,7 +645,7 @@ func (h *CRMHandler) DeactivateCategory(c *fiber.Ctx) error {
 // @Param        id     path      string  true  "Category ID"
 // @Param        limit  query     int     false "Limit"
 // @Param        offset query     int     false "Offset"
-// @Success      200    {array}   dto.BenefitResponse
+// @Success      200    {object}  dto.BenefitListResponse
 // @Router       /api/crm/categories/{id}/benefits [get]
 func (h *CRMHandler) ListBenefitsByCategory(c *fiber.Ctx) error {
 	categoryID := c.Params("id")
@@ -636,6 +654,15 @@ func (h *CRMHandler) ListBenefitsByCategory(c *fiber.Ctx) error {
 	}
 	limit, _ := strconv.Atoi(c.Query("limit", "50"))
 	offset, _ := strconv.Atoi(c.Query("offset", "0"))
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	if offset < 0 {
+		offset = 0
+	}
 	list, err := h.LoyaltyUC.ListBenefitsByCategory(c.Context(), categoryID, limit, offset)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
@@ -914,6 +941,15 @@ func (h *CRMHandler) ListTasks(c *fiber.Ctx) error {
 	}
 	limit, _ := strconv.Atoi(c.Query("limit", "20"))
 	offset, _ := strconv.Atoi(c.Query("offset", "0"))
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	if offset < 0 {
+		offset = 0
+	}
 	status := c.Query("status")
 	out, err := h.TaskUC.ListByCompany(c.Context(), companyID, status, limit, offset)
 	if err != nil {
@@ -1063,10 +1099,7 @@ func (h *CRMHandler) ListInteractions(c *fiber.Ctx) error {
 		})
 	}
 
-	return c.JSON(dto.InteractionListResponse{
-		Items: out,
-		Total: total,
-	})
+	return c.JSON(dto.InteractionListResponse{Items: out, Total: total, Limit: limit, Offset: offset})
 }
 
 // CreateTicket radica un ticket PQR.
@@ -1299,7 +1332,7 @@ func (h *CRMHandler) CreateOpportunity(c *fiber.Ctx) error {
 // @Produce      json
 // @Param        limit   query     int    false "Limit"
 // @Param        offset  query     int    false "Offset"
-// @Success      200     {array}   dto.OpportunityResponse
+// @Success      200     {object}  dto.OpportunityListResponse
 // @Failure      401     {object}  dto.ErrorResponse
 // @Failure      503     {object}  dto.ErrorResponse
 // @Router       /api/crm/opportunities [get]
@@ -1313,6 +1346,15 @@ func (h *CRMHandler) ListOpportunities(c *fiber.Ctx) error {
 	}
 	limit, _ := strconv.Atoi(c.Query("limit", "20"))
 	offset, _ := strconv.Atoi(c.Query("offset", "0"))
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	if offset < 0 {
+		offset = 0
+	}
 	out, err := h.OpportunityUC.ListByCompany(c.Context(), companyID, limit, offset)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
@@ -1366,7 +1408,7 @@ func (h *CRMHandler) UpdateOpportunityStage(c *fiber.Ctx) error {
 
 // GetOpportunityFunnel retorna el embudo de ventas por etapa.
 // @Summary      Embudo de ventas
-// @Description  Retorna el conteo y monto total de oportunidades agrupadas por etapa
+// @Description  [LEGACY_ARRAY] Devuelve array plano. Retorna el conteo y monto total de oportunidades agrupadas por etapa
 // @Tags         crm
 // @Security     Bearer
 // @Produce      json
@@ -1595,6 +1637,7 @@ func (h *CRMHandler) CreateCampaignTemplate(c *fiber.Ctx) error {
 
 // ListCampaignTemplates godoc
 // @Summary      Listar plantillas de campaña
+// @Description  [LEGACY_ARRAY] Devuelve array plano (no paginado).
 // @Tags         crm
 // @Security     Bearer
 // @Produce      json
@@ -1950,7 +1993,7 @@ func (h *CRMHandler) GetImportStatus(c *fiber.Ctx) error {
 
 // ListOverdueTickets lista los tickets en estado OVERDUE de la empresa.
 // @Summary      Tickets vencidos (OVERDUE)
-// @Description  Devuelve los tickets cuyo SLA ha expirado y fueron marcados como OVERDUE
+// @Description  [LEGACY_ARRAY] Devuelve array plano. Devuelve los tickets cuyo SLA ha expirado y fueron marcados como OVERDUE
 // @Tags         crm
 // @Security     Bearer
 // @Produce      json

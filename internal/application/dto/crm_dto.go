@@ -126,6 +126,7 @@ type TaskResponse struct {
 // TaskResponseList lista paginada de tareas.
 type TaskResponseList struct {
 	Items  []TaskResponse `json:"items"`
+	Total  int64          `json:"total"`
 	Limit  int            `json:"limit"`
 	Offset int            `json:"offset"`
 }
@@ -144,8 +145,10 @@ type InteractionResponse struct {
 
 // InteractionListResponse lista paginada de interacciones.
 type InteractionListResponse struct {
-	Items []InteractionResponse `json:"items"`
-	Total int64                 `json:"total"`
+	Items  []InteractionResponse `json:"items"`
+	Total  int64                 `json:"total"`
+	Limit  int                   `json:"limit"`
+	Offset int                   `json:"offset"`
 }
 
 // PointEventDTO evento de puntos de fidelización.
@@ -182,8 +185,23 @@ type TicketResponse struct {
 // TicketResponseList lista paginada de tickets.
 type TicketResponseList struct {
 	Items  []TicketResponse `json:"items"`
+	Total  int64            `json:"total"`
 	Limit  int              `json:"limit"`
 	Offset int              `json:"offset"`
+}
+
+type CategoryListResponse struct {
+	Items  []CategoryResponse `json:"items"`
+	Total  int64              `json:"total"`
+	Limit  int                `json:"limit"`
+	Offset int                `json:"offset"`
+}
+
+type BenefitListResponse struct {
+	Items  []BenefitResponse `json:"items"`
+	Total  int64             `json:"total"`
+	Limit  int               `json:"limit"`
+	Offset int               `json:"offset"`
 }
 
 // CategoryResponse categoría de fidelización.
@@ -253,6 +271,13 @@ type OpportunityResponse struct {
 	CreatedBy         string          `json:"created_by"`
 	CreatedAt         time.Time       `json:"created_at"`
 	UpdatedAt         time.Time       `json:"updated_at"`
+}
+
+type OpportunityListResponse struct {
+	Items  []OpportunityResponse `json:"items"`
+	Total  int64                 `json:"total"`
+	Limit  int                   `json:"limit"`
+	Offset int                   `json:"offset"`
 }
 
 // FunnelStageDTO resumen de una etapa del embudo de ventas.

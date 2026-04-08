@@ -392,8 +392,10 @@ func TestCompanyHandler_List(t *testing.T) {
 						assert.Equal(t, 20, limit)
 						assert.Equal(t, 0, offset)
 						return &dto.CompanyListResponse{
-							Items: []dto.CompanyResponse{*validCompanyResponse()},
-							Page:  dto.PageResponse{Limit: 20, Offset: 0},
+							Items:  []dto.CompanyResponse{*validCompanyResponse()},
+							Total:  1,
+							Limit:  20,
+							Offset: 0,
 						}, nil
 					},
 				}
@@ -404,8 +406,9 @@ func TestCompanyHandler_List(t *testing.T) {
 				require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
 				assert.Len(t, out.Items, 1)
 				assert.Equal(t, companyTestID, out.Items[0].ID)
-				assert.Equal(t, 20, out.Page.Limit)
-				assert.Equal(t, 0, out.Page.Offset)
+				assert.Equal(t, 1, out.Total)
+				assert.Equal(t, 20, out.Limit)
+				assert.Equal(t, 0, out.Offset)
 			},
 		},
 		{
@@ -417,8 +420,10 @@ func TestCompanyHandler_List(t *testing.T) {
 						assert.Equal(t, 10, limit)
 						assert.Equal(t, 5, offset)
 						return &dto.CompanyListResponse{
-							Items: []dto.CompanyResponse{},
-							Page:  dto.PageResponse{Limit: 10, Offset: 5},
+							Items:  []dto.CompanyResponse{},
+							Total:  0,
+							Limit:  10,
+							Offset: 5,
 						}, nil
 					},
 				}
@@ -428,8 +433,9 @@ func TestCompanyHandler_List(t *testing.T) {
 				var out dto.CompanyListResponse
 				require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
 				assert.Len(t, out.Items, 0)
-				assert.Equal(t, 10, out.Page.Limit)
-				assert.Equal(t, 5, out.Page.Offset)
+				assert.Equal(t, 0, out.Total)
+				assert.Equal(t, 10, out.Limit)
+				assert.Equal(t, 5, out.Offset)
 			},
 		},
 		{

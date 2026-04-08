@@ -19,9 +19,9 @@ import (
 // ── Fake CustomerUseCase (mock manual para tests) ──────────────────────────────
 
 type fakeCustomerUseCase struct {
-	createFunc func(companyID string, in dto.CreateCustomerRequest) (*dto.CustomerResponse, error)
-	listFunc   func(companyID string, search string, limit, offset int) ([]*dto.CustomerResponse, error)
-	updateFunc func(companyID, customerID string, in dto.UpdateCustomerRequest) (*dto.CustomerResponse, error)
+	createFunc     func(companyID string, in dto.CreateCustomerRequest) (*dto.CustomerResponse, error)
+	listFunc       func(companyID string, search string, limit, offset int) (*dto.CustomerListResponse, error)
+	updateFunc     func(companyID, customerID string, in dto.UpdateCustomerRequest) (*dto.CustomerResponse, error)
 	deactivateFunc func(companyID, customerID string) error
 }
 
@@ -32,7 +32,7 @@ func (f *fakeCustomerUseCase) Create(companyID string, in dto.CreateCustomerRequ
 	return nil, errors.New("create not configured")
 }
 
-func (f *fakeCustomerUseCase) List(companyID string, search string, limit, offset int) ([]*dto.CustomerResponse, error) {
+func (f *fakeCustomerUseCase) List(companyID string, search string, limit, offset int) (*dto.CustomerListResponse, error) {
 	if f.listFunc != nil {
 		return f.listFunc(companyID, search, limit, offset)
 	}
@@ -255,22 +255,25 @@ func TestCustomerHandler_List(t *testing.T) {
 			query: "",
 			mockSetup: func() *fakeCustomerUseCase {
 				return &fakeCustomerUseCase{
-					listFunc: func(companyID string, search string, limit, offset int) ([]*dto.CustomerResponse, error) {
+					listFunc: func(companyID string, search string, limit, offset int) (*dto.CustomerListResponse, error) {
 						assert.Equal(t, customerTestCompanyID, companyID)
 						assert.Equal(t, "", search)
 						assert.Equal(t, 20, limit)
 						assert.Equal(t, 0, offset)
-						return []*dto.CustomerResponse{validCustomerResponse()}, nil
+						return &dto.CustomerListResponse{Items: []dto.CustomerResponse{*validCustomerResponse()}, Total: 12, Limit: 20, Offset: 0}, nil
 					},
 				}
 			},
 			companyID:      customerTestCompanyID,
 			expectedStatus: http.StatusOK,
 			validateBody: func(t *testing.T, resp *http.Response) {
-				var out []*dto.CustomerResponse
+				var out dto.CustomerListResponse
 				require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
-				assert.Len(t, out, 1)
-				assert.Equal(t, "cust-001", out[0].ID)
+				assert.Len(t, out.Items, 1)
+				assert.Equal(t, "cust-001", out.Items[0].ID)
+				assert.Equal(t, 12, out.Total)
+				assert.Equal(t, 20, out.Limit)
+				assert.Equal(t, 0, out.Offset)
 			},
 		},
 		{
@@ -278,21 +281,24 @@ func TestCustomerHandler_List(t *testing.T) {
 			query: "?limit=10&offset=5",
 			mockSetup: func() *fakeCustomerUseCase {
 				return &fakeCustomerUseCase{
-					listFunc: func(companyID string, search string, limit, offset int) ([]*dto.CustomerResponse, error) {
+					listFunc: func(companyID string, search string, limit, offset int) (*dto.CustomerListResponse, error) {
 						assert.Equal(t, customerTestCompanyID, companyID)
 						assert.Equal(t, "", search)
 						assert.Equal(t, 10, limit)
 						assert.Equal(t, 5, offset)
-						return []*dto.CustomerResponse{}, nil
+						return &dto.CustomerListResponse{Items: []dto.CustomerResponse{}, Total: 3, Limit: 10, Offset: 5}, nil
 					},
 				}
 			},
 			companyID:      customerTestCompanyID,
 			expectedStatus: http.StatusOK,
 			validateBody: func(t *testing.T, resp *http.Response) {
-				var out []*dto.CustomerResponse
+				var out dto.CustomerListResponse
 				require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
-				assert.Len(t, out, 0)
+				assert.Len(t, out.Items, 0)
+				assert.Equal(t, 3, out.Total)
+				assert.Equal(t, 10, out.Limit)
+				assert.Equal(t, 5, out.Offset)
 			},
 		},
 		{
@@ -312,7 +318,7 @@ func TestCustomerHandler_List(t *testing.T) {
 			query: "",
 			mockSetup: func() *fakeCustomerUseCase {
 				return &fakeCustomerUseCase{
-					listFunc: func(_ string, _ string, _, _ int) ([]*dto.CustomerResponse, error) {
+					listFunc: func(_ string, _ string, _, _ int) (*dto.CustomerListResponse, error) {
 						return nil, errors.New("db error")
 					},
 				}

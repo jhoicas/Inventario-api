@@ -104,5 +104,5 @@ func (h *WarehouseHandler) List(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}
-	return c.JSON(out)
+	return respondPaginated(c, "warehouses.list", out)
 }

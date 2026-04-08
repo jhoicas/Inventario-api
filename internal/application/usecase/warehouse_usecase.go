@@ -72,7 +72,7 @@ func (uc *WarehouseUseCase) Update(id string, in dto.UpdateWarehouseRequest) (*d
 
 // List lista bodegas por empresa con paginación.
 func (uc *WarehouseUseCase) List(companyID string, limit, offset int) (*dto.WarehouseListResponse, error) {
-	list, err := uc.repo.ListByCompany(companyID, limit, offset)
+	list, total, err := uc.repo.ListByCompany(companyID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -81,8 +81,10 @@ func (uc *WarehouseUseCase) List(companyID string, limit, offset int) (*dto.Ware
 		items = append(items, *toWarehouseResponse(w))
 	}
 	return &dto.WarehouseListResponse{
-		Items: items,
-		Page:  dto.PageResponse{Limit: limit, Offset: offset},
+		Items:  items,
+		Total:  int(total),
+		Limit:  limit,
+		Offset: offset,
 	}, nil
 }
 

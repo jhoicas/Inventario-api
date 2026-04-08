@@ -19,9 +19,9 @@ import (
 // ── Fake WarehouseUseCase (mock manual para tests) ──────────────────────────────
 
 type fakeWarehouseUseCase struct {
-	createFunc func(companyID string, in dto.CreateWarehouseRequest) (*dto.WarehouseResponse, error)
+	createFunc  func(companyID string, in dto.CreateWarehouseRequest) (*dto.WarehouseResponse, error)
 	getByIDFunc func(id string) (*dto.WarehouseResponse, error)
-	listFunc   func(companyID string, limit, offset int) (*dto.WarehouseListResponse, error)
+	listFunc    func(companyID string, limit, offset int) (*dto.WarehouseListResponse, error)
 }
 
 func (f *fakeWarehouseUseCase) Create(companyID string, in dto.CreateWarehouseRequest) (*dto.WarehouseResponse, error) {
@@ -134,8 +134,8 @@ func TestWarehouseHandler_Create(t *testing.T) {
 			},
 		},
 		{
-			name: "Validation_NameRequired",
-			body: dto.CreateWarehouseRequest{Name: "", Address: "Calle 1"},
+			name:           "Validation_NameRequired",
+			body:           dto.CreateWarehouseRequest{Name: "", Address: "Calle 1"},
 			mockSetup:      func() *fakeWarehouseUseCase { return &fakeWarehouseUseCase{} },
 			companyID:      warehouseTestCompanyID,
 			expectedStatus: http.StatusBadRequest,
@@ -226,10 +226,10 @@ func TestWarehouseHandler_GetByID(t *testing.T) {
 			},
 		},
 		{
-			name:           "BadRequest_MissingID",
-			id:             "",
-			mockSetup:      func() *fakeWarehouseUseCase { return &fakeWarehouseUseCase{} },
-			companyID:      warehouseTestCompanyID,
+			name:      "BadRequest_MissingID",
+			id:        "",
+			mockSetup: func() *fakeWarehouseUseCase { return &fakeWarehouseUseCase{} },
+			companyID: warehouseTestCompanyID,
 			// Ruta sin :id no hace match en Fiber -> 404 plano.
 			expectedStatus: http.StatusNotFound,
 			validateBody:   nil,
@@ -322,8 +322,10 @@ func TestWarehouseHandler_List(t *testing.T) {
 						assert.Equal(t, 20, limit)
 						assert.Equal(t, 0, offset)
 						return &dto.WarehouseListResponse{
-							Items: []dto.WarehouseResponse{*validWarehouseResponse()},
-							Page:  dto.PageResponse{Limit: 20, Offset: 0},
+							Items:  []dto.WarehouseResponse{*validWarehouseResponse()},
+							Total:  1,
+							Limit:  20,
+							Offset: 0,
 						}, nil
 					},
 				}
@@ -335,8 +337,9 @@ func TestWarehouseHandler_List(t *testing.T) {
 				require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
 				assert.Len(t, out.Items, 1)
 				assert.Equal(t, "wh-001", out.Items[0].ID)
-				assert.Equal(t, 20, out.Page.Limit)
-				assert.Equal(t, 0, out.Page.Offset)
+				assert.Equal(t, 1, out.Total)
+				assert.Equal(t, 20, out.Limit)
+				assert.Equal(t, 0, out.Offset)
 			},
 		},
 		{
@@ -349,8 +352,10 @@ func TestWarehouseHandler_List(t *testing.T) {
 						assert.Equal(t, 10, limit)
 						assert.Equal(t, 5, offset)
 						return &dto.WarehouseListResponse{
-							Items: []dto.WarehouseResponse{},
-							Page:  dto.PageResponse{Limit: 10, Offset: 5},
+							Items:  []dto.WarehouseResponse{},
+							Total:  0,
+							Limit:  10,
+							Offset: 5,
 						}, nil
 					},
 				}
@@ -361,8 +366,9 @@ func TestWarehouseHandler_List(t *testing.T) {
 				var out dto.WarehouseListResponse
 				require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
 				assert.Len(t, out.Items, 0)
-				assert.Equal(t, 10, out.Page.Limit)
-				assert.Equal(t, 5, out.Page.Offset)
+				assert.Equal(t, 0, out.Total)
+				assert.Equal(t, 10, out.Limit)
+				assert.Equal(t, 5, out.Offset)
 			},
 		},
 		{

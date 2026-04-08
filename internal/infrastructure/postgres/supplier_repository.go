@@ -148,27 +148,52 @@ func (r *SupplierRepo) Update(supplier *entity.Supplier) error {
 }
 
 // ListByCompany lista proveedores por empresa con búsqueda y paginación.
-func (r *SupplierRepo) ListByCompany(companyID, search string, limit, offset int) ([]*entity.Supplier, error) {
-	const query = `
-		SELECT id, company_id, name, nit, email, phone, payment_term_days, lead_time_days, is_active, created_at, updated_at
+func (r *SupplierRepo) ListByCompany(companyID, search string, limit, offset int) ([]*entity.Supplier, int64, error) {
+	where, args := r.buildFilters(companyID, search)
+	items, err := r.list(where, args, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	total, err := r.count(where, args)
+	if err != nil {
+		return nil, 0, err
+	}
+	return items, total, nil
+}
+
+func (r *SupplierRepo) buildFilters(companyID, search string) (string, []any) {
+	where := `
 		FROM suppliers
 		WHERE company_id = $1
-		  AND is_active = true
+		  AND is_active = true`
+	args := []any{companyID}
+	if search != "" {
+		where += `
 		  AND (
-			$2 = ''
-			OR name ILIKE '%' || $2 || '%'
-			OR nit  ILIKE '%' || $2 || '%'
-		  )
-		ORDER BY created_at DESC
-		LIMIT $3 OFFSET $4`
+			name ILIKE '%' || $2 || '%'
+			OR nit ILIKE '%' || $2 || '%'
+		  )`
+		args = append(args, search)
+	}
+	return where, args
+}
 
-	rows, err := r.q.Query(context.Background(), query, companyID, search, limit, offset)
+func (r *SupplierRepo) list(where string, args []any, limit, offset int) ([]*entity.Supplier, error) {
+	argPos := len(args) + 1
+	query := `
+		SELECT id, company_id, name, nit, email, phone, payment_term_days, lead_time_days, is_active, created_at, updated_at
+		` + where + fmt.Sprintf(`
+		ORDER BY created_at DESC
+		LIMIT $%d OFFSET $%d`, argPos, argPos+1)
+	qArgs := append(args, limit, offset)
+
+	rows, err := r.q.Query(context.Background(), query, qArgs...)
 	if err != nil {
 		return nil, fmt.Errorf("list suppliers: %w", err)
 	}
 	defer rows.Close()
 
-	list := make([]*entity.Supplier, 0)
+	items := make([]*entity.Supplier, 0)
 	for rows.Next() {
 		var s entity.Supplier
 		if err := rows.Scan(
@@ -186,14 +211,22 @@ func (r *SupplierRepo) ListByCompany(companyID, search string, limit, offset int
 		); err != nil {
 			return nil, fmt.Errorf("scan supplier: %w", err)
 		}
-		list = append(list, &s)
+		items = append(items, &s)
 	}
 
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate suppliers: %w", err)
 	}
+	return items, nil
+}
 
-	return list, nil
+func (r *SupplierRepo) count(where string, args []any) (int64, error) {
+	query := `SELECT COUNT(*) ` + where
+	var total int64
+	if err := r.q.QueryRow(context.Background(), query, args...).Scan(&total); err != nil {
+		return 0, fmt.Errorf("count suppliers: %w", err)
+	}
+	return total, nil
 }
 
 func (r *SupplierRepo) SetActive(companyID, id string, isActive bool) error {

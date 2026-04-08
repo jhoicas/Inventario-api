@@ -28,6 +28,7 @@ func NewRBACHandler(uc RBACUseCase) *RBACHandler {
 
 // ListRoles godoc
 // @Summary      Listar roles
+// @Description  [LEGACY_ARRAY] Devuelve array plano (no paginado).
 // @Tags         rbac
 // @Security     Bearer
 // @Produce      json

@@ -36,8 +36,10 @@ type CompanyResponse struct {
 
 // CompanyListResponse lista paginada de empresas.
 type CompanyListResponse struct {
-	Items []CompanyResponse `json:"items"`
-	Page  PageResponse      `json:"page"`
+	Items  []CompanyResponse `json:"items"`
+	Total  int               `json:"total"`
+	Limit  int               `json:"limit"`
+	Offset int               `json:"offset"`
 }
 
 // CreateResolutionRequest entrada para crear resolución DIAN por empresa.

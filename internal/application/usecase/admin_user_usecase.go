@@ -22,7 +22,7 @@ func NewAdminUserUseCase(repo repository.UserRepository) *AdminUserUseCase {
 }
 
 // ListByCompany lista usuarios de una empresa.
-func (uc *AdminUserUseCase) ListByCompany(companyID string, limit, offset int) ([]*dto.UserResponse, error) {
+func (uc *AdminUserUseCase) ListByCompany(companyID string, limit, offset int) (*dto.UserListResponse, error) {
 	if companyID == "" {
 		return nil, domain.ErrInvalidInput
 	}
@@ -32,15 +32,15 @@ func (uc *AdminUserUseCase) ListByCompany(companyID string, limit, offset int) (
 	if offset < 0 {
 		offset = 0
 	}
-	list, err := uc.repo.ListByCompany(companyID, limit, offset)
+	list, total, err := uc.repo.ListByCompany(companyID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]*dto.UserResponse, 0, len(list))
+	out := make([]dto.UserResponse, 0, len(list))
 	for _, u := range list {
-		out = append(out, entityToUserResponse(u))
+		out = append(out, *entityToUserResponse(u))
 	}
-	return out, nil
+	return &dto.UserListResponse{Items: out, Total: int(total), Limit: limit, Offset: offset}, nil
 }
 
 // CreateForCompany crea un usuario admin para una empresa.

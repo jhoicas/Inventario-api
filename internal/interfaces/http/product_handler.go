@@ -113,7 +113,7 @@ func (h *ProductHandler) List(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}
-	return c.JSON(out)
+	return respondPaginated(c, "products.list", out)
 }
 
 // Update godoc

@@ -169,7 +169,7 @@ func (uc *LoyaltyUseCase) getBalanceByCustomer(ctx context.Context, customerID, 
 	}
 
 	nextTierThreshold := 0
-	cats, err := uc.categoryRepo.ListByCompany(companyID, 200, 0)
+	cats, _, err := uc.categoryRepo.ListByCompany(companyID, 200, 0)
 	if err == nil {
 		current := decimal.NewFromInt(int64(balance))
 		var next *decimal.Decimal
@@ -306,7 +306,7 @@ func (uc *LoyaltyUseCase) GetProfile360(ctx context.Context, companyID, customer
 		cat, _ := uc.categoryRepo.GetByID(p360.CategoryID)
 		if cat != nil {
 			resp.CategoryName = cat.Name
-			benefits, _ := uc.benefitRepo.ListByCategory(p360.CategoryID, 50, 0)
+			benefits, _, _ := uc.benefitRepo.ListByCategory(p360.CategoryID, 50, 0)
 			for _, b := range benefits {
 				resp.Benefits = append(resp.Benefits, dto.BenefitResponse{
 					ID:          b.ID,
@@ -359,8 +359,8 @@ func (uc *LoyaltyUseCase) AssignCategory(ctx context.Context, companyID, custome
 }
 
 // ListCategories lista categorías de fidelización de la empresa.
-func (uc *LoyaltyUseCase) ListCategories(ctx context.Context, companyID string, limit, offset int) ([]dto.CategoryResponse, error) {
-	list, err := uc.categoryRepo.ListByCompany(companyID, limit, offset)
+func (uc *LoyaltyUseCase) ListCategories(ctx context.Context, companyID string, limit, offset int) (*dto.CategoryListResponse, error) {
+	list, total, err := uc.categoryRepo.ListByCompany(companyID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -375,7 +375,7 @@ func (uc *LoyaltyUseCase) ListCategories(ctx context.Context, companyID string, 
 			UpdatedAt: c.UpdatedAt,
 		})
 	}
-	return out, nil
+	return &dto.CategoryListResponse{Items: out, Total: total, Limit: limit, Offset: offset}, nil
 }
 
 // CreateCategory crea una categoría de fidelización (solo admin).
@@ -463,8 +463,8 @@ func (uc *LoyaltyUseCase) DeactivateCategory(ctx context.Context, companyID, cat
 }
 
 // ListBenefitsByCategory lista beneficios de una categoría.
-func (uc *LoyaltyUseCase) ListBenefitsByCategory(ctx context.Context, categoryID string, limit, offset int) ([]dto.BenefitResponse, error) {
-	list, err := uc.benefitRepo.ListByCategory(categoryID, limit, offset)
+func (uc *LoyaltyUseCase) ListBenefitsByCategory(ctx context.Context, categoryID string, limit, offset int) (*dto.BenefitListResponse, error) {
+	list, total, err := uc.benefitRepo.ListByCategory(categoryID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -480,7 +480,7 @@ func (uc *LoyaltyUseCase) ListBenefitsByCategory(ctx context.Context, categoryID
 			UpdatedAt:   b.UpdatedAt,
 		})
 	}
-	return out, nil
+	return &dto.BenefitListResponse{Items: out, Total: total, Limit: limit, Offset: offset}, nil
 }
 
 // CreateBenefit crea un beneficio dentro de una categoría (admin).

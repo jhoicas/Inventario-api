@@ -10,8 +10,8 @@ import (
 
 // AnalyticsHandler maneja los endpoints de analítica de rentabilidad.
 type AnalyticsHandler struct {
-	uc             *usecase.AnalyticsUseCase
-	rawMaterialUC  *usecase.RawMaterialAnalyticsUseCase
+	uc            *usecase.AnalyticsUseCase
+	rawMaterialUC *usecase.RawMaterialAnalyticsUseCase
 }
 
 // NewAnalyticsHandler construye el handler.
@@ -22,7 +22,9 @@ func NewAnalyticsHandler(uc *usecase.AnalyticsUseCase, rawMaterialUC *usecase.Ra
 // GetMargins godoc
 // @Summary      Reporte de márgenes por canal y ranking de SKUs (Pareto 80/20)
 // @Description  Devuelve rentabilidad por canal de venta y el ranking de SKUs más rentables
-//               con análisis de Pareto. Requiere módulo 'analytics' activo.
+//
+//	con análisis de Pareto. Requiere módulo 'analytics' activo.
+//
 // @Tags         analytics
 // @Security     Bearer
 // @Produce      json
@@ -62,7 +64,7 @@ func (h *AnalyticsHandler) GetMargins(c *fiber.Ctx) error {
 
 // GetRawMaterialImpactRanking godoc
 // @Summary      Ranking de impacto de materias primas
-// @Description  Devuelve el ranking de materias primas por peso financiero en productos vendidos en el período (BOM + coste).
+// @Description  [LEGACY_ARRAY] Devuelve array plano. Devuelve el ranking de materias primas por peso financiero en productos vendidos en el período (BOM + coste).
 // @Tags         analytics
 // @Security     Bearer
 // @Produce      json

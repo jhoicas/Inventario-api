@@ -17,7 +17,7 @@ type EmailAccountRepository interface {
 	Update(account *entity.EmailAccount) error
 	Delete(companyID, id string) error
 	GetByID(companyID, id string) (*entity.EmailAccount, error)
-	ListByCompany(companyID string, limit, offset int) ([]*entity.EmailAccount, error)
+	ListByCompany(companyID string, limit, offset int) ([]*entity.EmailAccount, int64, error)
 	ListActive() ([]*entity.EmailAccount, error)
 }
 

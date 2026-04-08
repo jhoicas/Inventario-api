@@ -13,7 +13,7 @@ import (
 type CRMCategoryRepository interface {
 	Create(category *entity.CRMCategory) error
 	GetByID(id string) (*entity.CRMCategory, error)
-	ListByCompany(companyID string, limit, offset int) ([]*entity.CRMCategory, error)
+	ListByCompany(companyID string, limit, offset int) ([]*entity.CRMCategory, int64, error)
 	Update(category *entity.CRMCategory) error
 	Delete(id string) error
 	SetActive(companyID, id string, isActive bool, updatedAt time.Time) error
@@ -23,7 +23,7 @@ type CRMCategoryRepository interface {
 type CRMBenefitRepository interface {
 	Create(benefit *entity.CRMBenefit) error
 	GetByID(id string) (*entity.CRMBenefit, error)
-	ListByCategory(categoryID string, limit, offset int) ([]*entity.CRMBenefit, error)
+	ListByCategory(categoryID string, limit, offset int) ([]*entity.CRMBenefit, int64, error)
 	Update(benefit *entity.CRMBenefit) error
 	SetActive(companyID, id string, isActive bool) error
 }
@@ -85,7 +85,7 @@ type CRMTaskRepository interface {
 	Create(task *entity.CRMTask) error
 	GetByID(id string) (*entity.CRMTask, error)
 	Update(task *entity.CRMTask) error
-	ListByCompany(companyID string, status string, limit, offset int) ([]*entity.CRMTask, error)
+	ListByCompany(companyID string, status string, limit, offset int) ([]*entity.CRMTask, int64, error)
 }
 
 // CRMTicketRepository puerto de persistencia para tickets PQR.
@@ -97,7 +97,7 @@ type CRMTicketRepository interface {
 	// search: busca por asunto (subject) usando ILIKE.
 	// status: filtra por status exacto.
 	// sort: orden por created_at ("asc" | "desc"). Cualquier otro valor usa "desc".
-	ListByCompany(companyID string, search string, status string, sort string, limit, offset int) ([]*entity.CRMTicket, error)
+	ListByCompany(companyID string, search string, status string, sort string, limit, offset int) ([]*entity.CRMTicket, int64, error)
 	// UpdateStatus actualiza solo el status y updated_at de un ticket.
 	UpdateStatus(id, status string, updatedAt time.Time) error
 	// ListOverdue retorna los tickets en estado OVERDUE de una empresa.
@@ -123,6 +123,8 @@ type CRMOpportunityRepository interface {
 	GetByID(ctx context.Context, id string) (*entity.Opportunity, error)
 	UpdateStage(ctx context.Context, id string, stage entity.OpportunityStage, updatedAt time.Time) error
 	ListByCompany(ctx context.Context, companyID string) ([]*entity.Opportunity, error)
+	ListByCompanyPage(ctx context.Context, companyID string, limit, offset int) ([]*entity.Opportunity, error)
+	CountByCompany(ctx context.Context, companyID string) (int64, error)
 }
 
 // CRMCampaignRepository puerto de persistencia para campañas CRM.

@@ -133,7 +133,7 @@ func (uc *TaskUseCase) Update(ctx context.Context, companyID, id string, in dto.
 
 // ListByCompany lista tareas de la empresa con filtro opcional por status.
 func (uc *TaskUseCase) ListByCompany(ctx context.Context, companyID, status string, limit, offset int) (*dto.TaskResponseList, error) {
-	list, err := uc.taskRepo.ListByCompany(companyID, status, limit, offset)
+	list, total, err := uc.taskRepo.ListByCompany(companyID, status, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -141,7 +141,7 @@ func (uc *TaskUseCase) ListByCompany(ctx context.Context, companyID, status stri
 	for _, t := range list {
 		items = append(items, *toTaskResponse(t))
 	}
-	return &dto.TaskResponseList{Items: items, Limit: limit, Offset: offset}, nil
+	return &dto.TaskResponseList{Items: items, Total: total, Limit: limit, Offset: offset}, nil
 }
 
 // HasOpenReplenishmentTask devuelve true si ya existe una tarea pendiente de reabastecimiento
@@ -151,7 +151,7 @@ func (uc *TaskUseCase) HasOpenReplenishmentTask(ctx context.Context, companyID, 
 		return false, domain.ErrInvalidInput
 	}
 	// Limitamos a las primeras 200 tareas pendientes por eficiencia.
-	list, err := uc.taskRepo.ListByCompany(companyID, string(entity.TaskStatusPending), 200, 0)
+	list, _, err := uc.taskRepo.ListByCompany(companyID, string(entity.TaskStatusPending), 200, 0)
 	if err != nil {
 		return false, err
 	}

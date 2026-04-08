@@ -230,7 +230,7 @@ func main() {
 		run := func() {
 			ctx := context.Background()
 
-			companies, err := companyRepo.List(1000, 0)
+			companies, _, err := companyRepo.List(1000, 0)
 			if err != nil {
 				log.Error().Err(err).Msg("daily_replenishment_worker: listar compañías")
 				return

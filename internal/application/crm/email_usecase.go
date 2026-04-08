@@ -407,7 +407,7 @@ func (uc *EmailUseCase) GetAccount(companyID, id string) (*dto.EmailAccountRespo
 	return toEmailAccountResponse(acc), nil
 }
 
-func (uc *EmailUseCase) ListAccounts(companyID string, limit, offset int) ([]dto.EmailAccountResponse, error) {
+func (uc *EmailUseCase) ListAccounts(companyID string, limit, offset int) (*dto.EmailAccountListResponse, error) {
 	if strings.TrimSpace(companyID) == "" {
 		return nil, domain.ErrUnauthorized
 	}
@@ -421,7 +421,7 @@ func (uc *EmailUseCase) ListAccounts(companyID string, limit, offset int) ([]dto
 		offset = 0
 	}
 
-	list, err := uc.accountRepo.ListByCompany(companyID, limit, offset)
+	list, total, err := uc.accountRepo.ListByCompany(companyID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -429,7 +429,7 @@ func (uc *EmailUseCase) ListAccounts(companyID string, limit, offset int) ([]dto
 	for _, item := range list {
 		out = append(out, *toEmailAccountResponse(item))
 	}
-	return out, nil
+	return &dto.EmailAccountListResponse{Items: out, Total: int(total), Limit: limit, Offset: offset}, nil
 }
 
 func (uc *EmailUseCase) TestConnection(companyID, id string) (*dto.TestIMAPConnectionResponse, error) {

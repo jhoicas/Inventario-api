@@ -25,9 +25,9 @@ type UpdateProductRequest struct {
 	Description *string          `json:"description"`
 	Price       *decimal.Decimal `json:"price"`
 	TaxRate     *decimal.Decimal `json:"tax_rate"`
-	UNSPSC_Code *string         `json:"unspsc_code"`
-	UnitMeasure *string         `json:"unit_measure"`
-	Attributes  json.RawMessage `json:"attributes"`
+	UNSPSC_Code *string          `json:"unspsc_code"`
+	UnitMeasure *string          `json:"unit_measure"`
+	Attributes  json.RawMessage  `json:"attributes"`
 }
 
 // ProductResponse salida de un producto.
@@ -49,8 +49,10 @@ type ProductResponse struct {
 
 // ProductListResponse lista paginada de productos.
 type ProductListResponse struct {
-	Items []ProductResponse `json:"items"`
-	Page  PageResponse      `json:"page"`
+	Items  []ProductResponse `json:"items"`
+	Total  int               `json:"total"`
+	Limit  int               `json:"limit"`
+	Offset int               `json:"offset"`
 }
 
 // ── Clasificación arancelaria por IA ─────────────────────────────────────────
@@ -65,7 +67,7 @@ type AIClassificationRequest struct {
 // SuggestedTaxRate puede ser 0, 5 o 19 (tarifas de IVA Colombia).
 // ConfidenceScore va de 0.0 a 1.0; valores ≥ 0.8 se consideran alta confianza.
 type AIClassificationDTO struct {
-	SuggestedUNSPSC string          `json:"suggested_unspsc"` // código UNSPSC de 8 dígitos
+	SuggestedUNSPSC  string          `json:"suggested_unspsc"`   // código UNSPSC de 8 dígitos
 	SuggestedTaxRate decimal.Decimal `json:"suggested_tax_rate"` // 0, 5 o 19
 	ConfidenceScore  float64         `json:"confidence_score"`   // 0.0 – 1.0
 	Reasoning        string          `json:"reasoning"`          // explicación del modelo

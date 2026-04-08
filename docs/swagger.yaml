@@ -1,36 +1,22 @@
 basePath: /
 definitions:
-  billing.AcquirerInfo:
+  github_com_jhoicas_Inventario-api_internal_application_crm.JobProgress:
     properties:
-      business_name:
+      processedRows:
+        type: integer
+      status:
         type: string
-      dv:
-        type: string
-      id_code:
-        type: string
-      status_code:
-        type: string
-      status_description:
-        type: string
-      tax_id:
-        type: string
-      tax_scheme:
-        type: string
-      type_liability:
-        type: string
-      type_organization:
-        type: string
-      type_regime:
-        type: string
+      totalRows:
+        type: integer
     type: object
-  dto.AssignCategoryRequest:
+  github_com_jhoicas_Inventario-api_internal_application_dto.AssignCategoryRequest:
     properties:
       category_id:
         type: string
       ltv:
         type: number
     type: object
-  dto.AwardPointsRequest:
+  github_com_jhoicas_Inventario-api_internal_application_dto.AwardPointsRequest:
     properties:
       customer_id:
         type: string
@@ -41,7 +27,20 @@ definitions:
       reference_id:
         type: string
     type: object
-  dto.BenefitResponse:
+  github_com_jhoicas_Inventario-api_internal_application_dto.BenefitListResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.BenefitResponse'
+        type: array
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  github_com_jhoicas_Inventario-api_internal_application_dto.BenefitResponse:
     properties:
       category_id:
         type: string
@@ -58,7 +57,55 @@ definitions:
       updated_at:
         type: string
     type: object
-  dto.CampaignMetricsResponse:
+  github_com_jhoicas_Inventario-api_internal_application_dto.CRMAnalyticsEvolutionItem:
+    properties:
+      mes:
+        type: string
+      variacion:
+        type: string
+      ventas:
+        type: number
+    type: object
+  github_com_jhoicas_Inventario-api_internal_application_dto.CRMAnalyticsKPIs:
+    properties:
+      clientes_vip:
+        type: integer
+      ticket_promedio:
+        type: number
+      total_clientes:
+        type: integer
+      ventas_totales:
+        type: number
+    type: object
+  github_com_jhoicas_Inventario-api_internal_application_dto.CRMAnalyticsResponse:
+    properties:
+      evolucion_mensual:
+        items:
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CRMAnalyticsEvolutionItem'
+        type: array
+      kpis:
+        $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CRMAnalyticsKPIs'
+      segmentacion:
+        items:
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CRMAnalyticsSegmentItem'
+        type: array
+    type: object
+  github_com_jhoicas_Inventario-api_internal_application_dto.CRMAnalyticsSegmentItem:
+    properties:
+      accion:
+        type: string
+      clientes:
+        type: integer
+      porcentaje:
+        type: string
+      segmento:
+        type: string
+      ticket_promedio:
+        type: number
+      ventas_totales:
+        type: number
+    type: object
+  github_com_jhoicas_Inventario-api_internal_application_dto.CampaignMetricsResponse:
     properties:
       campaign_id:
         type: string
@@ -73,7 +120,26 @@ definitions:
       sent:
         type: integer
     type: object
-  dto.CampaignResponse:
+  github_com_jhoicas_Inventario-api_internal_application_dto.CampaignRecipientDTO:
+    properties:
+      customer_id:
+        type: string
+      email:
+        type: string
+      name:
+        type: string
+      segment:
+        type: string
+    type: object
+  github_com_jhoicas_Inventario-api_internal_application_dto.CampaignRecipientStrategy:
+    properties:
+      category_id:
+        type: string
+      type:
+        description: '"category"'
+        type: string
+    type: object
+  github_com_jhoicas_Inventario-api_internal_application_dto.CampaignResponse:
     properties:
       company_id:
         type: string
@@ -94,7 +160,37 @@ definitions:
       updated_at:
         type: string
     type: object
-  dto.CategoryResponse:
+  github_com_jhoicas_Inventario-api_internal_application_dto.CampaignTemplateResponse:
+    properties:
+      body:
+        type: string
+      company_id:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      subject:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  github_com_jhoicas_Inventario-api_internal_application_dto.CategoryListResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CategoryResponse'
+        type: array
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  github_com_jhoicas_Inventario-api_internal_application_dto.CategoryResponse:
     properties:
       company_id:
         type: string
@@ -109,11 +205,11 @@ definitions:
       updated_at:
         type: string
     type: object
-  dto.ChannelProfitabilityDTO:
+  github_com_jhoicas_Inventario-api_internal_application_dto.ChannelProfitabilityDTO:
     properties:
       channels:
         items:
-          $ref: '#/definitions/dto.MarginByChannelDTO'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.MarginByChannelDTO'
         type: array
       overall_margin_pct:
         description: margen ponderado global
@@ -125,16 +221,46 @@ definitions:
       total_revenue:
         type: number
     type: object
-  dto.CompanyListResponse:
+  github_com_jhoicas_Inventario-api_internal_application_dto.CompanyListResponse:
     properties:
       items:
         items:
-          $ref: '#/definitions/dto.CompanyResponse'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CompanyResponse'
         type: array
-      page:
-        $ref: '#/definitions/dto.PageResponse'
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
     type: object
-  dto.CompanyResponse:
+  github_com_jhoicas_Inventario-api_internal_application_dto.CompanyModuleResponse:
+    properties:
+      activated_at:
+        type: string
+      created_at:
+        type: string
+      expires_at:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      module_name:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  github_com_jhoicas_Inventario-api_internal_application_dto.CompanyModulesResponse:
+    properties:
+      company_id:
+        type: string
+      modules:
+        items:
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CompanyModuleResponse'
+        type: array
+    type: object
+  github_com_jhoicas_Inventario-api_internal_application_dto.CompanyResponse:
     properties:
       address:
         type: string
@@ -155,7 +281,7 @@ definitions:
       updated_at:
         type: string
     type: object
-  dto.CreateBenefitRequest:
+  github_com_jhoicas_Inventario-api_internal_application_dto.CreateBenefitRequest:
     properties:
       description:
         type: string
@@ -166,7 +292,7 @@ definitions:
     required:
     - name
     type: object
-  dto.CreateCampaignRequest:
+  github_com_jhoicas_Inventario-api_internal_application_dto.CreateCampaignRequest:
     properties:
       description:
         type: string
@@ -177,7 +303,39 @@ definitions:
     required:
     - name
     type: object
-  dto.CreateCompanyRequest:
+  github_com_jhoicas_Inventario-api_internal_application_dto.CreateCampaignTemplateRequest:
+    properties:
+      body:
+        type: string
+      name:
+        type: string
+      subject:
+        type: string
+    required:
+    - body
+    - name
+    - subject
+    type: object
+  github_com_jhoicas_Inventario-api_internal_application_dto.CreateCategoryRequest:
+    properties:
+      min_ltv:
+        type: number
+      name:
+        type: string
+    required:
+    - name
+    type: object
+  github_com_jhoicas_Inventario-api_internal_application_dto.CreateCompanyModuleRequest:
+    properties:
+      expires_at:
+        description: RFC3339 opcional
+        type: string
+      is_active:
+        type: boolean
+      module_name:
+        type: string
+    type: object
+  github_com_jhoicas_Inventario-api_internal_application_dto.CreateCompanyRequest:
     properties:
       address:
         type: string
@@ -197,7 +355,7 @@ definitions:
     - name
     - nit
     type: object
-  dto.CreateCustomerRequest:
+  github_com_jhoicas_Inventario-api_internal_application_dto.CreateCustomerRequest:
     properties:
       email:
         type: string
@@ -208,16 +366,16 @@ definitions:
       tax_id:
         type: string
     type: object
-  dto.CreateDebitNoteRequest:
+  github_com_jhoicas_Inventario-api_internal_application_dto.CreateDebitNoteRequest:
     properties:
       items:
         items:
-          $ref: '#/definitions/dto.DebitNoteItemRequest'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.DebitNoteItemRequest'
         type: array
       reason:
         type: string
     type: object
-  dto.CreateInteractionRequest:
+  github_com_jhoicas_Inventario-api_internal_application_dto.CreateInteractionRequest:
     properties:
       body:
         type: string
@@ -232,13 +390,13 @@ definitions:
     - customer_id
     - type
     type: object
-  dto.CreateInvoiceRequest:
+  github_com_jhoicas_Inventario-api_internal_application_dto.CreateInvoiceRequest:
     properties:
       customer_id:
         type: string
       items:
         items:
-          $ref: '#/definitions/dto.InvoiceItemRequest'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.InvoiceItemRequest'
         type: array
       number:
         description: opcional; si va vacío se puede generar
@@ -248,7 +406,7 @@ definitions:
       warehouse_id:
         type: string
     type: object
-  dto.CreateOpportunityRequest:
+  github_com_jhoicas_Inventario-api_internal_application_dto.CreateOpportunityRequest:
     properties:
       amount:
         type: number
@@ -267,7 +425,7 @@ definitions:
     required:
     - title
     type: object
-  dto.CreateProductRequest:
+  github_com_jhoicas_Inventario-api_internal_application_dto.CreateProductRequest:
     properties:
       attributes:
         items:
@@ -296,10 +454,17 @@ definitions:
     - sku
     - unit_measure
     type: object
-  dto.CreateResolutionRequest:
+  github_com_jhoicas_Inventario-api_internal_application_dto.CreateResolutionRequest:
     properties:
+      alert_threshold:
+        description: porcentaje; por ahora solo compatibilidad, cálculo interno sigue
+          siendo 10%
+        type: integer
+      current_number:
+        description: no usado por ahora; solo para compatibilidad de payload
+        type: integer
       environment:
-        description: test|prod
+        description: test|prod; opcional en este payload
         type: string
       from_number:
         type: integer
@@ -312,11 +477,11 @@ definitions:
       valid_from:
         description: formato YYYY-MM-DD
         type: string
-      valid_until:
-        description: formato YYYY-MM-DD
+      valid_to:
+        description: formato YYYY-MM-DD (respetar nombre del frontend)
         type: string
     type: object
-  dto.CreateSupplierRequest:
+  github_com_jhoicas_Inventario-api_internal_application_dto.CreateSupplierRequest:
     properties:
       email:
         type: string
@@ -331,7 +496,20 @@ definitions:
       phone:
         type: string
     type: object
-  dto.CreateTaskRequest:
+  github_com_jhoicas_Inventario-api_internal_application_dto.CreateTaskFromEmailRequest:
+    properties:
+      assigned_to:
+        type: string
+      description:
+        type: string
+      due_date:
+        type: string
+      email_id:
+        type: string
+      title:
+        type: string
+    type: object
+  github_com_jhoicas_Inventario-api_internal_application_dto.CreateTaskRequest:
     properties:
       customer_id:
         type: string
@@ -344,7 +522,22 @@ definitions:
     required:
     - title
     type: object
-  dto.CreateTicketRequest:
+  github_com_jhoicas_Inventario-api_internal_application_dto.CreateTicketFromEmailRequest:
+    properties:
+      assigned_to:
+        type: string
+      description:
+        type: string
+      email_id:
+        type: string
+      priority:
+        type: string
+      sender_email:
+        type: string
+      subject:
+        type: string
+    type: object
+  github_com_jhoicas_Inventario-api_internal_application_dto.CreateTicketRequest:
     properties:
       customer_id:
         type: string
@@ -357,7 +550,7 @@ definitions:
     - description
     - subject
     type: object
-  dto.CreateUserRequest:
+  github_com_jhoicas_Inventario-api_internal_application_dto.CreateUserRequest:
     properties:
       company_id:
         type: string
@@ -381,14 +574,14 @@ definitions:
     - name
     - password
     type: object
-  dto.CreateVoidInvoiceRequest:
+  github_com_jhoicas_Inventario-api_internal_application_dto.CreateVoidInvoiceRequest:
     properties:
       concept_code:
         type: integer
       reason:
         type: string
     type: object
-  dto.CreateWarehouseRequest:
+  github_com_jhoicas_Inventario-api_internal_application_dto.CreateWarehouseRequest:
     properties:
       address:
         type: string
@@ -399,7 +592,20 @@ definitions:
     required:
     - name
     type: object
-  dto.CustomerPurchaseStatsDTO:
+  github_com_jhoicas_Inventario-api_internal_application_dto.CustomerListResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CustomerResponse'
+        type: array
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  github_com_jhoicas_Inventario-api_internal_application_dto.CustomerPurchaseStatsDTO:
     properties:
       avg_ticket:
         type: number
@@ -411,14 +617,18 @@ definitions:
       total_purchases:
         type: number
     type: object
-  dto.CustomerResponse:
+  github_com_jhoicas_Inventario-api_internal_application_dto.CustomerResponse:
     properties:
+      category_name:
+        type: string
       company_id:
         type: string
       email:
         type: string
       id:
         type: string
+      ltv:
+        type: number
       name:
         type: string
       phone:
@@ -426,7 +636,29 @@ definitions:
       tax_id:
         type: string
     type: object
-  dto.DebitNoteItemRequest:
+  github_com_jhoicas_Inventario-api_internal_application_dto.DIANSettingsResponse:
+    properties:
+      certificate_file_name:
+        type: string
+      certificate_file_size:
+        type: integer
+      company_id:
+        type: string
+      environment:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  github_com_jhoicas_Inventario-api_internal_application_dto.DIANSummaryDTO:
+    properties:
+      pending:
+        type: integer
+      rejected:
+        type: integer
+      sent_today:
+        type: integer
+    type: object
+  github_com_jhoicas_Inventario-api_internal_application_dto.DebitNoteItemRequest:
     properties:
       product_id:
         type: string
@@ -435,7 +667,7 @@ definitions:
       unit_price:
         type: number
     type: object
-  dto.DebitNoteResponse:
+  github_com_jhoicas_Inventario-api_internal_application_dto.DebitNoteResponse:
     properties:
       cufe:
         type: string
@@ -444,14 +676,103 @@ definitions:
       dian_status:
         type: string
     type: object
-  dto.ErrorResponse:
+  github_com_jhoicas_Inventario-api_internal_application_dto.EmailAccountListResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.EmailAccountResponse'
+        type: array
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  github_com_jhoicas_Inventario-api_internal_application_dto.EmailAccountResponse:
+    properties:
+      company_id:
+        type: string
+      created_at:
+        type: string
+      email_address:
+        type: string
+      id:
+        type: string
+      imap_port:
+        type: integer
+      imap_server:
+        type: string
+      is_active:
+        type: boolean
+      updated_at:
+        type: string
+    type: object
+  github_com_jhoicas_Inventario-api_internal_application_dto.EmailAttachmentResponse:
+    properties:
+      file_name:
+        type: string
+      file_url:
+        type: string
+      id:
+        type: string
+      mime_type:
+        type: string
+      size:
+        type: integer
+    type: object
+  github_com_jhoicas_Inventario-api_internal_application_dto.EmailListResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.EmailResponse'
+        type: array
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  github_com_jhoicas_Inventario-api_internal_application_dto.EmailResponse:
+    properties:
+      account_id:
+        type: string
+      attachments:
+        items:
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.EmailAttachmentResponse'
+        type: array
+      body_html:
+        type: string
+      body_text:
+        type: string
+      created_at:
+        type: string
+      customer_id:
+        type: string
+      from_address:
+        type: string
+      id:
+        type: string
+      is_read:
+        type: boolean
+      message_id:
+        type: string
+      received_at:
+        type: string
+      subject:
+        type: string
+      to_address:
+        type: string
+    type: object
+  github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse:
     properties:
       code:
         type: string
       message:
         type: string
     type: object
-  dto.FunnelStageDTO:
+  github_com_jhoicas_Inventario-api_internal_application_dto.FunnelStageDTO:
     properties:
       count:
         type: integer
@@ -460,16 +781,20 @@ definitions:
       total_amount:
         type: number
     type: object
-  dto.InteractionListResponse:
+  github_com_jhoicas_Inventario-api_internal_application_dto.InteractionListResponse:
     properties:
       items:
         items:
-          $ref: '#/definitions/dto.InteractionResponse'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.InteractionResponse'
         type: array
+      limit:
+        type: integer
+      offset:
+        type: integer
       total:
         type: integer
     type: object
-  dto.InteractionResponse:
+  github_com_jhoicas_Inventario-api_internal_application_dto.InteractionResponse:
     properties:
       body:
         type: string
@@ -488,7 +813,7 @@ definitions:
       type:
         type: string
     type: object
-  dto.InvoiceDIANStatusDTO:
+  github_com_jhoicas_Inventario-api_internal_application_dto.InvoiceDIANStatusDTO:
     properties:
       cufe:
         description: Código único de factura (SHA-384)
@@ -505,7 +830,7 @@ definitions:
         description: ZipKey devuelto por el WS DIAN
         type: string
     type: object
-  dto.InvoiceDetailResponse:
+  github_com_jhoicas_Inventario-api_internal_application_dto.InvoiceDetailResponse:
     properties:
       id:
         type: string
@@ -520,7 +845,7 @@ definitions:
       unit_price:
         type: number
     type: object
-  dto.InvoiceItemRequest:
+  github_com_jhoicas_Inventario-api_internal_application_dto.InvoiceItemRequest:
     properties:
       product_id:
         type: string
@@ -529,11 +854,11 @@ definitions:
       unit_price:
         type: number
     type: object
-  dto.InvoiceListResponse:
+  github_com_jhoicas_Inventario-api_internal_application_dto.InvoiceListResponse:
     properties:
       items:
         items:
-          $ref: '#/definitions/dto.InvoiceResponse'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.InvoiceResponse'
         type: array
       limit:
         type: integer
@@ -542,7 +867,7 @@ definitions:
       total:
         type: integer
     type: object
-  dto.InvoiceResponse:
+  github_com_jhoicas_Inventario-api_internal_application_dto.InvoiceResponse:
     properties:
       company_id:
         type: string
@@ -556,7 +881,7 @@ definitions:
         type: string
       details:
         items:
-          $ref: '#/definitions/dto.InvoiceDetailResponse'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.InvoiceDetailResponse'
         type: array
       dian_status:
         type: string
@@ -576,7 +901,7 @@ definitions:
       tax_total:
         type: number
     type: object
-  dto.InvoiceSummaryDTO:
+  github_com_jhoicas_Inventario-api_internal_application_dto.InvoiceSummaryDTO:
     properties:
       date:
         type: string
@@ -593,7 +918,7 @@ definitions:
       prefix:
         type: string
     type: object
-  dto.LoginRequest:
+  github_com_jhoicas_Inventario-api_internal_application_dto.LoginRequest:
     properties:
       email:
         type: string
@@ -603,27 +928,31 @@ definitions:
     - email
     - password
     type: object
-  dto.LoginResponse:
+  github_com_jhoicas_Inventario-api_internal_application_dto.LoginResponse:
     properties:
+      role_id:
+        type: string
+      role_key:
+        type: string
       token:
         type: string
       user:
-        $ref: '#/definitions/dto.UserResponse'
+        $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.UserResponse'
     type: object
-  dto.LoyaltyBalanceDTO:
+  github_com_jhoicas_Inventario-api_internal_application_dto.LoyaltyBalanceDTO:
     properties:
       balance:
         type: integer
       history:
         items:
-          $ref: '#/definitions/dto.PointEventDTO'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.PointEventDTO'
         type: array
       next_tier_threshold:
         type: integer
       tier:
         type: string
     type: object
-  dto.MarginByChannelDTO:
+  github_com_jhoicas_Inventario-api_internal_application_dto.MarginByChannelDTO:
     properties:
       channel_id:
         description: UUID o "direct"
@@ -668,24 +997,41 @@ definitions:
         description: unidades totales
         type: number
     type: object
-  dto.MarginsReportDTO:
+  github_com_jhoicas_Inventario-api_internal_application_dto.MarginsReportDTO:
     properties:
       channel_profitability:
-        $ref: '#/definitions/dto.ChannelProfitabilityDTO'
+        $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ChannelProfitabilityDTO'
       pareto_skus:
         description: SKUs del top 20% que generan ~80% ingresos
         items:
-          $ref: '#/definitions/dto.SKURankingDTO'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.SKURankingDTO'
         type: array
       period:
-        $ref: '#/definitions/dto.PeriodDTO'
+        $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.PeriodDTO'
       sku_ranking:
         description: top N por margen
         items:
-          $ref: '#/definitions/dto.SKURankingDTO'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.SKURankingDTO'
         type: array
     type: object
-  dto.MovementDTO:
+  github_com_jhoicas_Inventario-api_internal_application_dto.ModuleResponse:
+    properties:
+      icon:
+        type: string
+      id:
+        type: string
+      key:
+        type: string
+      name:
+        type: string
+      order:
+        type: integer
+      screens:
+        items:
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ScreenResponse'
+        type: array
+    type: object
+  github_com_jhoicas_Inventario-api_internal_application_dto.MovementDTO:
     properties:
       balance:
         type: number
@@ -714,7 +1060,20 @@ definitions:
       warehouse_id:
         type: string
     type: object
-  dto.OpportunityResponse:
+  github_com_jhoicas_Inventario-api_internal_application_dto.OpportunityListResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.OpportunityResponse'
+        type: array
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  github_com_jhoicas_Inventario-api_internal_application_dto.OpportunityResponse:
     properties:
       amount:
         type: number
@@ -739,32 +1098,23 @@ definitions:
       updated_at:
         type: string
     type: object
-  dto.PageResponse:
-    properties:
-      limit:
-        type: integer
-      offset:
-        type: integer
-      total:
-        type: integer
-    type: object
-  dto.PaginatedMovementsDTO:
+  github_com_jhoicas_Inventario-api_internal_application_dto.PaginatedMovementsDTO:
     properties:
       items:
         items:
-          $ref: '#/definitions/dto.MovementDTO'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.MovementDTO'
         type: array
       total:
         type: integer
     type: object
-  dto.PeriodDTO:
+  github_com_jhoicas_Inventario-api_internal_application_dto.PeriodDTO:
     properties:
       end_date:
         type: string
       start_date:
         type: string
     type: object
-  dto.PointEventDTO:
+  github_com_jhoicas_Inventario-api_internal_application_dto.PointEventDTO:
     properties:
       occurred_at:
         type: string
@@ -775,16 +1125,20 @@ definitions:
       reference_id:
         type: string
     type: object
-  dto.ProductListResponse:
+  github_com_jhoicas_Inventario-api_internal_application_dto.ProductListResponse:
     properties:
       items:
         items:
-          $ref: '#/definitions/dto.ProductResponse'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ProductResponse'
         type: array
-      page:
-        $ref: '#/definitions/dto.PageResponse'
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
     type: object
-  dto.ProductResponse:
+  github_com_jhoicas_Inventario-api_internal_application_dto.ProductResponse:
     properties:
       attributes:
         items:
@@ -815,35 +1169,57 @@ definitions:
       updated_at:
         type: string
     type: object
-  dto.Profile360Response:
+  github_com_jhoicas_Inventario-api_internal_application_dto.Profile360Response:
     properties:
       benefits:
         items:
-          $ref: '#/definitions/dto.BenefitResponse'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.BenefitResponse'
         type: array
       category_id:
         type: string
       category_name:
         type: string
       customer:
-        $ref: '#/definitions/dto.CustomerResponse'
+        $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CustomerResponse'
       ltv:
         type: number
+      metadata:
+        $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_domain_entity.ProfileMetadata'
       profile_id:
         type: string
     type: object
-  dto.PurchaseHistoryResponse:
+  github_com_jhoicas_Inventario-api_internal_application_dto.PurchaseHistoryResponse:
     properties:
       invoices:
         items:
-          $ref: '#/definitions/dto.InvoiceSummaryDTO'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.InvoiceSummaryDTO'
         type: array
       stats:
-        $ref: '#/definitions/dto.CustomerPurchaseStatsDTO'
+        $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CustomerPurchaseStatsDTO'
       total:
         type: integer
     type: object
-  dto.RawMaterialImpactDTO:
+  github_com_jhoicas_Inventario-api_internal_application_dto.RBACCatalogResponse:
+    properties:
+      modules:
+        items:
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ModuleResponse'
+        type: array
+    type: object
+  github_com_jhoicas_Inventario-api_internal_application_dto.RBACMenuResponse:
+    properties:
+      modules:
+        items:
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ModuleResponse'
+        type: array
+      role_id:
+        type: string
+      role_key:
+        type: string
+      role_name:
+        type: string
+    type: object
+  github_com_jhoicas_Inventario-api_internal_application_dto.RawMaterialImpactDTO:
     properties:
       name:
         type: string
@@ -858,7 +1234,7 @@ definitions:
         description: participación % sobre el costo total de materias primas
         type: number
     type: object
-  dto.RedeemPointsRequest:
+  github_com_jhoicas_Inventario-api_internal_application_dto.RedeemPointsRequest:
     properties:
       customer_id:
         type: string
@@ -867,7 +1243,7 @@ definitions:
       reason:
         type: string
     type: object
-  dto.RegisterMovementRequest:
+  github_com_jhoicas_Inventario-api_internal_application_dto.RegisterMovementRequest:
     properties:
       adjustment_reason:
         description: |-
@@ -889,7 +1265,7 @@ definitions:
       warehouse_id:
         type: string
     type: object
-  dto.RegisterRequest:
+  github_com_jhoicas_Inventario-api_internal_application_dto.RegisterRequest:
     properties:
       company_id:
         type: string
@@ -911,7 +1287,24 @@ definitions:
     - email
     - password
     type: object
-  dto.ReorderConfigRequest:
+  github_com_jhoicas_Inventario-api_internal_application_dto.RemarketingProspect:
+    properties:
+      categoria:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      mensajeSugerido:
+        type: string
+      nombre:
+        type: string
+      segmento:
+        type: string
+      totalComprado:
+        type: number
+    type: object
+  github_com_jhoicas_Inventario-api_internal_application_dto.ReorderConfigRequest:
     properties:
       lead_time_days:
         type: integer
@@ -926,7 +1319,7 @@ definitions:
       warehouse_id:
         type: string
     type: object
-  dto.ReplenishmentSuggestionDTO:
+  github_com_jhoicas_Inventario-api_internal_application_dto.ReplenishmentSuggestionDTO:
     properties:
       current_stock:
         type: number
@@ -963,7 +1356,7 @@ definitions:
         description: volumen de ventas reciente
         type: number
     type: object
-  dto.ResolutionResponse:
+  github_com_jhoicas_Inventario-api_internal_application_dto.ResolutionResponse:
     properties:
       alert_threshold:
         type: boolean
@@ -990,25 +1383,52 @@ definitions:
       valid_until:
         type: string
     type: object
-  dto.ReturnInvoiceRequest:
+  github_com_jhoicas_Inventario-api_internal_application_dto.ResolveCampaignRecipientsRequest:
+    properties:
+      strategies:
+        items:
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CampaignRecipientStrategy'
+        type: array
+    type: object
+  github_com_jhoicas_Inventario-api_internal_application_dto.ResolveCampaignRecipientsResponse:
+    properties:
+      recipients:
+        items:
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CampaignRecipientDTO'
+        type: array
+    type: object
+  github_com_jhoicas_Inventario-api_internal_application_dto.ReturnInvoiceRequest:
     properties:
       items:
         items:
-          $ref: '#/definitions/dto.ReturnItemRequest'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ReturnItemRequest'
         type: array
       reason:
         type: string
       warehouse_id:
         type: string
     type: object
-  dto.ReturnItemRequest:
+  github_com_jhoicas_Inventario-api_internal_application_dto.ReturnItemRequest:
     properties:
       product_id:
         type: string
       quantity:
         type: number
     type: object
-  dto.SKURankingDTO:
+  github_com_jhoicas_Inventario-api_internal_application_dto.RoleResponse:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      key:
+        type: string
+      name:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  github_com_jhoicas_Inventario-api_internal_application_dto.SKURankingDTO:
     properties:
       cumulative_revenue_pct:
         description: acumulado descendente
@@ -1041,7 +1461,42 @@ definitions:
       units_sold:
         type: number
     type: object
-  dto.SendCustomEmailRequest:
+  github_com_jhoicas_Inventario-api_internal_application_dto.ScreenResponse:
+    properties:
+      api_endpoint:
+        type: string
+      frontend_route:
+        type: string
+      id:
+        type: string
+      key:
+        type: string
+      module_classification:
+        type: string
+      module_key:
+        type: string
+      module_key_snapshot:
+        type: string
+      module_name:
+        type: string
+      name:
+        type: string
+      order:
+        type: integer
+    type: object
+  github_com_jhoicas_Inventario-api_internal_application_dto.SendCampaignRequest:
+    properties:
+      body:
+        description: requerido (texto generado por IA o HTML simple)
+        type: string
+      category_id:
+        description: 'opcional: filtrar por categoría CRM'
+        type: string
+      subject:
+        description: requerido
+        type: string
+    type: object
+  github_com_jhoicas_Inventario-api_internal_application_dto.SendCustomEmailRequest:
     properties:
       body:
         type: string
@@ -1050,7 +1505,18 @@ definitions:
       to:
         type: string
     type: object
-  dto.StockSummaryDTO:
+  github_com_jhoicas_Inventario-api_internal_application_dto.SendTestCampaignRequest:
+    properties:
+      body:
+        type: string
+      customer_id:
+        type: string
+      email:
+        type: string
+      subject:
+        type: string
+    type: object
+  github_com_jhoicas_Inventario-api_internal_application_dto.StockSummaryDTO:
     properties:
       available_stock:
         type: number
@@ -1068,16 +1534,20 @@ definitions:
         description: vacío si es agregado de todas las bodegas
         type: string
     type: object
-  dto.SupplierListResponse:
+  github_com_jhoicas_Inventario-api_internal_application_dto.SupplierListResponse:
     properties:
       items:
         items:
-          $ref: '#/definitions/dto.SupplierResponse'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.SupplierResponse'
         type: array
-      page:
-        $ref: '#/definitions/dto.PageResponse'
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
     type: object
-  dto.SupplierResponse:
+  github_com_jhoicas_Inventario-api_internal_application_dto.SupplierResponse:
     properties:
       company_id:
         type: string
@@ -1100,7 +1570,7 @@ definitions:
       updated_at:
         type: string
     type: object
-  dto.TaskResponse:
+  github_com_jhoicas_Inventario-api_internal_application_dto.TaskResponse:
     properties:
       company_id:
         type: string
@@ -1123,18 +1593,20 @@ definitions:
       updated_at:
         type: string
     type: object
-  dto.TaskResponseList:
+  github_com_jhoicas_Inventario-api_internal_application_dto.TaskResponseList:
     properties:
       items:
         items:
-          $ref: '#/definitions/dto.TaskResponse'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.TaskResponse'
         type: array
       limit:
         type: integer
       offset:
         type: integer
+      total:
+        type: integer
     type: object
-  dto.TicketResponse:
+  github_com_jhoicas_Inventario-api_internal_application_dto.TicketResponse:
     properties:
       company_id:
         type: string
@@ -1159,18 +1631,20 @@ definitions:
       updated_at:
         type: string
     type: object
-  dto.TicketResponseList:
+  github_com_jhoicas_Inventario-api_internal_application_dto.TicketResponseList:
     properties:
       items:
         items:
-          $ref: '#/definitions/dto.TicketResponse'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.TicketResponse'
         type: array
       limit:
         type: integer
       offset:
         type: integer
+      total:
+        type: integer
     type: object
-  dto.UpdateBenefitRequest:
+  github_com_jhoicas_Inventario-api_internal_application_dto.UpdateBenefitRequest:
     properties:
       description:
         type: string
@@ -1181,7 +1655,45 @@ definitions:
     required:
     - name
     type: object
-  dto.UpdateCustomerRequest:
+  github_com_jhoicas_Inventario-api_internal_application_dto.UpdateCategoryRequest:
+    properties:
+      min_ltv:
+        type: number
+      name:
+        type: string
+    type: object
+  github_com_jhoicas_Inventario-api_internal_application_dto.UpdateCompanyModuleRequest:
+    properties:
+      expires_at:
+        description: RFC3339 opcional; "" limpia vencimiento
+        type: string
+      is_active:
+        type: boolean
+    type: object
+  github_com_jhoicas_Inventario-api_internal_application_dto.UpdateCompanyRequest:
+    properties:
+      address:
+        type: string
+      email:
+        type: string
+      name:
+        maxLength: 200
+        minLength: 1
+        type: string
+      nit:
+        maxLength: 20
+        minLength: 1
+        type: string
+      phone:
+        type: string
+      status:
+        enum:
+        - active
+        - suspended
+        - inactive
+        type: string
+    type: object
+  github_com_jhoicas_Inventario-api_internal_application_dto.UpdateCustomerRequest:
     properties:
       email:
         type: string
@@ -1192,7 +1704,7 @@ definitions:
       tax_id:
         type: string
     type: object
-  dto.UpdateProductRequest:
+  github_com_jhoicas_Inventario-api_internal_application_dto.UpdateProductRequest:
     properties:
       attributes:
         items:
@@ -1213,7 +1725,14 @@ definitions:
       unspsc_code:
         type: string
     type: object
-  dto.UpdateSupplierRequest:
+  github_com_jhoicas_Inventario-api_internal_application_dto.UpdateRoleScreensRequest:
+    properties:
+      screen_ids:
+        items:
+          type: string
+        type: array
+    type: object
+  github_com_jhoicas_Inventario-api_internal_application_dto.UpdateSupplierRequest:
     properties:
       email:
         type: string
@@ -1228,7 +1747,7 @@ definitions:
       phone:
         type: string
     type: object
-  dto.UpdateTaskRequest:
+  github_com_jhoicas_Inventario-api_internal_application_dto.UpdateTaskRequest:
     properties:
       description:
         type: string
@@ -1240,7 +1759,7 @@ definitions:
       title:
         type: string
     type: object
-  dto.UpdateTicketRequest:
+  github_com_jhoicas_Inventario-api_internal_application_dto.UpdateTicketRequest:
     properties:
       description:
         type: string
@@ -1251,7 +1770,20 @@ definitions:
       subject:
         type: string
     type: object
-  dto.UserResponse:
+  github_com_jhoicas_Inventario-api_internal_application_dto.UserListResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.UserResponse'
+        type: array
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
+  github_com_jhoicas_Inventario-api_internal_application_dto.UserResponse:
     properties:
       company_id:
         type: string
@@ -1272,7 +1804,7 @@ definitions:
       updated_at:
         type: string
     type: object
-  dto.VoidInvoiceResponse:
+  github_com_jhoicas_Inventario-api_internal_application_dto.VoidInvoiceResponse:
     properties:
       credit_note_id:
         type: string
@@ -1281,16 +1813,20 @@ definitions:
       dian_status:
         type: string
     type: object
-  dto.WarehouseListResponse:
+  github_com_jhoicas_Inventario-api_internal_application_dto.WarehouseListResponse:
     properties:
       items:
         items:
-          $ref: '#/definitions/dto.WarehouseResponse'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.WarehouseResponse'
         type: array
-      page:
-        $ref: '#/definitions/dto.PageResponse'
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
     type: object
-  dto.WarehouseResponse:
+  github_com_jhoicas_Inventario-api_internal_application_dto.WarehouseResponse:
     properties:
       address:
         type: string
@@ -1305,37 +1841,20 @@ definitions:
       updated_at:
         type: string
     type: object
-  http.createStocktakeRequest:
-    properties:
-      warehouse_id:
-        type: string
-    type: object
-  http.receivePurchaseOrderRequest:
-    properties:
-      warehouse_id:
-        type: string
-    type: object
-  http.updateStocktakeCountsRequest:
-    properties:
-      items:
-        items:
-          $ref: '#/definitions/inventory.StocktakeItemInput'
-        type: array
-    type: object
-  inventory.CreatePurchaseOrderInput:
+  github_com_jhoicas_Inventario-api_internal_application_inventory.CreatePurchaseOrderInput:
     properties:
       date:
         type: string
       items:
         items:
-          $ref: '#/definitions/inventory.PurchaseOrderItemInput'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_inventory.PurchaseOrderItemInput'
         type: array
       number:
         type: string
       supplier_id:
         type: string
     type: object
-  inventory.PurchaseOrderItemInput:
+  github_com_jhoicas_Inventario-api_internal_application_inventory.PurchaseOrderItemInput:
     properties:
       product_id:
         type: string
@@ -1344,12 +1863,67 @@ definitions:
       unit_cost:
         type: number
     type: object
-  inventory.StocktakeItemInput:
+  github_com_jhoicas_Inventario-api_internal_application_inventory.StocktakeItemInput:
     properties:
       counted_qty:
         type: number
       product_id:
         type: string
+    type: object
+  github_com_jhoicas_Inventario-api_internal_domain_entity.ProfileMetadata:
+    properties:
+      distinctProducts:
+        type: integer
+      followUpStrategy:
+        type: string
+      lastPurchaseDate:
+        type: string
+      mainCategory:
+        type: string
+      ordersCount:
+        type: integer
+      productsList:
+        type: string
+    type: object
+  internal_billing.AcquirerInfo:
+    properties:
+      business_name:
+        type: string
+      dv:
+        type: string
+      id_code:
+        type: string
+      status_code:
+        type: string
+      status_description:
+        type: string
+      tax_id:
+        type: string
+      tax_scheme:
+        type: string
+      type_liability:
+        type: string
+      type_organization:
+        type: string
+      type_regime:
+        type: string
+    type: object
+  internal_interfaces_http.createStocktakeRequest:
+    properties:
+      warehouse_id:
+        type: string
+    type: object
+  internal_interfaces_http.receivePurchaseOrderRequest:
+    properties:
+      warehouse_id:
+        type: string
+    type: object
+  internal_interfaces_http.updateStocktakeCountsRequest:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_inventory.StocktakeItemInput'
+        type: array
     type: object
 host: api.naturerp.ludoia.com
 info:
@@ -1358,6 +1932,29 @@ info:
   title: Tu API ERP
   version: "1.0"
 paths:
+  /api/admin/companies:
+    get:
+      parameters:
+      - default: 20
+        description: Límite
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CompanyListResponse'
+      summary: Listar empresas para super admin
+      tags:
+      - companies
   /api/analytics/margins:
     get:
       description: Devuelve rentabilidad por canal de venta y el ranking de SKUs más
@@ -1381,19 +1978,19 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.MarginsReportDTO'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.MarginsReportDTO'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Reporte de márgenes por canal y ranking de SKUs (Pareto 80/20)
@@ -1401,8 +1998,8 @@ paths:
       - analytics
   /api/analytics/raw-materials-impact:
     get:
-      description: Devuelve el ranking de materias primas por peso financiero en productos
-        vendidos en el período (BOM + coste).
+      description: '[LEGACY_ARRAY] Devuelve array plano. Devuelve el ranking de materias
+        primas por peso financiero en productos vendidos en el período (BOM + coste).'
       parameters:
       - description: 'Inicio del período (YYYY-MM-DD). Default: primer día del mes.'
         in: query
@@ -1423,20 +2020,20 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/dto.RawMaterialImpactDTO'
+              $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.RawMaterialImpactDTO'
             type: array
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Ranking de impacto de materias primas
@@ -1452,22 +2049,22 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/dto.LoginRequest'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.LoginRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.LoginResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.LoginResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       summary: Iniciar sesión
       tags:
       - auth
@@ -1481,25 +2078,49 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/dto.RegisterRequest'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.RegisterRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/dto.UserResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.UserResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       summary: Registrar usuario
       tags:
       - auth
+  /api/billing/dian/summary:
+    get:
+      description: 'Devuelve contadores para tablero DIAN: enviados hoy, pendientes
+        y rechazados'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.DIANSummaryDTO'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Resumen de estado DIAN
+      tags:
+      - billing
   /api/companies:
     get:
       parameters:
@@ -1519,7 +2140,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.CompanyListResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CompanyListResponse'
       summary: Listar empresas
       tags:
       - companies
@@ -1532,22 +2153,41 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/dto.CreateCompanyRequest'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateCompanyRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/dto.CompanyResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CompanyResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       summary: Crear empresa
       tags:
       - companies
   /api/companies/{id}:
+    delete:
+      parameters:
+      - description: ID de la empresa
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+      summary: Eliminar empresa
+      tags:
+      - companies
     get:
       parameters:
       - description: ID de la empresa
@@ -1561,16 +2201,172 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.CompanyResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CompanyResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       summary: Obtener empresa por ID
+      tags:
+      - companies
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: ID de la empresa
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Datos a actualizar
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.UpdateCompanyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CompanyResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+      summary: Actualizar empresa
+      tags:
+      - companies
+  /api/companies/{id}/modules:
+    get:
+      parameters:
+      - description: ID de la empresa
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CompanyModulesResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+      summary: Listar módulos SaaS de una empresa
+      tags:
+      - companies
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: ID de la empresa
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Datos del módulo
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateCompanyModuleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CompanyModuleResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+      summary: Crear/actualizar módulo de una empresa
+      tags:
+      - companies
+  /api/companies/{id}/modules/{module_name}:
+    delete:
+      parameters:
+      - description: ID de la empresa
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Nombre del módulo
+        in: path
+        name: module_name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+      summary: Eliminar módulo de una empresa
+      tags:
+      - companies
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: ID de la empresa
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Nombre del módulo
+        in: path
+        name: module_name
+        required: true
+        type: string
+      - description: Datos del módulo
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.UpdateCompanyModuleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CompanyModuleResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+      summary: Actualizar módulo de una empresa
       tags:
       - companies
   /api/companies/{id}/resolutions:
     get:
+      description: '[LEGACY_ARRAY] Devuelve array plano (no paginado).'
       parameters:
       - description: ID de la empresa
         in: path
@@ -1584,12 +2380,12 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/dto.ResolutionResponse'
+              $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ResolutionResponse'
             type: array
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       summary: Listar resoluciones DIAN de una empresa
       tags:
       - companies
@@ -1607,22 +2403,22 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/dto.CreateResolutionRequest'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateResolutionRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/dto.ResolutionResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ResolutionResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       summary: Crear resolución DIAN de una empresa
       tags:
       - companies
@@ -1650,7 +2446,7 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Generar copy de campaña con IA
@@ -1680,10 +2476,36 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Resumir timeline de interacciones con IA
+      tags:
+      - crm
+  /api/crm/analytics:
+    get:
+      consumes:
+      - application/json
+      description: Devuelve KPIs, evolución mensual y segmentación del CRM para la
+        empresa actual
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CRMAnalyticsResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Analytics CRM
       tags:
       - crm
   /api/crm/benefits/{benefitId}:
@@ -1702,33 +2524,157 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/dto.UpdateBenefitRequest'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.UpdateBenefitRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.BenefitResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.BenefitResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Actualizar beneficio
+      tags:
+      - crm
+  /api/crm/benefits/{benefitId}/deactivate:
+    put:
+      description: Desactiva (soft delete) un beneficio de fidelización (solo admin)
+      parameters:
+      - description: Benefit ID
+        in: path
+        name: benefitId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Desactivar beneficio
+      tags:
+      - crm
+  /api/crm/campaign-templates:
+    get:
+      description: '[LEGACY_ARRAY] Devuelve array plano (no paginado).'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CampaignTemplateResponse'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Listar plantillas de campaña
+      tags:
+      - crm
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Datos de la plantilla
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateCampaignTemplateRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CampaignTemplateResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Crear plantilla de campaña
+      tags:
+      - crm
+  /api/crm/campaign-templates/{id}:
+    delete:
+      parameters:
+      - description: Template ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Eliminar plantilla de campaña
       tags:
       - crm
   /api/crm/campaigns:
@@ -1742,22 +2688,22 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/dto.CreateCampaignRequest'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateCampaignRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/dto.CampaignResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CampaignResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "503":
           description: Service Unavailable
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Crear campaña
@@ -1779,18 +2725,134 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.CampaignMetricsResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CampaignMetricsResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "503":
           description: Service Unavailable
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Métricas de campaña
+      tags:
+      - crm
+  /api/crm/campaigns/recipients/resolve:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Estrategia category con category_id
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ResolveCampaignRecipientsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ResolveCampaignRecipientsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Resolver destinatarios de campaña
+      tags:
+      - crm
+  /api/crm/campaigns/send:
+    post:
+      consumes:
+      - application/json
+      description: Envía el contenido de la campaña por correo a los clientes filtrados
+        por categoría (opcional)
+      parameters:
+      - description: Datos de la campaña a enviar
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.SendCampaignRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Enviar campaña de email
+      tags:
+      - crm
+  /api/crm/campaigns/send-test:
+    post:
+      consumes:
+      - application/json
+      description: Envía el subject/body a un email específico (solo prueba)
+      parameters:
+      - description: Email de destino + contenido
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.SendTestCampaignRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Enviar campaña de prueba
       tags:
       - crm
   /api/crm/categories:
@@ -1813,12 +2875,45 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/dto.CategoryResponse'
-            type: array
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CategoryListResponse'
       security:
       - Bearer: []
       summary: Listar categorías CRM
+      tags:
+      - crm
+    post:
+      consumes:
+      - application/json
+      description: Crea una categoría de fidelización (solo admin)
+      parameters:
+      - description: Category
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateCategoryRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CategoryResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Crear categoría CRM
       tags:
       - crm
   /api/crm/categories/{categoryId}/benefits:
@@ -1838,33 +2933,78 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/dto.CreateBenefitRequest'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateBenefitRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/dto.BenefitResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.BenefitResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Crear beneficio
+      tags:
+      - crm
+  /api/crm/categories/{id}:
+    put:
+      consumes:
+      - application/json
+      description: Actualiza una categoría de fidelización (solo admin)
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Category
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.UpdateCategoryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CategoryResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Actualizar categoría CRM
       tags:
       - crm
   /api/crm/categories/{id}/benefits:
@@ -1892,12 +3032,179 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/dto.BenefitResponse'
-            type: array
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.BenefitListResponse'
       security:
       - Bearer: []
       summary: Listar beneficios por categoría
+      tags:
+      - crm
+  /api/crm/categories/{id}/deactivate:
+    put:
+      description: Desactiva (soft delete) una categoría de fidelización (solo admin)
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Desactivar categoría CRM
+      tags:
+      - crm
+  /api/crm/customers:
+    get:
+      consumes:
+      - application/json
+      description: Lista los clientes de la empresa autenticada para uso en CRM
+      parameters:
+      - description: Buscar por nombre o NIT (tax_id)
+        in: query
+        name: search
+        type: string
+      - description: Límite de resultados
+        in: query
+        name: limit
+        type: integer
+      - description: Desplazamiento
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CustomerListResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Listar clientes CRM
+      tags:
+      - crm
+    post:
+      consumes:
+      - application/json
+      description: Crea un cliente asociado a la empresa autenticada para uso en CRM
+      parameters:
+      - description: Datos del cliente
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateCustomerRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CustomerResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Crear cliente CRM
+      tags:
+      - crm
+  /api/crm/customers/{id}:
+    put:
+      consumes:
+      - application/json
+      description: Actualiza un cliente asociado a la empresa autenticada
+      parameters:
+      - description: Customer ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Datos del cliente
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.UpdateCustomerRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CustomerResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Actualizar cliente CRM
       tags:
       - crm
   /api/crm/customers/{id}/category:
@@ -1917,7 +3224,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/dto.AssignCategoryRequest'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.AssignCategoryRequest'
       produces:
       - application/json
       responses:
@@ -1930,14 +3237,54 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Asignar categoría al cliente
+      tags:
+      - crm
+  /api/crm/customers/{id}/deactivate:
+    put:
+      description: Desactiva (soft delete) un cliente asociado a la empresa autenticada
+        (solo admin)
+      parameters:
+      - description: Customer ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Desactivar cliente CRM
       tags:
       - crm
   /api/crm/customers/{id}/interactions:
@@ -1976,15 +3323,15 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.InteractionListResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.InteractionListResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Listar interacciones por cliente
@@ -2006,11 +3353,11 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.LoyaltyBalanceDTO'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.LoyaltyBalanceDTO'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Balance de puntos
@@ -2034,19 +3381,19 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.Profile360Response'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.Profile360Response'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Vista 360 del cliente
@@ -2076,22 +3423,89 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.PurchaseHistoryResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.PurchaseHistoryResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "503":
           description: Service Unavailable
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Historial de compras del cliente
+      tags:
+      - crm
+  /api/crm/import:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Carga perfiles de clientes en background y retorna un jobID para
+        consultar progreso
+      parameters:
+      - description: Archivo Excel (.xlsx) o CSV
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Importar perfiles CRM
+      tags:
+      - crm
+  /api/crm/import/status/{jobID}:
+    get:
+      description: Consulta el estado de una importación por jobID
+      parameters:
+      - description: Job ID
+        in: path
+        name: jobID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_crm.JobProgress'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Estado de importación CRM
       tags:
       - crm
   /api/crm/interactions:
@@ -2106,18 +3520,18 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/dto.CreateInteractionRequest'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateInteractionRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/dto.InteractionResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.InteractionResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Registrar interacción
@@ -2134,7 +3548,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/dto.AwardPointsRequest'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.AwardPointsRequest'
       produces:
       - application/json
       responses:
@@ -2147,15 +3561,15 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Acreditar puntos
@@ -2172,7 +3586,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/dto.RedeemPointsRequest'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.RedeemPointsRequest'
       produces:
       - application/json
       responses:
@@ -2185,15 +3599,15 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Redimir puntos
@@ -2217,17 +3631,15 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/dto.OpportunityResponse'
-            type: array
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.OpportunityListResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "503":
           description: Service Unavailable
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Listar oportunidades
@@ -2243,22 +3655,22 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/dto.CreateOpportunityRequest'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateOpportunityRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/dto.OpportunityResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.OpportunityResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "503":
           description: Service Unavailable
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Crear oportunidad
@@ -2293,15 +3705,15 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Actualizar etapa de oportunidad
@@ -2309,8 +3721,8 @@ paths:
       - crm
   /api/crm/opportunities/funnel:
     get:
-      description: Retorna el conteo y monto total de oportunidades agrupadas por
-        etapa
+      description: '[LEGACY_ARRAY] Devuelve array plano. Retorna el conteo y monto
+        total de oportunidades agrupadas por etapa'
       produces:
       - application/json
       responses:
@@ -2318,15 +3730,43 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/dto.FunnelStageDTO'
+              $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.FunnelStageDTO'
             type: array
         "503":
           description: Service Unavailable
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Embudo de ventas
+      tags:
+      - crm
+  /api/crm/remarketing:
+    get:
+      consumes:
+      - application/json
+      description: '[LEGACY_ARRAY] Devuelve array plano. Devuelve una lista de clientes/prospectos
+        ideales filtrados por la empresa autenticada'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.RemarketingProspect'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Remarketing CRM
       tags:
       - crm
   /api/crm/tasks:
@@ -2354,7 +3794,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.TaskResponseList'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.TaskResponseList'
       security:
       - Bearer: []
       summary: Listar tareas
@@ -2370,18 +3810,18 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/dto.CreateTaskRequest'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateTaskRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/dto.TaskResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.TaskResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Crear tarea CRM
@@ -2404,11 +3844,11 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.TaskResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.TaskResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Obtener tarea
@@ -2429,22 +3869,22 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/dto.UpdateTaskRequest'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.UpdateTaskRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.TaskResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.TaskResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Actualizar tarea
@@ -2482,7 +3922,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.TicketResponseList'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.TicketResponseList'
       security:
       - Bearer: []
       summary: Listar tickets PQR
@@ -2498,22 +3938,22 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/dto.CreateTicketRequest'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateTicketRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/dto.TicketResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.TicketResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Radicar ticket PQR
@@ -2536,11 +3976,11 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.TicketResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.TicketResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Obtener ticket PQR
@@ -2561,18 +4001,18 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/dto.UpdateTicketRequest'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.UpdateTicketRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.TicketResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.TicketResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Actualizar ticket PQR
@@ -2608,15 +4048,15 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Escalar ticket PQR
@@ -2624,8 +4064,8 @@ paths:
       - crm
   /api/crm/tickets/overdue:
     get:
-      description: Devuelve los tickets cuyo SLA ha expirado y fueron marcados como
-        OVERDUE
+      description: '[LEGACY_ARRAY] Devuelve array plano. Devuelve los tickets cuyo
+        SLA ha expirado y fueron marcados como OVERDUE'
       produces:
       - application/json
       responses:
@@ -2633,12 +4073,12 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/dto.TicketResponse'
+              $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.TicketResponse'
             type: array
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Tickets vencidos (OVERDUE)
@@ -2668,17 +4108,15 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/dto.CustomerResponse'
-            type: array
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CustomerListResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Listar clientes
@@ -2694,30 +4132,30 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/dto.CreateCustomerRequest'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateCustomerRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/dto.CustomerResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CustomerResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Crear cliente
@@ -2739,41 +4177,81 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/dto.UpdateCustomerRequest'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.UpdateCustomerRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.CustomerResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CustomerResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Actualizar cliente
+      tags:
+      - customers
+  /api/customers/{id}/deactivate:
+    put:
+      description: Desactiva (soft delete) un cliente asociado a la empresa autenticada
+        (solo admin)
+      parameters:
+      - description: Customer ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Desactivar cliente
       tags:
       - customers
   /api/customers/lookup:
@@ -2797,28 +4275,70 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/billing.AcquirerInfo'
+            $ref: '#/definitions/internal_billing.AcquirerInfo'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "502":
           description: Bad Gateway
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Consultar contribuyente en DIAN
       tags:
       - customers
+  /api/emails:
+    get:
+      description: 'Respuesta paginada estandar: {items,total,limit,offset}'
+      parameters:
+      - description: Filtrar por cliente
+        in: query
+        name: customer_id
+        type: string
+      - description: Filtrar por leidos/no leidos
+        in: query
+        name: is_read
+        type: boolean
+      - default: 20
+        description: Limite
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.EmailListResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Listar emails
+      tags:
+      - email
   /api/emails/send:
     post:
       consumes:
@@ -2830,7 +4350,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/dto.SendCustomEmailRequest'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.SendCustomEmailRequest'
       produces:
       - application/json
       responses:
@@ -2843,15 +4363,15 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Enviar correo libre
@@ -2869,7 +4389,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/dto.RegisterMovementRequest'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.RegisterMovementRequest'
       produces:
       - application/json
       responses:
@@ -2882,19 +4402,19 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Registrar ajuste de inventario
@@ -2941,23 +4461,23 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.PaginatedMovementsDTO'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.PaginatedMovementsDTO'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "503":
           description: Service Unavailable
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Listar movimientos de inventario
@@ -2973,7 +4493,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/dto.RegisterMovementRequest'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.RegisterMovementRequest'
       produces:
       - application/json
       responses:
@@ -2986,19 +4506,19 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Registrar movimiento de inventario
@@ -3006,8 +4526,9 @@ paths:
       - inventory
   /api/inventory/replenishment-list:
     get:
-      description: Devuelve los SKUs por debajo del punto de reorden con la cantidad
-        sugerida
+      description: |-
+        Devuelve los SKUs por debajo del punto de reorden con la cantidad sugerida
+        [LEGACY_ARRAY] Devuelve array plano en `replenishments` (usa `total` separado).
       parameters:
       - description: Filtrar por bodega (UUID). Vacío = stock global.
         in: query
@@ -3020,16 +4541,16 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/dto.ReplenishmentSuggestionDTO'
+              $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ReplenishmentSuggestionDTO'
             type: array
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Lista semanal de reposición
@@ -3055,19 +4576,19 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.StockSummaryDTO'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.StockSummaryDTO'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Resumen de stock
@@ -3085,7 +4606,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/http.createStocktakeRequest'
+          $ref: '#/definitions/internal_interfaces_http.createStocktakeRequest'
       produces:
       - application/json
       responses:
@@ -3098,19 +4619,19 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "503":
           description: Service Unavailable
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Crear snapshot de conteo físico
@@ -3132,7 +4653,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/http.updateStocktakeCountsRequest'
+          $ref: '#/definitions/internal_interfaces_http.updateStocktakeCountsRequest'
       produces:
       - application/json
       responses:
@@ -3145,23 +4666,23 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "503":
           description: Service Unavailable
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Actualizar conteo físico
@@ -3189,23 +4710,23 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "503":
           description: Service Unavailable
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Cerrar conteo físico
@@ -3252,15 +4773,15 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.InvoiceListResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.InvoiceListResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Listar facturas
@@ -3276,38 +4797,38 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/dto.CreateInvoiceRequest'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateInvoiceRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/dto.InvoiceResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.InvoiceResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Crear factura
@@ -3330,27 +4851,27 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.InvoiceResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.InvoiceResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Obtener factura por ID
@@ -3373,38 +4894,38 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/dto.CreateDebitNoteRequest'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateDebitNoteRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/dto.DebitNoteResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.DebitNoteResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Registrar nota débito
@@ -3432,27 +4953,27 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Descargar PDF de la factura
@@ -3471,31 +4992,31 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.InvoiceDIANStatusDTO'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.InvoiceDIANStatusDTO'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Reintentar envío DIAN
@@ -3518,38 +5039,38 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/dto.ReturnInvoiceRequest'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ReturnInvoiceRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/dto.InvoiceResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.InvoiceResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Registrar devolución de factura (Nota Crédito)
@@ -3575,23 +5096,23 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Enviar factura por correo
@@ -3615,27 +5136,27 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.InvoiceDIANStatusDTO'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.InvoiceDIANStatusDTO'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Obtener estado DIAN de una factura
@@ -3658,41 +5179,151 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/dto.CreateVoidInvoiceRequest'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateVoidInvoiceRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/dto.VoidInvoiceResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.VoidInvoiceResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Anular factura por nota crédito total
+      tags:
+      - billing
+  /api/invoices/credit-notes:
+    get:
+      description: Devuelve notas crédito paginadas filtradas por fecha, cliente,
+        estado DIAN y prefijo
+      parameters:
+      - description: Fecha inicio (YYYY-MM-DD)
+        in: query
+        name: start_date
+        type: string
+      - description: Fecha fin (YYYY-MM-DD)
+        in: query
+        name: end_date
+        type: string
+      - description: ID del cliente
+        in: query
+        name: customer_id
+        type: string
+      - description: Estado DIAN
+        in: query
+        name: dian_status
+        type: string
+      - description: Prefijo de la nota crédito
+        in: query
+        name: prefix
+        type: string
+      - default: 20
+        description: Límite de resultados
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Desplazamiento
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.InvoiceListResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Listar notas crédito
+      tags:
+      - billing
+  /api/invoices/debit-notes:
+    get:
+      description: Devuelve notas débito paginadas filtradas por fecha, cliente, estado
+        DIAN y prefijo
+      parameters:
+      - description: Fecha inicio (YYYY-MM-DD)
+        in: query
+        name: start_date
+        type: string
+      - description: Fecha fin (YYYY-MM-DD)
+        in: query
+        name: end_date
+        type: string
+      - description: ID del cliente
+        in: query
+        name: customer_id
+        type: string
+      - description: Estado DIAN
+        in: query
+        name: dian_status
+        type: string
+      - description: Prefijo de la nota débito
+        in: query
+        name: prefix
+        type: string
+      - default: 20
+        description: Límite de resultados
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Desplazamiento
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.InvoiceListResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Listar notas débito
       tags:
       - billing
   /api/products:
@@ -3714,7 +5345,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.ProductListResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ProductListResponse'
       security:
       - Bearer: []
       summary: Listar productos
@@ -3729,22 +5360,22 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/dto.CreateProductRequest'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateProductRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/dto.ProductResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ProductResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Crear producto
@@ -3764,11 +5395,11 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.ProductResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ProductResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Obtener producto por ID
@@ -3788,22 +5419,22 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/dto.UpdateProductRequest'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.UpdateProductRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.ProductResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ProductResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Actualizar producto
@@ -3826,7 +5457,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/dto.ReorderConfigRequest'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ReorderConfigRequest'
       produces:
       - application/json
       responses:
@@ -3839,29 +5470,67 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "503":
           description: Service Unavailable
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Configurar reposición por producto
       tags:
       - inventory
   /api/purchase-orders:
+    get:
+      description: Lista órdenes de compra por empresa con paginación.
+      parameters:
+      - default: 20
+        description: Límite
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Listar órdenes de compra
+      tags:
+      - inventory
     post:
       consumes:
       - application/json
@@ -3872,7 +5541,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/inventory.CreatePurchaseOrderInput'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_inventory.CreatePurchaseOrderInput'
       produces:
       - application/json
       responses:
@@ -3885,23 +5554,23 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "503":
           description: Service Unavailable
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Crear orden de compra
@@ -3924,7 +5593,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/http.receivePurchaseOrderRequest'
+          $ref: '#/definitions/internal_interfaces_http.receivePurchaseOrderRequest'
       produces:
       - application/json
       responses:
@@ -3937,32 +5606,410 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "503":
           description: Service Unavailable
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Recibir orden de compra
       tags:
       - inventory
+  /api/rbac/menu:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.RBACMenuResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Menú del rol activo
+      tags:
+      - rbac
+  /api/rbac/modules:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.RBACCatalogResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Catálogo de módulos y pantallas
+      tags:
+      - rbac
+  /api/rbac/roles:
+    get:
+      description: '[LEGACY_ARRAY] Devuelve array plano (no paginado).'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.RoleResponse'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Listar roles
+      tags:
+      - rbac
+  /api/rbac/roles/{role_id}/menu:
+    get:
+      parameters:
+      - description: Role ID o key
+        in: path
+        name: role_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.RBACMenuResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Menú por role_id
+      tags:
+      - rbac
+  /api/rbac/roles/{role_id}/permissions:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Role ID o key
+        in: path
+        name: role_id
+        required: true
+        type: string
+      - description: screen_ids
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.UpdateRoleScreensRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.RBACMenuResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Asignar permisos (role_screens) a un rol
+      tags:
+      - rbac
+  /api/rbac/roles/{role_id}/screens:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Role ID o key
+        in: path
+        name: role_id
+        required: true
+        type: string
+      - description: screen_ids
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.UpdateRoleScreensRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.RBACMenuResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Actualizar pantallas de un rol
+      tags:
+      - rbac
+  /api/resolutions:
+    get:
+      description: '[LEGACY_ARRAY] Devuelve array plano (no paginado).'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ResolutionResponse'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Listar resoluciones DIAN de la empresa del token
+      tags:
+      - companies
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Datos de la resolución
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateResolutionRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ResolutionResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Crear resolución DIAN para la empresa del token
+      tags:
+      - companies
+  /api/settings/dian:
+    get:
+      description: Devuelve la configuración DIAN de la empresa. Si se indica `?environment=test|testing|prod|production`
+        devuelve la del ambiente específico; si se omite devuelve la más reciente.
+      parameters:
+      - description: 'Ambiente a consultar: test|testing|prod|production'
+        in: query
+        name: environment
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.DIANSettingsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Consultar configuración DIAN activa
+      tags:
+      - settings
+    put:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: 'Entorno DIAN: test|prod'
+        in: formData
+        name: environment
+        required: true
+        type: string
+      - description: Contraseña del certificado .p12
+        in: formData
+        name: certificate_password
+        required: true
+        type: string
+      - description: Archivo .p12
+        in: formData
+        name: certificate
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.DIANSettingsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "413":
+          description: Request Entity Too Large
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "415":
+          description: Unsupported Media Type
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Guardar configuración DIAN con certificado .p12
+      tags:
+      - settings
+  /api/settings/email-accounts:
+    get:
+      description: 'Respuesta paginada estandar: {items,total,limit,offset}'
+      parameters:
+      - default: 20
+        description: Limite
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.EmailAccountListResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Listar cuentas de email
+      tags:
+      - email
   /api/suppliers:
     get:
       parameters:
@@ -3986,7 +6033,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.SupplierListResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.SupplierListResponse'
       security:
       - Bearer: []
       summary: Listar proveedores
@@ -4001,22 +6048,22 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/dto.CreateSupplierRequest'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateSupplierRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/dto.SupplierResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.SupplierResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Crear proveedor
@@ -4036,11 +6083,11 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.SupplierResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.SupplierResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Obtener proveedor por ID
@@ -4060,29 +6107,69 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/dto.UpdateSupplierRequest'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.UpdateSupplierRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.SupplierResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.SupplierResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Actualizar proveedor
+      tags:
+      - suppliers
+  /api/suppliers/{id}/deactivate:
+    put:
+      description: Desactiva (soft delete) un proveedor asociado a la empresa autenticada
+        (solo admin)
+      parameters:
+      - description: ID del proveedor
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Desactivar proveedor
       tags:
       - suppliers
   /api/users:
@@ -4105,17 +6192,15 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/dto.UserResponse'
-            type: array
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.UserListResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Listar usuarios
@@ -4131,30 +6216,30 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/dto.CreateUserRequest'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateUserRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/dto.UserResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.UserResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Crear usuario
@@ -4183,28 +6268,94 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.UserResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.UserResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Actualizar usuario
       tags:
       - users
+  /api/v1/crm/tasks/from-email:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Task from email
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateTaskFromEmailRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.TaskResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Crear tarea desde correo
+      tags:
+      - crm
+  /api/v1/crm/tickets/from-email:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Ticket from email
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateTicketFromEmailRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.TicketResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
+      security:
+      - Bearer: []
+      summary: Crear ticket desde correo
+      tags:
+      - crm
   /api/warehouses:
     get:
       parameters:
@@ -4224,7 +6375,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.WarehouseListResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.WarehouseListResponse'
       security:
       - Bearer: []
       summary: Listar bodegas
@@ -4239,18 +6390,18 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/dto.CreateWarehouseRequest'
+          $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateWarehouseRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/dto.WarehouseResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.WarehouseResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Crear bodega
@@ -4270,11 +6421,11 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dto.WarehouseResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.WarehouseResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/dto.ErrorResponse'
+            $ref: '#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse'
       security:
       - Bearer: []
       summary: Obtener bodega por ID

@@ -22,6 +22,14 @@ type CustomerResponse struct {
 	CategoryName string          `json:"category_name,omitempty"`
 }
 
+// CustomerListResponse respuesta paginada de clientes.
+type CustomerListResponse struct {
+	Items  []CustomerResponse `json:"items"`
+	Total  int                `json:"total"`
+	Limit  int                `json:"limit"`
+	Offset int                `json:"offset"`
+}
+
 // UpdateCustomerRequest body para actualizar un cliente.
 type UpdateCustomerRequest struct {
 	Name  string `json:"name"`

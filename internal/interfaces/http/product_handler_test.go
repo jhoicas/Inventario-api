@@ -21,10 +21,10 @@ import (
 // ── Fake ProductUseCase (mock manual para tests) ────────────────────────────────
 
 type fakeProductUseCase struct {
-	createFunc func(companyID string, in dto.CreateProductRequest) (*dto.ProductResponse, error)
+	createFunc  func(companyID string, in dto.CreateProductRequest) (*dto.ProductResponse, error)
 	getByIDFunc func(id string) (*dto.ProductResponse, error)
-	listFunc   func(companyID string, limit, offset int) (*dto.ProductListResponse, error)
-	updateFunc func(id string, in dto.UpdateProductRequest) (*dto.ProductResponse, error)
+	listFunc    func(companyID string, limit, offset int) (*dto.ProductListResponse, error)
+	updateFunc  func(id string, in dto.UpdateProductRequest) (*dto.ProductResponse, error)
 }
 
 func (f *fakeProductUseCase) Create(companyID string, in dto.CreateProductRequest) (*dto.ProductResponse, error) {
@@ -263,9 +263,9 @@ func TestProductHandler_GetByID(t *testing.T) {
 			},
 		},
 		{
-			name:           "BadRequest_MissingID",
-			id:             "",
-			mockSetup:      func() *fakeProductUseCase { return &fakeProductUseCase{} },
+			name:      "BadRequest_MissingID",
+			id:        "",
+			mockSetup: func() *fakeProductUseCase { return &fakeProductUseCase{} },
 			// Ruta sin :id no hace match, Fiber responde 404.
 			expectedStatus: http.StatusNotFound,
 			validateBody:   nil,
@@ -350,8 +350,10 @@ func TestProductHandler_List(t *testing.T) {
 				return &fakeProductUseCase{
 					listFunc: func(_ string, limit, offset int) (*dto.ProductListResponse, error) {
 						return &dto.ProductListResponse{
-							Items: []dto.ProductResponse{*validProductResponse()},
-							Page:  dto.PageResponse{Limit: limit, Offset: offset},
+							Items:  []dto.ProductResponse{*validProductResponse()},
+							Total:  1,
+							Limit:  limit,
+							Offset: offset,
 						}, nil
 					},
 				}
@@ -362,8 +364,9 @@ func TestProductHandler_List(t *testing.T) {
 				var out dto.ProductListResponse
 				require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
 				assert.Len(t, out.Items, 1)
-				assert.Equal(t, 20, out.Page.Limit)
-				assert.Equal(t, 0, out.Page.Offset)
+				assert.Equal(t, 1, out.Total)
+				assert.Equal(t, 20, out.Limit)
+				assert.Equal(t, 0, out.Offset)
 			},
 		},
 		{
@@ -373,8 +376,10 @@ func TestProductHandler_List(t *testing.T) {
 				return &fakeProductUseCase{
 					listFunc: func(_ string, limit, offset int) (*dto.ProductListResponse, error) {
 						return &dto.ProductListResponse{
-							Items: []dto.ProductResponse{},
-							Page:  dto.PageResponse{Limit: limit, Offset: offset},
+							Items:  []dto.ProductResponse{},
+							Total:  0,
+							Limit:  limit,
+							Offset: offset,
 						}, nil
 					},
 				}
@@ -384,8 +389,9 @@ func TestProductHandler_List(t *testing.T) {
 			validateBody: func(t *testing.T, resp *http.Response) {
 				var out dto.ProductListResponse
 				require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
-				assert.Equal(t, 10, out.Page.Limit)
-				assert.Equal(t, 5, out.Page.Offset)
+				assert.Equal(t, 0, out.Total)
+				assert.Equal(t, 10, out.Limit)
+				assert.Equal(t, 5, out.Offset)
 			},
 		},
 		{

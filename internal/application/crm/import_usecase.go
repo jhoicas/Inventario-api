@@ -444,7 +444,7 @@ func (uc *ImportUseCase) resolveCategoryID(companyID, segment string) (string, e
 	if segment == "" || uc.categoryRepo == nil {
 		return "", nil
 	}
-	categories, err := uc.categoryRepo.ListByCompany(companyID, 200, 0)
+	categories, _, err := uc.categoryRepo.ListByCompany(companyID, 200, 0)
 	if err != nil {
 		return "", err
 	}

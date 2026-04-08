@@ -15,6 +15,41 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/api/admin/companies": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "companies"
+                ],
+                "summary": "Listar empresas para super admin",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Límite",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "Offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CompanyListResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/analytics/margins": {
             "get": {
                 "security": [
@@ -54,25 +89,25 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dto.MarginsReportDTO"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.MarginsReportDTO"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -85,7 +120,7 @@ const docTemplate = `{
                         "Bearer": []
                     }
                 ],
-                "description": "Devuelve el ranking de materias primas por peso financiero en productos vendidos en el período (BOM + coste).",
+                "description": "[LEGACY_ARRAY] Devuelve array plano. Devuelve el ranking de materias primas por peso financiero en productos vendidos en el período (BOM + coste).",
                 "produces": [
                     "application/json"
                 ],
@@ -119,26 +154,26 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/dto.RawMaterialImpactDTO"
+                                "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.RawMaterialImpactDTO"
                             }
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -163,7 +198,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dto.LoginRequest"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.LoginRequest"
                         }
                     }
                 ],
@@ -171,19 +206,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dto.LoginResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.LoginResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -208,7 +243,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dto.RegisterRequest"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.RegisterRequest"
                         }
                     }
                 ],
@@ -216,19 +251,56 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/dto.UserResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.UserResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/billing/dian/summary": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Devuelve contadores para tablero DIAN: enviados hoy, pendientes y rechazados",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "billing"
+                ],
+                "summary": "Resumen de estado DIAN",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.DIANSummaryDTO"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -263,7 +335,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dto.CompanyListResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CompanyListResponse"
                         }
                     }
                 }
@@ -286,7 +358,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dto.CreateCompanyRequest"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateCompanyRequest"
                         }
                     }
                 ],
@@ -294,13 +366,13 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/dto.CompanyResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CompanyResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -328,13 +400,277 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dto.CompanyResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CompanyResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "companies"
+                ],
+                "summary": "Actualizar empresa",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID de la empresa",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Datos a actualizar",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.UpdateCompanyRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CompanyResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "companies"
+                ],
+                "summary": "Eliminar empresa",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID de la empresa",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/companies/{id}/modules": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "companies"
+                ],
+                "summary": "Listar módulos SaaS de una empresa",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID de la empresa",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CompanyModulesResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "companies"
+                ],
+                "summary": "Crear/actualizar módulo de una empresa",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID de la empresa",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Datos del módulo",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateCompanyModuleRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CompanyModuleResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/companies/{id}/modules/{module_name}": {
+            "put": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "companies"
+                ],
+                "summary": "Actualizar módulo de una empresa",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID de la empresa",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Nombre del módulo",
+                        "name": "module_name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Datos del módulo",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.UpdateCompanyModuleRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CompanyModuleResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "companies"
+                ],
+                "summary": "Eliminar módulo de una empresa",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID de la empresa",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Nombre del módulo",
+                        "name": "module_name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -342,6 +678,7 @@ const docTemplate = `{
         },
         "/api/companies/{id}/resolutions": {
             "get": {
+                "description": "[LEGACY_ARRAY] Devuelve array plano (no paginado).",
                 "produces": [
                     "application/json"
                 ],
@@ -364,14 +701,14 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/dto.ResolutionResponse"
+                                "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ResolutionResponse"
                             }
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -401,7 +738,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dto.CreateResolutionRequest"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateResolutionRequest"
                         }
                     }
                 ],
@@ -409,19 +746,19 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/dto.ResolutionResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ResolutionResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -469,7 +806,7 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -517,7 +854,47 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/crm/analytics": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Devuelve KPIs, evolución mensual y segmentación del CRM para la empresa actual",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "crm"
+                ],
+                "summary": "Analytics CRM",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CRMAnalyticsResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -555,7 +932,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dto.UpdateBenefitRequest"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.UpdateBenefitRequest"
                         }
                     }
                 ],
@@ -563,31 +940,228 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dto.BenefitResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.BenefitResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/crm/benefits/{benefitId}/deactivate": {
+            "put": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Desactiva (soft delete) un beneficio de fidelización (solo admin)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "crm"
+                ],
+                "summary": "Desactivar beneficio",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Benefit ID",
+                        "name": "benefitId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/crm/campaign-templates": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "[LEGACY_ARRAY] Devuelve array plano (no paginado).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "crm"
+                ],
+                "summary": "Listar plantillas de campaña",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CampaignTemplateResponse"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "crm"
+                ],
+                "summary": "Crear plantilla de campaña",
+                "parameters": [
+                    {
+                        "description": "Datos de la plantilla",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateCampaignTemplateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CampaignTemplateResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/crm/campaign-templates/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "crm"
+                ],
+                "summary": "Eliminar plantilla de campaña",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Template ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -618,7 +1192,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dto.CreateCampaignRequest"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateCampaignRequest"
                         }
                     }
                 ],
@@ -626,19 +1200,201 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/dto.CampaignResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CampaignResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "503": {
                         "description": "Service Unavailable",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/crm/campaigns/recipients/resolve": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "crm"
+                ],
+                "summary": "Resolver destinatarios de campaña",
+                "parameters": [
+                    {
+                        "description": "Estrategia category con category_id",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ResolveCampaignRecipientsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ResolveCampaignRecipientsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/crm/campaigns/send": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Envía el contenido de la campaña por correo a los clientes filtrados por categoría (opcional)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "crm"
+                ],
+                "summary": "Enviar campaña de email",
+                "parameters": [
+                    {
+                        "description": "Datos de la campaña a enviar",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.SendCampaignRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/crm/campaigns/send-test": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Envía el subject/body a un email específico (solo prueba)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "crm"
+                ],
+                "summary": "Enviar campaña de prueba",
+                "parameters": [
+                    {
+                        "description": "Email de destino + contenido",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.SendTestCampaignRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -672,19 +1428,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dto.CampaignMetricsResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CampaignMetricsResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "503": {
                         "description": "Service Unavailable",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -726,10 +1482,62 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/dto.CategoryResponse"
-                            }
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CategoryListResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Crea una categoría de fidelización (solo admin)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "crm"
+                ],
+                "summary": "Crear categoría CRM",
+                "parameters": [
+                    {
+                        "description": "Category",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateCategoryRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CategoryResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -767,7 +1575,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dto.CreateBenefitRequest"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateBenefitRequest"
                         }
                     }
                 ],
@@ -775,31 +1583,101 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/dto.BenefitResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.BenefitResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/crm/categories/{id}": {
+            "put": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Actualiza una categoría de fidelización (solo admin)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "crm"
+                ],
+                "summary": "Actualizar categoría CRM",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Category ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Category",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.UpdateCategoryRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CategoryResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -848,10 +1726,271 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/dto.BenefitResponse"
-                            }
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.BenefitListResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/crm/categories/{id}/deactivate": {
+            "put": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Desactiva (soft delete) una categoría de fidelización (solo admin)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "crm"
+                ],
+                "summary": "Desactivar categoría CRM",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Category ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/crm/customers": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Lista los clientes de la empresa autenticada para uso en CRM",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "crm"
+                ],
+                "summary": "Listar clientes CRM",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Buscar por nombre o NIT (tax_id)",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Límite de resultados",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Desplazamiento",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CustomerListResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Crea un cliente asociado a la empresa autenticada para uso en CRM",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "crm"
+                ],
+                "summary": "Crear cliente CRM",
+                "parameters": [
+                    {
+                        "description": "Datos del cliente",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateCustomerRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CustomerResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/crm/customers/{id}": {
+            "put": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Actualiza un cliente asociado a la empresa autenticada",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "crm"
+                ],
+                "summary": "Actualizar cliente CRM",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Customer ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Datos del cliente",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.UpdateCustomerRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CustomerResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -889,7 +2028,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dto.AssignCategoryRequest"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.AssignCategoryRequest"
                         }
                     }
                 ],
@@ -906,13 +2045,74 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/crm/customers/{id}/deactivate": {
+            "put": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Desactiva (soft delete) un cliente asociado a la empresa autenticada (solo admin)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "crm"
+                ],
+                "summary": "Desactivar cliente CRM",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Customer ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -976,19 +2176,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dto.InteractionListResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.InteractionListResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -1022,13 +2222,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dto.LoyaltyBalanceDTO"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.LoyaltyBalanceDTO"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -1065,25 +2265,25 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dto.Profile360Response"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.Profile360Response"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -1129,25 +2329,129 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dto.PurchaseHistoryResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.PurchaseHistoryResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "503": {
                         "description": "Service Unavailable",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/crm/import": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Carga perfiles de clientes en background y retorna un jobID para consultar progreso",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "crm"
+                ],
+                "summary": "Importar perfiles CRM",
+                "parameters": [
+                    {
+                        "type": "file",
+                        "description": "Archivo Excel (.xlsx) o CSV",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/crm/import/status/{jobID}": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Consulta el estado de una importación por jobID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "crm"
+                ],
+                "summary": "Estado de importación CRM",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Job ID",
+                        "name": "jobID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_crm.JobProgress"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -1178,7 +2482,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dto.CreateInteractionRequest"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateInteractionRequest"
                         }
                     }
                 ],
@@ -1186,13 +2490,13 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/dto.InteractionResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.InteractionResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -1223,7 +2527,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dto.AwardPointsRequest"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.AwardPointsRequest"
                         }
                     }
                 ],
@@ -1240,19 +2544,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -1283,7 +2587,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dto.RedeemPointsRequest"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.RedeemPointsRequest"
                         }
                     }
                 ],
@@ -1300,19 +2604,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -1351,22 +2655,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/dto.OpportunityResponse"
-                            }
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.OpportunityListResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "503": {
                         "description": "Service Unavailable",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -1395,7 +2696,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dto.CreateOpportunityRequest"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateOpportunityRequest"
                         }
                     }
                 ],
@@ -1403,19 +2704,19 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/dto.OpportunityResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.OpportunityResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "503": {
                         "description": "Service Unavailable",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -1428,7 +2729,7 @@ const docTemplate = `{
                         "Bearer": []
                     }
                 ],
-                "description": "Retorna el conteo y monto total de oportunidades agrupadas por etapa",
+                "description": "[LEGACY_ARRAY] Devuelve array plano. Retorna el conteo y monto total de oportunidades agrupadas por etapa",
                 "produces": [
                     "application/json"
                 ],
@@ -1442,14 +2743,14 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/dto.FunnelStageDTO"
+                                "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.FunnelStageDTO"
                             }
                         }
                     },
                     "503": {
                         "description": "Service Unavailable",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -1504,19 +2805,62 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/crm/remarketing": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "[LEGACY_ARRAY] Devuelve array plano. Devuelve una lista de clientes/prospectos ideales filtrados por la empresa autenticada",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "crm"
+                ],
+                "summary": "Remarketing CRM",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.RemarketingProspect"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -1564,7 +2908,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dto.TaskResponseList"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.TaskResponseList"
                         }
                     }
                 }
@@ -1593,7 +2937,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dto.CreateTaskRequest"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateTaskRequest"
                         }
                     }
                 ],
@@ -1601,13 +2945,13 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/dto.TaskResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.TaskResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -1644,13 +2988,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dto.TaskResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.TaskResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -1686,7 +3030,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dto.UpdateTaskRequest"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.UpdateTaskRequest"
                         }
                     }
                 ],
@@ -1694,19 +3038,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dto.TaskResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.TaskResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -1766,7 +3110,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dto.TicketResponseList"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.TicketResponseList"
                         }
                     }
                 }
@@ -1795,7 +3139,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dto.CreateTicketRequest"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateTicketRequest"
                         }
                     }
                 ],
@@ -1803,19 +3147,19 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/dto.TicketResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.TicketResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -1828,7 +3172,7 @@ const docTemplate = `{
                         "Bearer": []
                     }
                 ],
-                "description": "Devuelve los tickets cuyo SLA ha expirado y fueron marcados como OVERDUE",
+                "description": "[LEGACY_ARRAY] Devuelve array plano. Devuelve los tickets cuyo SLA ha expirado y fueron marcados como OVERDUE",
                 "produces": [
                     "application/json"
                 ],
@@ -1842,14 +3186,14 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/dto.TicketResponse"
+                                "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.TicketResponse"
                             }
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -1886,13 +3230,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dto.TicketResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.TicketResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -1928,7 +3272,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dto.UpdateTicketRequest"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.UpdateTicketRequest"
                         }
                     }
                 ],
@@ -1936,13 +3280,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dto.TicketResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.TicketResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -1997,19 +3341,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -2057,22 +3401,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/dto.CustomerResponse"
-                            }
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CustomerListResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -2101,7 +3442,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dto.CreateCustomerRequest"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateCustomerRequest"
                         }
                     }
                 ],
@@ -2109,31 +3450,31 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/dto.CustomerResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CustomerResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -2174,31 +3515,31 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/billing.AcquirerInfo"
+                            "$ref": "#/definitions/internal_billing.AcquirerInfo"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "502": {
                         "description": "Bad Gateway",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -2236,7 +3577,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dto.UpdateCustomerRequest"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.UpdateCustomerRequest"
                         }
                     }
                 ],
@@ -2244,43 +3585,169 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dto.CustomerResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CustomerResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/customers/{id}/deactivate": {
+            "put": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Desactiva (soft delete) un cliente asociado a la empresa autenticada (solo admin)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "customers"
+                ],
+                "summary": "Desactivar cliente",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Customer ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/emails": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Respuesta paginada estandar: {items,total,limit,offset}",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "email"
+                ],
+                "summary": "Listar emails",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Filtrar por cliente",
+                        "name": "customer_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Filtrar por leidos/no leidos",
+                        "name": "is_read",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Limite",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "Offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.EmailListResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -2311,7 +3778,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dto.SendCustomEmailRequest"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.SendCustomEmailRequest"
                         }
                     }
                 ],
@@ -2328,19 +3795,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -2371,7 +3838,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dto.RegisterMovementRequest"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.RegisterMovementRequest"
                         }
                     }
                 ],
@@ -2388,25 +3855,25 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -2477,31 +3944,31 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dto.PaginatedMovementsDTO"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.PaginatedMovementsDTO"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "503": {
                         "description": "Service Unavailable",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -2529,7 +3996,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dto.RegisterMovementRequest"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.RegisterMovementRequest"
                         }
                     }
                 ],
@@ -2546,25 +4013,25 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -2577,7 +4044,7 @@ const docTemplate = `{
                         "Bearer": []
                     }
                 ],
-                "description": "Devuelve los SKUs por debajo del punto de reorden con la cantidad sugerida",
+                "description": "Devuelve los SKUs por debajo del punto de reorden con la cantidad sugerida\n[LEGACY_ARRAY] Devuelve array plano en ` + "`" + `replenishments` + "`" + ` (usa ` + "`" + `total` + "`" + ` separado).",
                 "produces": [
                     "application/json"
                 ],
@@ -2599,20 +4066,20 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/dto.ReplenishmentSuggestionDTO"
+                                "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ReplenishmentSuggestionDTO"
                             }
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -2652,25 +4119,25 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dto.StockSummaryDTO"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.StockSummaryDTO"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -2701,7 +4168,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/http.createStocktakeRequest"
+                            "$ref": "#/definitions/internal_interfaces_http.createStocktakeRequest"
                         }
                     }
                 ],
@@ -2718,25 +4185,25 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "503": {
                         "description": "Service Unavailable",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -2774,7 +4241,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/http.updateStocktakeCountsRequest"
+                            "$ref": "#/definitions/internal_interfaces_http.updateStocktakeCountsRequest"
                         }
                     }
                 ],
@@ -2791,31 +4258,31 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "503": {
                         "description": "Service Unavailable",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -2858,31 +4325,31 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "503": {
                         "description": "Service Unavailable",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -2953,19 +4420,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dto.InvoiceListResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.InvoiceListResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -2994,7 +4461,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dto.CreateInvoiceRequest"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateInvoiceRequest"
                         }
                     }
                 ],
@@ -3002,43 +4469,209 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/dto.InvoiceResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.InvoiceResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/invoices/credit-notes": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Devuelve notas crédito paginadas filtradas por fecha, cliente, estado DIAN y prefijo",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "billing"
+                ],
+                "summary": "Listar notas crédito",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Fecha inicio (YYYY-MM-DD)",
+                        "name": "start_date",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Fecha fin (YYYY-MM-DD)",
+                        "name": "end_date",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "ID del cliente",
+                        "name": "customer_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Estado DIAN",
+                        "name": "dian_status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Prefijo de la nota crédito",
+                        "name": "prefix",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Límite de resultados",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "Desplazamiento",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.InvoiceListResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/invoices/debit-notes": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Devuelve notas débito paginadas filtradas por fecha, cliente, estado DIAN y prefijo",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "billing"
+                ],
+                "summary": "Listar notas débito",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Fecha inicio (YYYY-MM-DD)",
+                        "name": "start_date",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Fecha fin (YYYY-MM-DD)",
+                        "name": "end_date",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "ID del cliente",
+                        "name": "customer_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Estado DIAN",
+                        "name": "dian_status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Prefijo de la nota débito",
+                        "name": "prefix",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Límite de resultados",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "Desplazamiento",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.InvoiceListResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -3075,37 +4708,37 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dto.InvoiceResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.InvoiceResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -3143,7 +4776,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dto.CreateDebitNoteRequest"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateDebitNoteRequest"
                         }
                     }
                 ],
@@ -3151,43 +4784,43 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/dto.DebitNoteResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.DebitNoteResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -3230,37 +4863,37 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -3291,43 +4924,43 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dto.InvoiceDIANStatusDTO"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.InvoiceDIANStatusDTO"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -3365,7 +4998,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dto.ReturnInvoiceRequest"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ReturnInvoiceRequest"
                         }
                     }
                 ],
@@ -3373,43 +5006,43 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/dto.InvoiceResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.InvoiceResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -3449,31 +5082,31 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -3510,37 +5143,37 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dto.InvoiceDIANStatusDTO"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.InvoiceDIANStatusDTO"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -3578,7 +5211,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dto.CreateVoidInvoiceRequest"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateVoidInvoiceRequest"
                         }
                     }
                 ],
@@ -3586,43 +5219,43 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/dto.VoidInvoiceResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.VoidInvoiceResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -3662,7 +5295,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dto.ProductListResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ProductListResponse"
                         }
                     }
                 }
@@ -3690,7 +5323,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dto.CreateProductRequest"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateProductRequest"
                         }
                     }
                 ],
@@ -3698,19 +5331,19 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/dto.ProductResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ProductResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -3743,13 +5376,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dto.ProductResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ProductResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -3784,7 +5417,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dto.UpdateProductRequest"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.UpdateProductRequest"
                         }
                     }
                 ],
@@ -3792,19 +5425,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dto.ProductResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ProductResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -3842,7 +5475,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dto.ReorderConfigRequest"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ReorderConfigRequest"
                         }
                     }
                 ],
@@ -3859,37 +5492,95 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "503": {
                         "description": "Service Unavailable",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
             }
         },
         "/api/purchase-orders": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Lista órdenes de compra por empresa con paginación.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "inventory"
+                ],
+                "summary": "Listar órdenes de compra",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Límite",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "Offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
             "post": {
                 "security": [
                     {
@@ -3914,7 +5605,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/inventory.CreatePurchaseOrderInput"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_inventory.CreatePurchaseOrderInput"
                         }
                     }
                 ],
@@ -3931,31 +5622,31 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "503": {
                         "description": "Service Unavailable",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -3993,7 +5684,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/http.receivePurchaseOrderRequest"
+                            "$ref": "#/definitions/internal_interfaces_http.receivePurchaseOrderRequest"
                         }
                     }
                 ],
@@ -4010,37 +5701,632 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "503": {
                         "description": "Service Unavailable",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/rbac/menu": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "rbac"
+                ],
+                "summary": "Menú del rol activo",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.RBACMenuResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/rbac/modules": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "rbac"
+                ],
+                "summary": "Catálogo de módulos y pantallas",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.RBACCatalogResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/rbac/roles": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "[LEGACY_ARRAY] Devuelve array plano (no paginado).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "rbac"
+                ],
+                "summary": "Listar roles",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.RoleResponse"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/rbac/roles/{role_id}/menu": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "rbac"
+                ],
+                "summary": "Menú por role_id",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Role ID o key",
+                        "name": "role_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.RBACMenuResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/rbac/roles/{role_id}/permissions": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "rbac"
+                ],
+                "summary": "Asignar permisos (role_screens) a un rol",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Role ID o key",
+                        "name": "role_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "screen_ids",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.UpdateRoleScreensRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.RBACMenuResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/rbac/roles/{role_id}/screens": {
+            "put": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "rbac"
+                ],
+                "summary": "Actualizar pantallas de un rol",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Role ID o key",
+                        "name": "role_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "screen_ids",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.UpdateRoleScreensRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.RBACMenuResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/resolutions": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "[LEGACY_ARRAY] Devuelve array plano (no paginado).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "companies"
+                ],
+                "summary": "Listar resoluciones DIAN de la empresa del token",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ResolutionResponse"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "companies"
+                ],
+                "summary": "Crear resolución DIAN para la empresa del token",
+                "parameters": [
+                    {
+                        "description": "Datos de la resolución",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateResolutionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ResolutionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/settings/dian": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Devuelve la configuración DIAN de la empresa. Si se indica ` + "`" + `?environment=test|testing|prod|production` + "`" + ` devuelve la del ambiente específico; si se omite devuelve la más reciente.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "settings"
+                ],
+                "summary": "Consultar configuración DIAN activa",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Ambiente a consultar: test|testing|prod|production",
+                        "name": "environment",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.DIANSettingsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "settings"
+                ],
+                "summary": "Guardar configuración DIAN con certificado .p12",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Entorno DIAN: test|prod",
+                        "name": "environment",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Contraseña del certificado .p12",
+                        "name": "certificate_password",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "Archivo .p12",
+                        "name": "certificate",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.DIANSettingsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "413": {
+                        "description": "Request Entity Too Large",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "415": {
+                        "description": "Unsupported Media Type",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/settings/email-accounts": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Respuesta paginada estandar: {items,total,limit,offset}",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "email"
+                ],
+                "summary": "Listar cuentas de email",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Limite",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "Offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.EmailAccountListResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -4086,7 +6372,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dto.SupplierListResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.SupplierListResponse"
                         }
                     }
                 }
@@ -4114,7 +6400,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dto.CreateSupplierRequest"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateSupplierRequest"
                         }
                     }
                 ],
@@ -4122,19 +6408,19 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/dto.SupplierResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.SupplierResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -4167,13 +6453,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dto.SupplierResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.SupplierResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -4208,7 +6494,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dto.UpdateSupplierRequest"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.UpdateSupplierRequest"
                         }
                     }
                 ],
@@ -4216,25 +6502,86 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dto.SupplierResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.SupplierResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/suppliers/{id}/deactivate": {
+            "put": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Desactiva (soft delete) un proveedor asociado a la empresa autenticada (solo admin)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "suppliers"
+                ],
+                "summary": "Desactivar proveedor",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID del proveedor",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -4275,22 +6622,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/dto.UserResponse"
-                            }
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.UserListResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -4319,7 +6663,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dto.CreateUserRequest"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateUserRequest"
                         }
                     }
                 ],
@@ -4327,31 +6671,31 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/dto.UserResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.UserResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -4397,31 +6741,137 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dto.UserResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.UserResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/crm/tasks/from-email": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "crm"
+                ],
+                "summary": "Crear tarea desde correo",
+                "parameters": [
+                    {
+                        "description": "Task from email",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateTaskFromEmailRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.TaskResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/crm/tickets/from-email": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "crm"
+                ],
+                "summary": "Crear ticket desde correo",
+                "parameters": [
+                    {
+                        "description": "Ticket from email",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateTicketFromEmailRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.TicketResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -4461,7 +6911,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dto.WarehouseListResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.WarehouseListResponse"
                         }
                     }
                 }
@@ -4489,7 +6939,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dto.CreateWarehouseRequest"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CreateWarehouseRequest"
                         }
                     }
                 ],
@@ -4497,13 +6947,13 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/dto.WarehouseResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.WarehouseResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -4536,13 +6986,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dto.WarehouseResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.WarehouseResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/dto.ErrorResponse"
+                            "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse"
                         }
                     }
                 }
@@ -4550,42 +7000,21 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "billing.AcquirerInfo": {
+        "github_com_jhoicas_Inventario-api_internal_application_crm.JobProgress": {
             "type": "object",
             "properties": {
-                "business_name": {
+                "processedRows": {
+                    "type": "integer"
+                },
+                "status": {
                     "type": "string"
                 },
-                "dv": {
-                    "type": "string"
-                },
-                "id_code": {
-                    "type": "string"
-                },
-                "status_code": {
-                    "type": "string"
-                },
-                "status_description": {
-                    "type": "string"
-                },
-                "tax_id": {
-                    "type": "string"
-                },
-                "tax_scheme": {
-                    "type": "string"
-                },
-                "type_liability": {
-                    "type": "string"
-                },
-                "type_organization": {
-                    "type": "string"
-                },
-                "type_regime": {
-                    "type": "string"
+                "totalRows": {
+                    "type": "integer"
                 }
             }
         },
-        "dto.AssignCategoryRequest": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.AssignCategoryRequest": {
             "type": "object",
             "properties": {
                 "category_id": {
@@ -4596,7 +7025,7 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.AwardPointsRequest": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.AwardPointsRequest": {
             "type": "object",
             "properties": {
                 "customer_id": {
@@ -4613,7 +7042,27 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.BenefitResponse": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.BenefitListResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.BenefitResponse"
+                    }
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_jhoicas_Inventario-api_internal_application_dto.BenefitResponse": {
             "type": "object",
             "properties": {
                 "category_id": {
@@ -4639,7 +7088,81 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.CampaignMetricsResponse": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.CRMAnalyticsEvolutionItem": {
+            "type": "object",
+            "properties": {
+                "mes": {
+                    "type": "string"
+                },
+                "variacion": {
+                    "type": "string"
+                },
+                "ventas": {
+                    "type": "number"
+                }
+            }
+        },
+        "github_com_jhoicas_Inventario-api_internal_application_dto.CRMAnalyticsKPIs": {
+            "type": "object",
+            "properties": {
+                "clientes_vip": {
+                    "type": "integer"
+                },
+                "ticket_promedio": {
+                    "type": "number"
+                },
+                "total_clientes": {
+                    "type": "integer"
+                },
+                "ventas_totales": {
+                    "type": "number"
+                }
+            }
+        },
+        "github_com_jhoicas_Inventario-api_internal_application_dto.CRMAnalyticsResponse": {
+            "type": "object",
+            "properties": {
+                "evolucion_mensual": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CRMAnalyticsEvolutionItem"
+                    }
+                },
+                "kpis": {
+                    "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CRMAnalyticsKPIs"
+                },
+                "segmentacion": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CRMAnalyticsSegmentItem"
+                    }
+                }
+            }
+        },
+        "github_com_jhoicas_Inventario-api_internal_application_dto.CRMAnalyticsSegmentItem": {
+            "type": "object",
+            "properties": {
+                "accion": {
+                    "type": "string"
+                },
+                "clientes": {
+                    "type": "integer"
+                },
+                "porcentaje": {
+                    "type": "string"
+                },
+                "segmento": {
+                    "type": "string"
+                },
+                "ticket_promedio": {
+                    "type": "number"
+                },
+                "ventas_totales": {
+                    "type": "number"
+                }
+            }
+        },
+        "github_com_jhoicas_Inventario-api_internal_application_dto.CampaignMetricsResponse": {
             "type": "object",
             "properties": {
                 "campaign_id": {
@@ -4662,7 +7185,36 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.CampaignResponse": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.CampaignRecipientDTO": {
+            "type": "object",
+            "properties": {
+                "customer_id": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "segment": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_jhoicas_Inventario-api_internal_application_dto.CampaignRecipientStrategy": {
+            "type": "object",
+            "properties": {
+                "category_id": {
+                    "type": "string"
+                },
+                "type": {
+                    "description": "\"category\"",
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_jhoicas_Inventario-api_internal_application_dto.CampaignResponse": {
             "type": "object",
             "properties": {
                 "company_id": {
@@ -4694,7 +7246,53 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.CategoryResponse": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.CampaignTemplateResponse": {
+            "type": "object",
+            "properties": {
+                "body": {
+                    "type": "string"
+                },
+                "company_id": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "subject": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_jhoicas_Inventario-api_internal_application_dto.CategoryListResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CategoryResponse"
+                    }
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_jhoicas_Inventario-api_internal_application_dto.CategoryResponse": {
             "type": "object",
             "properties": {
                 "company_id": {
@@ -4717,13 +7315,13 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.ChannelProfitabilityDTO": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.ChannelProfitabilityDTO": {
             "type": "object",
             "properties": {
                 "channels": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/dto.MarginByChannelDTO"
+                        "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.MarginByChannelDTO"
                     }
                 },
                 "overall_margin_pct": {
@@ -4741,21 +7339,67 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.CompanyListResponse": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.CompanyListResponse": {
             "type": "object",
             "properties": {
                 "items": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/dto.CompanyResponse"
+                        "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CompanyResponse"
                     }
                 },
-                "page": {
-                    "$ref": "#/definitions/dto.PageResponse"
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
                 }
             }
         },
-        "dto.CompanyResponse": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.CompanyModuleResponse": {
+            "type": "object",
+            "properties": {
+                "activated_at": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "expires_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "module_name": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_jhoicas_Inventario-api_internal_application_dto.CompanyModulesResponse": {
+            "type": "object",
+            "properties": {
+                "company_id": {
+                    "type": "string"
+                },
+                "modules": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CompanyModuleResponse"
+                    }
+                }
+            }
+        },
+        "github_com_jhoicas_Inventario-api_internal_application_dto.CompanyResponse": {
             "type": "object",
             "properties": {
                 "address": {
@@ -4787,7 +7431,7 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.CreateBenefitRequest": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.CreateBenefitRequest": {
             "type": "object",
             "required": [
                 "name"
@@ -4803,7 +7447,7 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.CreateCampaignRequest": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.CreateCampaignRequest": {
             "type": "object",
             "required": [
                 "name"
@@ -4820,7 +7464,55 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.CreateCompanyRequest": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.CreateCampaignTemplateRequest": {
+            "type": "object",
+            "required": [
+                "body",
+                "name",
+                "subject"
+            ],
+            "properties": {
+                "body": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "subject": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_jhoicas_Inventario-api_internal_application_dto.CreateCategoryRequest": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "min_ltv": {
+                    "type": "number"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_jhoicas_Inventario-api_internal_application_dto.CreateCompanyModuleRequest": {
+            "type": "object",
+            "properties": {
+                "expires_at": {
+                    "description": "RFC3339 opcional",
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "module_name": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_jhoicas_Inventario-api_internal_application_dto.CreateCompanyRequest": {
             "type": "object",
             "required": [
                 "name",
@@ -4848,7 +7540,7 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.CreateCustomerRequest": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.CreateCustomerRequest": {
             "type": "object",
             "properties": {
                 "email": {
@@ -4865,13 +7557,13 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.CreateDebitNoteRequest": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.CreateDebitNoteRequest": {
             "type": "object",
             "properties": {
                 "items": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/dto.DebitNoteItemRequest"
+                        "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.DebitNoteItemRequest"
                     }
                 },
                 "reason": {
@@ -4879,7 +7571,7 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.CreateInteractionRequest": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.CreateInteractionRequest": {
             "type": "object",
             "required": [
                 "customer_id",
@@ -4901,7 +7593,7 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.CreateInvoiceRequest": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.CreateInvoiceRequest": {
             "type": "object",
             "properties": {
                 "customer_id": {
@@ -4910,7 +7602,7 @@ const docTemplate = `{
                 "items": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/dto.InvoiceItemRequest"
+                        "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.InvoiceItemRequest"
                     }
                 },
                 "number": {
@@ -4925,7 +7617,7 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.CreateOpportunityRequest": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.CreateOpportunityRequest": {
             "type": "object",
             "required": [
                 "title"
@@ -4953,7 +7645,7 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.CreateProductRequest": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.CreateProductRequest": {
             "type": "object",
             "required": [
                 "name",
@@ -4994,11 +7686,19 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.CreateResolutionRequest": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.CreateResolutionRequest": {
             "type": "object",
             "properties": {
+                "alert_threshold": {
+                    "description": "porcentaje; por ahora solo compatibilidad, cálculo interno sigue siendo 10%",
+                    "type": "integer"
+                },
+                "current_number": {
+                    "description": "no usado por ahora; solo para compatibilidad de payload",
+                    "type": "integer"
+                },
                 "environment": {
-                    "description": "test|prod",
+                    "description": "test|prod; opcional en este payload",
                     "type": "string"
                 },
                 "from_number": {
@@ -5017,13 +7717,13 @@ const docTemplate = `{
                     "description": "formato YYYY-MM-DD",
                     "type": "string"
                 },
-                "valid_until": {
-                    "description": "formato YYYY-MM-DD",
+                "valid_to": {
+                    "description": "formato YYYY-MM-DD (respetar nombre del frontend)",
                     "type": "string"
                 }
             }
         },
-        "dto.CreateSupplierRequest": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.CreateSupplierRequest": {
             "type": "object",
             "properties": {
                 "email": {
@@ -5046,7 +7746,27 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.CreateTaskRequest": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.CreateTaskFromEmailRequest": {
+            "type": "object",
+            "properties": {
+                "assigned_to": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "due_date": {
+                    "type": "string"
+                },
+                "email_id": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_jhoicas_Inventario-api_internal_application_dto.CreateTaskRequest": {
             "type": "object",
             "required": [
                 "title"
@@ -5066,7 +7786,30 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.CreateTicketRequest": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.CreateTicketFromEmailRequest": {
+            "type": "object",
+            "properties": {
+                "assigned_to": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "email_id": {
+                    "type": "string"
+                },
+                "priority": {
+                    "type": "string"
+                },
+                "sender_email": {
+                    "type": "string"
+                },
+                "subject": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_jhoicas_Inventario-api_internal_application_dto.CreateTicketRequest": {
             "type": "object",
             "required": [
                 "customer_id",
@@ -5085,7 +7828,7 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.CreateUserRequest": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.CreateUserRequest": {
             "type": "object",
             "required": [
                 "company_id",
@@ -5118,7 +7861,7 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.CreateVoidInvoiceRequest": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.CreateVoidInvoiceRequest": {
             "type": "object",
             "properties": {
                 "concept_code": {
@@ -5129,7 +7872,7 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.CreateWarehouseRequest": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.CreateWarehouseRequest": {
             "type": "object",
             "required": [
                 "name"
@@ -5145,7 +7888,27 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.CustomerPurchaseStatsDTO": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.CustomerListResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CustomerResponse"
+                    }
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_jhoicas_Inventario-api_internal_application_dto.CustomerPurchaseStatsDTO": {
             "type": "object",
             "properties": {
                 "avg_ticket": {
@@ -5163,9 +7926,12 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.CustomerResponse": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.CustomerResponse": {
             "type": "object",
             "properties": {
+                "category_name": {
+                    "type": "string"
+                },
                 "company_id": {
                     "type": "string"
                 },
@@ -5174,6 +7940,9 @@ const docTemplate = `{
                 },
                 "id": {
                     "type": "string"
+                },
+                "ltv": {
+                    "type": "number"
                 },
                 "name": {
                     "type": "string"
@@ -5186,7 +7955,41 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.DebitNoteItemRequest": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.DIANSettingsResponse": {
+            "type": "object",
+            "properties": {
+                "certificate_file_name": {
+                    "type": "string"
+                },
+                "certificate_file_size": {
+                    "type": "integer"
+                },
+                "company_id": {
+                    "type": "string"
+                },
+                "environment": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_jhoicas_Inventario-api_internal_application_dto.DIANSummaryDTO": {
+            "type": "object",
+            "properties": {
+                "pending": {
+                    "type": "integer"
+                },
+                "rejected": {
+                    "type": "integer"
+                },
+                "sent_today": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_jhoicas_Inventario-api_internal_application_dto.DebitNoteItemRequest": {
             "type": "object",
             "properties": {
                 "product_id": {
@@ -5200,7 +8003,7 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.DebitNoteResponse": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.DebitNoteResponse": {
             "type": "object",
             "properties": {
                 "cufe": {
@@ -5214,7 +8017,143 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.ErrorResponse": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.EmailAccountListResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.EmailAccountResponse"
+                    }
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_jhoicas_Inventario-api_internal_application_dto.EmailAccountResponse": {
+            "type": "object",
+            "properties": {
+                "company_id": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "email_address": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "imap_port": {
+                    "type": "integer"
+                },
+                "imap_server": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_jhoicas_Inventario-api_internal_application_dto.EmailAttachmentResponse": {
+            "type": "object",
+            "properties": {
+                "file_name": {
+                    "type": "string"
+                },
+                "file_url": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "mime_type": {
+                    "type": "string"
+                },
+                "size": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_jhoicas_Inventario-api_internal_application_dto.EmailListResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.EmailResponse"
+                    }
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_jhoicas_Inventario-api_internal_application_dto.EmailResponse": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string"
+                },
+                "attachments": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.EmailAttachmentResponse"
+                    }
+                },
+                "body_html": {
+                    "type": "string"
+                },
+                "body_text": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "customer_id": {
+                    "type": "string"
+                },
+                "from_address": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_read": {
+                    "type": "boolean"
+                },
+                "message_id": {
+                    "type": "string"
+                },
+                "received_at": {
+                    "type": "string"
+                },
+                "subject": {
+                    "type": "string"
+                },
+                "to_address": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_jhoicas_Inventario-api_internal_application_dto.ErrorResponse": {
             "type": "object",
             "properties": {
                 "code": {
@@ -5225,7 +8164,7 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.FunnelStageDTO": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.FunnelStageDTO": {
             "type": "object",
             "properties": {
                 "count": {
@@ -5239,21 +8178,27 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.InteractionListResponse": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.InteractionListResponse": {
             "type": "object",
             "properties": {
                 "items": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/dto.InteractionResponse"
+                        "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.InteractionResponse"
                     }
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
                 },
                 "total": {
                     "type": "integer"
                 }
             }
         },
-        "dto.InteractionResponse": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.InteractionResponse": {
             "type": "object",
             "properties": {
                 "body": {
@@ -5282,7 +8227,7 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.InvoiceDIANStatusDTO": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.InvoiceDIANStatusDTO": {
             "type": "object",
             "properties": {
                 "cufe": {
@@ -5306,7 +8251,7 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.InvoiceDetailResponse": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.InvoiceDetailResponse": {
             "type": "object",
             "properties": {
                 "id": {
@@ -5329,7 +8274,7 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.InvoiceItemRequest": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.InvoiceItemRequest": {
             "type": "object",
             "properties": {
                 "product_id": {
@@ -5343,13 +8288,13 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.InvoiceListResponse": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.InvoiceListResponse": {
             "type": "object",
             "properties": {
                 "items": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/dto.InvoiceResponse"
+                        "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.InvoiceResponse"
                     }
                 },
                 "limit": {
@@ -5363,7 +8308,7 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.InvoiceResponse": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.InvoiceResponse": {
             "type": "object",
             "properties": {
                 "company_id": {
@@ -5384,7 +8329,7 @@ const docTemplate = `{
                 "details": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/dto.InvoiceDetailResponse"
+                        "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.InvoiceDetailResponse"
                     }
                 },
                 "dian_status": {
@@ -5414,7 +8359,7 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.InvoiceSummaryDTO": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.InvoiceSummaryDTO": {
             "type": "object",
             "properties": {
                 "date": {
@@ -5440,7 +8385,7 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.LoginRequest": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.LoginRequest": {
             "type": "object",
             "required": [
                 "email",
@@ -5455,18 +8400,24 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.LoginResponse": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.LoginResponse": {
             "type": "object",
             "properties": {
+                "role_id": {
+                    "type": "string"
+                },
+                "role_key": {
+                    "type": "string"
+                },
                 "token": {
                     "type": "string"
                 },
                 "user": {
-                    "$ref": "#/definitions/dto.UserResponse"
+                    "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.UserResponse"
                 }
             }
         },
-        "dto.LoyaltyBalanceDTO": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.LoyaltyBalanceDTO": {
             "type": "object",
             "properties": {
                 "balance": {
@@ -5475,7 +8426,7 @@ const docTemplate = `{
                 "history": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/dto.PointEventDTO"
+                        "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.PointEventDTO"
                     }
                 },
                 "next_tier_threshold": {
@@ -5486,7 +8437,7 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.MarginByChannelDTO": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.MarginByChannelDTO": {
             "type": "object",
             "properties": {
                 "channel_id": {
@@ -5547,32 +8498,58 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.MarginsReportDTO": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.MarginsReportDTO": {
             "type": "object",
             "properties": {
                 "channel_profitability": {
-                    "$ref": "#/definitions/dto.ChannelProfitabilityDTO"
+                    "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ChannelProfitabilityDTO"
                 },
                 "pareto_skus": {
                     "description": "SKUs del top 20% que generan ~80% ingresos",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/dto.SKURankingDTO"
+                        "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.SKURankingDTO"
                     }
                 },
                 "period": {
-                    "$ref": "#/definitions/dto.PeriodDTO"
+                    "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.PeriodDTO"
                 },
                 "sku_ranking": {
                     "description": "top N por margen",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/dto.SKURankingDTO"
+                        "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.SKURankingDTO"
                     }
                 }
             }
         },
-        "dto.MovementDTO": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.ModuleResponse": {
+            "type": "object",
+            "properties": {
+                "icon": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "key": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "order": {
+                    "type": "integer"
+                },
+                "screens": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ScreenResponse"
+                    }
+                }
+            }
+        },
+        "github_com_jhoicas_Inventario-api_internal_application_dto.MovementDTO": {
             "type": "object",
             "properties": {
                 "balance": {
@@ -5616,7 +8593,27 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.OpportunityResponse": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.OpportunityListResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.OpportunityResponse"
+                    }
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_jhoicas_Inventario-api_internal_application_dto.OpportunityResponse": {
             "type": "object",
             "properties": {
                 "amount": {
@@ -5654,27 +8651,13 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.PageResponse": {
-            "type": "object",
-            "properties": {
-                "limit": {
-                    "type": "integer"
-                },
-                "offset": {
-                    "type": "integer"
-                },
-                "total": {
-                    "type": "integer"
-                }
-            }
-        },
-        "dto.PaginatedMovementsDTO": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.PaginatedMovementsDTO": {
             "type": "object",
             "properties": {
                 "items": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/dto.MovementDTO"
+                        "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.MovementDTO"
                     }
                 },
                 "total": {
@@ -5682,7 +8665,7 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.PeriodDTO": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.PeriodDTO": {
             "type": "object",
             "properties": {
                 "end_date": {
@@ -5693,7 +8676,7 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.PointEventDTO": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.PointEventDTO": {
             "type": "object",
             "properties": {
                 "occurred_at": {
@@ -5710,21 +8693,27 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.ProductListResponse": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.ProductListResponse": {
             "type": "object",
             "properties": {
                 "items": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/dto.ProductResponse"
+                        "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ProductResponse"
                     }
                 },
-                "page": {
-                    "$ref": "#/definitions/dto.PageResponse"
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
                 }
             }
         },
-        "dto.ProductResponse": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.ProductResponse": {
             "type": "object",
             "properties": {
                 "attributes": {
@@ -5771,13 +8760,13 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.Profile360Response": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.Profile360Response": {
             "type": "object",
             "properties": {
                 "benefits": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/dto.BenefitResponse"
+                        "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.BenefitResponse"
                     }
                 },
                 "category_id": {
@@ -5787,34 +8776,68 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "customer": {
-                    "$ref": "#/definitions/dto.CustomerResponse"
+                    "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CustomerResponse"
                 },
                 "ltv": {
                     "type": "number"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_domain_entity.ProfileMetadata"
                 },
                 "profile_id": {
                     "type": "string"
                 }
             }
         },
-        "dto.PurchaseHistoryResponse": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.PurchaseHistoryResponse": {
             "type": "object",
             "properties": {
                 "invoices": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/dto.InvoiceSummaryDTO"
+                        "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.InvoiceSummaryDTO"
                     }
                 },
                 "stats": {
-                    "$ref": "#/definitions/dto.CustomerPurchaseStatsDTO"
+                    "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CustomerPurchaseStatsDTO"
                 },
                 "total": {
                     "type": "integer"
                 }
             }
         },
-        "dto.RawMaterialImpactDTO": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.RBACCatalogResponse": {
+            "type": "object",
+            "properties": {
+                "modules": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ModuleResponse"
+                    }
+                }
+            }
+        },
+        "github_com_jhoicas_Inventario-api_internal_application_dto.RBACMenuResponse": {
+            "type": "object",
+            "properties": {
+                "modules": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ModuleResponse"
+                    }
+                },
+                "role_id": {
+                    "type": "string"
+                },
+                "role_key": {
+                    "type": "string"
+                },
+                "role_name": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_jhoicas_Inventario-api_internal_application_dto.RawMaterialImpactDTO": {
             "type": "object",
             "properties": {
                 "name": {
@@ -5836,7 +8859,7 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.RedeemPointsRequest": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.RedeemPointsRequest": {
             "type": "object",
             "properties": {
                 "customer_id": {
@@ -5850,7 +8873,7 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.RegisterMovementRequest": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.RegisterMovementRequest": {
             "type": "object",
             "properties": {
                 "adjustment_reason": {
@@ -5880,7 +8903,7 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.RegisterRequest": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.RegisterRequest": {
             "type": "object",
             "required": [
                 "company_id",
@@ -5911,7 +8934,33 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.ReorderConfigRequest": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.RemarketingProspect": {
+            "type": "object",
+            "properties": {
+                "categoria": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "mensajeSugerido": {
+                    "type": "string"
+                },
+                "nombre": {
+                    "type": "string"
+                },
+                "segmento": {
+                    "type": "string"
+                },
+                "totalComprado": {
+                    "type": "number"
+                }
+            }
+        },
+        "github_com_jhoicas_Inventario-api_internal_application_dto.ReorderConfigRequest": {
             "type": "object",
             "properties": {
                 "lead_time_days": {
@@ -5934,7 +8983,7 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.ReplenishmentSuggestionDTO": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.ReplenishmentSuggestionDTO": {
             "type": "object",
             "properties": {
                 "current_stock": {
@@ -5986,7 +9035,7 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.ResolutionResponse": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.ResolutionResponse": {
             "type": "object",
             "properties": {
                 "alert_threshold": {
@@ -6027,13 +9076,35 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.ReturnInvoiceRequest": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.ResolveCampaignRecipientsRequest": {
+            "type": "object",
+            "properties": {
+                "strategies": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CampaignRecipientStrategy"
+                    }
+                }
+            }
+        },
+        "github_com_jhoicas_Inventario-api_internal_application_dto.ResolveCampaignRecipientsResponse": {
+            "type": "object",
+            "properties": {
+                "recipients": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.CampaignRecipientDTO"
+                    }
+                }
+            }
+        },
+        "github_com_jhoicas_Inventario-api_internal_application_dto.ReturnInvoiceRequest": {
             "type": "object",
             "properties": {
                 "items": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/dto.ReturnItemRequest"
+                        "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.ReturnItemRequest"
                     }
                 },
                 "reason": {
@@ -6044,7 +9115,7 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.ReturnItemRequest": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.ReturnItemRequest": {
             "type": "object",
             "properties": {
                 "product_id": {
@@ -6055,7 +9126,27 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.SKURankingDTO": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.RoleResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "key": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_jhoicas_Inventario-api_internal_application_dto.SKURankingDTO": {
             "type": "object",
             "properties": {
                 "cumulative_revenue_pct": {
@@ -6102,7 +9193,59 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.SendCustomEmailRequest": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.ScreenResponse": {
+            "type": "object",
+            "properties": {
+                "api_endpoint": {
+                    "type": "string"
+                },
+                "frontend_route": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "key": {
+                    "type": "string"
+                },
+                "module_classification": {
+                    "type": "string"
+                },
+                "module_key": {
+                    "type": "string"
+                },
+                "module_key_snapshot": {
+                    "type": "string"
+                },
+                "module_name": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "order": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_jhoicas_Inventario-api_internal_application_dto.SendCampaignRequest": {
+            "type": "object",
+            "properties": {
+                "body": {
+                    "description": "requerido (texto generado por IA o HTML simple)",
+                    "type": "string"
+                },
+                "category_id": {
+                    "description": "opcional: filtrar por categoría CRM",
+                    "type": "string"
+                },
+                "subject": {
+                    "description": "requerido",
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_jhoicas_Inventario-api_internal_application_dto.SendCustomEmailRequest": {
             "type": "object",
             "properties": {
                 "body": {
@@ -6116,7 +9259,24 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.StockSummaryDTO": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.SendTestCampaignRequest": {
+            "type": "object",
+            "properties": {
+                "body": {
+                    "type": "string"
+                },
+                "customer_id": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "subject": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_jhoicas_Inventario-api_internal_application_dto.StockSummaryDTO": {
             "type": "object",
             "properties": {
                 "available_stock": {
@@ -6143,21 +9303,27 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.SupplierListResponse": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.SupplierListResponse": {
             "type": "object",
             "properties": {
                 "items": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/dto.SupplierResponse"
+                        "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.SupplierResponse"
                     }
                 },
-                "page": {
-                    "$ref": "#/definitions/dto.PageResponse"
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
                 }
             }
         },
-        "dto.SupplierResponse": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.SupplierResponse": {
             "type": "object",
             "properties": {
                 "company_id": {
@@ -6192,7 +9358,7 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.TaskResponse": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.TaskResponse": {
             "type": "object",
             "properties": {
                 "company_id": {
@@ -6227,13 +9393,13 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.TaskResponseList": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.TaskResponseList": {
             "type": "object",
             "properties": {
                 "items": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/dto.TaskResponse"
+                        "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.TaskResponse"
                     }
                 },
                 "limit": {
@@ -6241,10 +9407,13 @@ const docTemplate = `{
                 },
                 "offset": {
                     "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
                 }
             }
         },
-        "dto.TicketResponse": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.TicketResponse": {
             "type": "object",
             "properties": {
                 "company_id": {
@@ -6282,13 +9451,13 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.TicketResponseList": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.TicketResponseList": {
             "type": "object",
             "properties": {
                 "items": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/dto.TicketResponse"
+                        "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.TicketResponse"
                     }
                 },
                 "limit": {
@@ -6296,10 +9465,13 @@ const docTemplate = `{
                 },
                 "offset": {
                     "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
                 }
             }
         },
-        "dto.UpdateBenefitRequest": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.UpdateBenefitRequest": {
             "type": "object",
             "required": [
                 "name"
@@ -6315,7 +9487,62 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.UpdateCustomerRequest": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.UpdateCategoryRequest": {
+            "type": "object",
+            "properties": {
+                "min_ltv": {
+                    "type": "number"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_jhoicas_Inventario-api_internal_application_dto.UpdateCompanyModuleRequest": {
+            "type": "object",
+            "properties": {
+                "expires_at": {
+                    "description": "RFC3339 opcional; \"\" limpia vencimiento",
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "github_com_jhoicas_Inventario-api_internal_application_dto.UpdateCompanyRequest": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "minLength": 1
+                },
+                "nit": {
+                    "type": "string",
+                    "maxLength": 20,
+                    "minLength": 1
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "active",
+                        "suspended",
+                        "inactive"
+                    ]
+                }
+            }
+        },
+        "github_com_jhoicas_Inventario-api_internal_application_dto.UpdateCustomerRequest": {
             "type": "object",
             "properties": {
                 "email": {
@@ -6332,7 +9559,7 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.UpdateProductRequest": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.UpdateProductRequest": {
             "type": "object",
             "properties": {
                 "attributes": {
@@ -6363,7 +9590,18 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.UpdateSupplierRequest": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.UpdateRoleScreensRequest": {
+            "type": "object",
+            "properties": {
+                "screen_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "github_com_jhoicas_Inventario-api_internal_application_dto.UpdateSupplierRequest": {
             "type": "object",
             "properties": {
                 "email": {
@@ -6386,7 +9624,7 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.UpdateTaskRequest": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.UpdateTaskRequest": {
             "type": "object",
             "properties": {
                 "description": {
@@ -6404,7 +9642,7 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.UpdateTicketRequest": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.UpdateTicketRequest": {
             "type": "object",
             "properties": {
                 "description": {
@@ -6421,7 +9659,27 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.UserResponse": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.UserListResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.UserResponse"
+                    }
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_jhoicas_Inventario-api_internal_application_dto.UserResponse": {
             "type": "object",
             "properties": {
                 "company_id": {
@@ -6453,7 +9711,7 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.VoidInvoiceResponse": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.VoidInvoiceResponse": {
             "type": "object",
             "properties": {
                 "credit_note_id": {
@@ -6467,21 +9725,27 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.WarehouseListResponse": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.WarehouseListResponse": {
             "type": "object",
             "properties": {
                 "items": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/dto.WarehouseResponse"
+                        "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_dto.WarehouseResponse"
                     }
                 },
-                "page": {
-                    "$ref": "#/definitions/dto.PageResponse"
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
                 }
             }
         },
-        "dto.WarehouseResponse": {
+        "github_com_jhoicas_Inventario-api_internal_application_dto.WarehouseResponse": {
             "type": "object",
             "properties": {
                 "address": {
@@ -6504,34 +9768,7 @@ const docTemplate = `{
                 }
             }
         },
-        "http.createStocktakeRequest": {
-            "type": "object",
-            "properties": {
-                "warehouse_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "http.receivePurchaseOrderRequest": {
-            "type": "object",
-            "properties": {
-                "warehouse_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "http.updateStocktakeCountsRequest": {
-            "type": "object",
-            "properties": {
-                "items": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/inventory.StocktakeItemInput"
-                    }
-                }
-            }
-        },
-        "inventory.CreatePurchaseOrderInput": {
+        "github_com_jhoicas_Inventario-api_internal_application_inventory.CreatePurchaseOrderInput": {
             "type": "object",
             "properties": {
                 "date": {
@@ -6540,7 +9777,7 @@ const docTemplate = `{
                 "items": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/inventory.PurchaseOrderItemInput"
+                        "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_inventory.PurchaseOrderItemInput"
                     }
                 },
                 "number": {
@@ -6551,7 +9788,7 @@ const docTemplate = `{
                 }
             }
         },
-        "inventory.PurchaseOrderItemInput": {
+        "github_com_jhoicas_Inventario-api_internal_application_inventory.PurchaseOrderItemInput": {
             "type": "object",
             "properties": {
                 "product_id": {
@@ -6565,7 +9802,7 @@ const docTemplate = `{
                 }
             }
         },
-        "inventory.StocktakeItemInput": {
+        "github_com_jhoicas_Inventario-api_internal_application_inventory.StocktakeItemInput": {
             "type": "object",
             "properties": {
                 "counted_qty": {
@@ -6573,6 +9810,91 @@ const docTemplate = `{
                 },
                 "product_id": {
                     "type": "string"
+                }
+            }
+        },
+        "github_com_jhoicas_Inventario-api_internal_domain_entity.ProfileMetadata": {
+            "type": "object",
+            "properties": {
+                "distinctProducts": {
+                    "type": "integer"
+                },
+                "followUpStrategy": {
+                    "type": "string"
+                },
+                "lastPurchaseDate": {
+                    "type": "string"
+                },
+                "mainCategory": {
+                    "type": "string"
+                },
+                "ordersCount": {
+                    "type": "integer"
+                },
+                "productsList": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_billing.AcquirerInfo": {
+            "type": "object",
+            "properties": {
+                "business_name": {
+                    "type": "string"
+                },
+                "dv": {
+                    "type": "string"
+                },
+                "id_code": {
+                    "type": "string"
+                },
+                "status_code": {
+                    "type": "string"
+                },
+                "status_description": {
+                    "type": "string"
+                },
+                "tax_id": {
+                    "type": "string"
+                },
+                "tax_scheme": {
+                    "type": "string"
+                },
+                "type_liability": {
+                    "type": "string"
+                },
+                "type_organization": {
+                    "type": "string"
+                },
+                "type_regime": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_interfaces_http.createStocktakeRequest": {
+            "type": "object",
+            "properties": {
+                "warehouse_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_interfaces_http.receivePurchaseOrderRequest": {
+            "type": "object",
+            "properties": {
+                "warehouse_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_interfaces_http.updateStocktakeCountsRequest": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_jhoicas_Inventario-api_internal_application_inventory.StocktakeItemInput"
+                    }
                 }
             }
         }

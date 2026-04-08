@@ -65,6 +65,13 @@ type EmailListResponse struct {
 	Offset int             `json:"offset"`
 }
 
+type EmailAccountListResponse struct {
+	Items  []EmailAccountResponse `json:"items"`
+	Total  int                    `json:"total"`
+	Limit  int                    `json:"limit"`
+	Offset int                    `json:"offset"`
+}
+
 type EmailMessage struct {
 	ID      string    `json:"id"`
 	Subject string    `json:"subject"`
