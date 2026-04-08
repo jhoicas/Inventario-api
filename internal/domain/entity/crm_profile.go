@@ -41,4 +41,5 @@ type Profile360 struct {
 	ProfileID  string
 	CategoryID string
 	LTV        decimal.Decimal
+	Metadata   ProfileMetadata
 }

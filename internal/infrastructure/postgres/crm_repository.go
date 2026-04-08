@@ -211,16 +211,17 @@ func (r *CRMProfileRepo) GetByCustomerID(customerID string) (*entity.CRMCustomer
 func (r *CRMProfileRepo) GetProfile360(ctx context.Context, companyID, customerID string) (*entity.Profile360, error) {
 	query := `
 		SELECT c.id, c.company_id, c.name, c.tax_id, c.email, c.phone, c.created_at, c.updated_at,
-		       p.id AS profile_id, p.category_id, COALESCE(p.ltv, 0) AS ltv
+		       p.id AS profile_id, p.category_id, COALESCE(p.ltv, 0) AS ltv, COALESCE(p.metadata, '{}'::jsonb) AS metadata
 		FROM customers c
 		LEFT JOIN crm_customer_profiles p ON p.customer_id = c.id
 		WHERE c.id = $1 AND c.company_id = $2`
 	var cust entity.Customer
 	var profileID, catID *string
 	var ltv decimal.Decimal
+	var metadataRaw []byte
 	err := r.q.QueryRow(ctx, query, customerID, companyID).Scan(
 		&cust.ID, &cust.CompanyID, &cust.Name, &cust.TaxID, &cust.Email, &cust.Phone, &cust.CreatedAt, &cust.UpdatedAt,
-		&profileID, &catID, &ltv,
+		&profileID, &catID, &ltv, &metadataRaw,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -234,6 +235,9 @@ func (r *CRMProfileRepo) GetProfile360(ctx context.Context, companyID, customerI
 	}
 	if catID != nil {
 		out.CategoryID = *catID
+	}
+	if len(metadataRaw) > 0 {
+		_ = json.Unmarshal(metadataRaw, &out.Metadata)
 	}
 	return out, nil
 }

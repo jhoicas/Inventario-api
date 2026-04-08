@@ -3,6 +3,7 @@ package dto
 import (
 	"time"
 
+	"github.com/jhoicas/Inventario-api/internal/domain/entity"
 	"github.com/shopspring/decimal"
 )
 
@@ -99,12 +100,13 @@ type UpdateBenefitRequest struct {
 
 // Profile360Response vista 360 del cliente (datos base + perfil CRM).
 type Profile360Response struct {
-	Customer     CustomerResponse  `json:"customer"`
-	ProfileID    string            `json:"profile_id"`
-	CategoryID   string            `json:"category_id"`
-	CategoryName string            `json:"category_name,omitempty"`
-	LTV          decimal.Decimal   `json:"ltv"`
-	Benefits     []BenefitResponse `json:"benefits,omitempty"`
+	Customer     CustomerResponse        `json:"customer"`
+	ProfileID    string                  `json:"profile_id"`
+	CategoryID   string                  `json:"category_id"`
+	CategoryName string                  `json:"category_name,omitempty"`
+	LTV          decimal.Decimal         `json:"ltv"`
+	Metadata     *entity.ProfileMetadata `json:"metadata,omitempty"`
+	Benefits     []BenefitResponse       `json:"benefits,omitempty"`
 }
 
 // TaskResponse tarea en respuestas.

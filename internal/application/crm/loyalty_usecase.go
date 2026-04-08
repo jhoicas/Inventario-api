@@ -299,6 +299,7 @@ func (uc *LoyaltyUseCase) GetProfile360(ctx context.Context, companyID, customer
 		ProfileID:  p360.ProfileID,
 		CategoryID: p360.CategoryID,
 		LTV:        p360.LTV,
+		Metadata:   &p360.Metadata,
 		Benefits:   []dto.BenefitResponse{},
 	}
 	if p360.CategoryID != "" {
