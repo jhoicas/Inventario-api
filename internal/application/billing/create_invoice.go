@@ -327,6 +327,7 @@ func (uc *CreateInvoiceUseCase) ListInvoices(ctx context.Context, companyID stri
 
 	invoices, total, err := uc.invoiceRepo.List(repository.InvoiceListFilter{
 		CompanyID:    companyID,
+		Search:       in.Search,
 		StartDate:    in.StartDate,
 		EndDate:      in.EndDate,
 		CustomerID:   in.CustomerID,

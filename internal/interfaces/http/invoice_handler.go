@@ -116,6 +116,7 @@ func NewInvoiceHandlerWithBillingOps(
 // @Tags         billing
 // @Security     Bearer
 // @Produce      json
+// @Param        search       query     string  false  "Búsqueda libre (prefijo, número, CUFE, cliente)"
 // @Param        start_date   query     string  false  "Fecha inicio (YYYY-MM-DD)"
 // @Param        end_date     query     string  false  "Fecha fin (YYYY-MM-DD)"
 // @Param        customer_id  query     string  false  "ID del cliente"
@@ -134,6 +135,7 @@ func (h *InvoiceHandler) GetInvoices(c *fiber.Ctx) error {
 	}
 
 	filter := dto.InvoiceFilter{
+		Search:       c.Query("search"),
 		StartDate:    c.Query("start_date"),
 		EndDate:      c.Query("end_date"),
 		CustomerID:   c.Query("customer_id"),
@@ -157,6 +159,7 @@ func (h *InvoiceHandler) GetInvoices(c *fiber.Ctx) error {
 // @Tags         billing
 // @Security     Bearer
 // @Produce      json
+// @Param        search       query     string  false  "Búsqueda libre (prefijo, número, CUFE, cliente)"
 // @Param        start_date   query     string  false  "Fecha inicio (YYYY-MM-DD)"
 // @Param        end_date     query     string  false  "Fecha fin (YYYY-MM-DD)"
 // @Param        customer_id  query     string  false  "ID del cliente"
@@ -175,6 +178,7 @@ func (h *InvoiceHandler) GetCreditNotes(c *fiber.Ctx) error {
 	}
 
 	filter := dto.InvoiceFilter{
+		Search:       c.Query("search"),
 		StartDate:    c.Query("start_date"),
 		EndDate:      c.Query("end_date"),
 		CustomerID:   c.Query("customer_id"),
@@ -198,6 +202,7 @@ func (h *InvoiceHandler) GetCreditNotes(c *fiber.Ctx) error {
 // @Tags         billing
 // @Security     Bearer
 // @Produce      json
+// @Param        search       query     string  false  "Búsqueda libre (prefijo, número, CUFE, cliente)"
 // @Param        start_date   query     string  false  "Fecha inicio (YYYY-MM-DD)"
 // @Param        end_date     query     string  false  "Fecha fin (YYYY-MM-DD)"
 // @Param        customer_id  query     string  false  "ID del cliente"
@@ -216,6 +221,7 @@ func (h *InvoiceHandler) GetDebitNotes(c *fiber.Ctx) error {
 	}
 
 	filter := dto.InvoiceFilter{
+		Search:       c.Query("search"),
 		StartDate:    c.Query("start_date"),
 		EndDate:      c.Query("end_date"),
 		CustomerID:   c.Query("customer_id"),

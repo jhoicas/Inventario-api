@@ -9,7 +9,7 @@ type UserRepository interface {
 	GetByEmail(email string) (*entity.User, error)
 	GetByEmailAndCompany(email, companyID string) (*entity.User, error)
 	Update(user *entity.User) error
-	ListByCompany(companyID string, limit, offset int) ([]*entity.User, int64, error)
+	ListByCompany(companyID, search string, limit, offset int) ([]*entity.User, int64, error)
 	Delete(id string) error
 	// FindByID y FindByEmail alias semánticos para uso en auth.
 	FindByID(id string) (*entity.User, error)

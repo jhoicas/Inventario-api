@@ -28,6 +28,7 @@ func NewUserHandler(repo repository.UserRepository) *UserHandler {
 // @Tags         users
 // @Security     Bearer
 // @Produce      json
+// @Param        search  query     string  false  "Búsqueda libre por email o nombre"
 // @Param        limit   query     int   false  "Límite"   default(20)
 // @Param        offset  query     int   false  "Offset"   default(0)
 // @Success      200     {object}  dto.UserListResponse
@@ -50,7 +51,8 @@ func (h *UserHandler) List(c *fiber.Ctx) error {
 	if offset < 0 {
 		offset = 0
 	}
-	list, total, err := h.repo.ListByCompany(companyID, limit, offset)
+	search := c.Query("search")
+	list, total, err := h.repo.ListByCompany(companyID, search, limit, offset)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}

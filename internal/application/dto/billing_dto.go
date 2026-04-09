@@ -140,6 +140,7 @@ type InvoiceDetailResponse struct {
 
 // InvoiceFilter parámetros de filtrado y paginación para GET /api/invoices.
 type InvoiceFilter struct {
+	Search       string `query:"search"`
 	StartDate    string `query:"start_date"` // YYYY-MM-DD
 	EndDate      string `query:"end_date"`   // YYYY-MM-DD
 	CustomerID   string `query:"customer_id"`

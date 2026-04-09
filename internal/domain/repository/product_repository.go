@@ -12,6 +12,6 @@ type ProductRepository interface {
 	GetByCompanyAndSKU(companyID, sku string) (*entity.Product, error)
 	Update(product *entity.Product) error
 	UpdateCost(productID string, cost decimal.Decimal) error
-	ListByCompany(companyID string, limit, offset int) ([]*entity.Product, int64, error)
+	ListByCompany(companyID, search string, limit, offset int) ([]*entity.Product, int64, error)
 	Delete(id string) error
 }

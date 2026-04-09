@@ -108,8 +108,8 @@ func (uc *ProductUseCase) Update(id string, in dto.UpdateProductRequest) (*dto.P
 }
 
 // List lista productos por empresa con paginación.
-func (uc *ProductUseCase) List(companyID string, limit, offset int) (*dto.ProductListResponse, error) {
-	list, total, err := uc.repo.ListByCompany(companyID, limit, offset)
+func (uc *ProductUseCase) List(companyID, search string, limit, offset int) (*dto.ProductListResponse, error) {
+	list, total, err := uc.repo.ListByCompany(companyID, search, limit, offset)
 	if err != nil {
 		return nil, err
 	}

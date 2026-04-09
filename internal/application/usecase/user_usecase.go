@@ -17,14 +17,14 @@ func NewUserUseCase(repo repository.UserRepository) *UserUseCase {
 }
 
 // ListByCompany lista usuarios de una empresa con paginación.
-func (uc *UserUseCase) ListByCompany(companyID string, limit, offset int) (*dto.UserListResponse, error) {
+func (uc *UserUseCase) ListByCompany(companyID, search string, limit, offset int) (*dto.UserListResponse, error) {
 	if limit <= 0 {
 		limit = 20
 	}
 	if offset < 0 {
 		offset = 0
 	}
-	list, total, err := uc.repo.ListByCompany(companyID, limit, offset)
+	list, total, err := uc.repo.ListByCompany(companyID, search, limit, offset)
 	if err != nil {
 		return nil, err
 	}

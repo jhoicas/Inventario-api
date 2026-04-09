@@ -23,7 +23,7 @@ type fakeProductRepository struct {
 	getByCompanyAndSKUFunc func(companyID, sku string) (*entity.Product, error)
 	updateFunc             func(product *entity.Product) error
 	updateCostFunc         func(productID string, cost decimal.Decimal) error
-	listByCompanyFunc      func(companyID string, limit, offset int) ([]*entity.Product, error)
+	listByCompanyFunc      func(companyID, search string, limit, offset int) ([]*entity.Product, int64, error)
 	deleteFunc             func(id string) error
 }
 
@@ -62,11 +62,11 @@ func (f *fakeProductRepository) UpdateCost(productID string, cost decimal.Decima
 	return nil
 }
 
-func (f *fakeProductRepository) ListByCompany(companyID string, limit, offset int) ([]*entity.Product, error) {
+func (f *fakeProductRepository) ListByCompany(companyID, search string, limit, offset int) ([]*entity.Product, int64, error) {
 	if f.listByCompanyFunc != nil {
-		return f.listByCompanyFunc(companyID, limit, offset)
+		return f.listByCompanyFunc(companyID, search, limit, offset)
 	}
-	return nil, nil
+	return nil, 0, nil
 }
 
 func (f *fakeProductRepository) Delete(id string) error {
@@ -99,19 +99,19 @@ func validCreateProductRequest() dto.CreateProductRequest {
 func validProductEntity(id, companyID string) *entity.Product {
 	now := time.Now()
 	return &entity.Product{
-		ID:           id,
-		CompanyID:    companyID,
-		SKU:          "SKU-TEST-001",
-		Name:         "Producto de prueba",
-		Description:  "Descripción",
-		Price:        decimal.NewFromInt(10000),
-		Cost:         decimal.Zero,
-		TaxRate:      decimal.NewFromInt(19),
-		UNSPSC_Code:  "12345678",
-		UnitMeasure:  "94",
-		Attributes:   nil,
-		CreatedAt:    now,
-		UpdatedAt:    now,
+		ID:          id,
+		CompanyID:   companyID,
+		SKU:         "SKU-TEST-001",
+		Name:        "Producto de prueba",
+		Description: "Descripción",
+		Price:       decimal.NewFromInt(10000),
+		Cost:        decimal.Zero,
+		TaxRate:     decimal.NewFromInt(19),
+		UNSPSC_Code: "12345678",
+		UnitMeasure: "94",
+		Attributes:  nil,
+		CreatedAt:   now,
+		UpdatedAt:   now,
 	}
 }
 
@@ -358,11 +358,12 @@ func TestProductUseCase_List(t *testing.T) {
 			offset:    0,
 			repoSetup: func() *fakeProductRepository {
 				return &fakeProductRepository{
-					listByCompanyFunc: func(companyID string, limit, offset int) ([]*entity.Product, error) {
+					listByCompanyFunc: func(companyID, search string, limit, offset int) ([]*entity.Product, int64, error) {
 						assert.Equal(t, testCompanyID, companyID)
+						assert.Equal(t, "", search)
 						assert.Equal(t, 20, limit)
 						assert.Equal(t, 0, offset)
-						return []*entity.Product{validProductEntity("p1", testCompanyID)}, nil
+						return []*entity.Product{validProductEntity("p1", testCompanyID)}, 1, nil
 					},
 				}
 			},
@@ -370,8 +371,8 @@ func TestProductUseCase_List(t *testing.T) {
 			validateOut: func(t *testing.T, out *dto.ProductListResponse) {
 				require.Len(t, out.Items, 1)
 				assert.Equal(t, "p1", out.Items[0].ID)
-				assert.Equal(t, 20, out.Page.Limit)
-				assert.Equal(t, 0, out.Page.Offset)
+				assert.Equal(t, 20, out.Limit)
+				assert.Equal(t, 0, out.Offset)
 			},
 		},
 		{
@@ -381,18 +382,18 @@ func TestProductUseCase_List(t *testing.T) {
 			offset:    5,
 			repoSetup: func() *fakeProductRepository {
 				return &fakeProductRepository{
-					listByCompanyFunc: func(_ string, limit, offset int) ([]*entity.Product, error) {
+					listByCompanyFunc: func(_ string, _ string, limit, offset int) ([]*entity.Product, int64, error) {
 						assert.Equal(t, 10, limit)
 						assert.Equal(t, 5, offset)
-						return []*entity.Product{}, nil
+						return []*entity.Product{}, 0, nil
 					},
 				}
 			},
 			wantErr: false,
 			validateOut: func(t *testing.T, out *dto.ProductListResponse) {
 				assert.Len(t, out.Items, 0)
-				assert.Equal(t, 10, out.Page.Limit)
-				assert.Equal(t, 5, out.Page.Offset)
+				assert.Equal(t, 10, out.Limit)
+				assert.Equal(t, 5, out.Offset)
 			},
 		},
 		{
@@ -402,8 +403,8 @@ func TestProductUseCase_List(t *testing.T) {
 			offset:    0,
 			repoSetup: func() *fakeProductRepository {
 				return &fakeProductRepository{
-					listByCompanyFunc: func(_ string, _, _ int) ([]*entity.Product, error) {
-						return nil, errors.New("db error")
+					listByCompanyFunc: func(_ string, _ string, _, _ int) ([]*entity.Product, int64, error) {
+						return nil, 0, errors.New("db error")
 					},
 				}
 			},
@@ -417,7 +418,7 @@ func TestProductUseCase_List(t *testing.T) {
 			repo := tt.repoSetup()
 			uc := NewProductUseCase(repo)
 
-			out, err := uc.List(tt.companyID, tt.limit, tt.offset)
+			out, err := uc.List(tt.companyID, "", tt.limit, tt.offset)
 
 			if tt.wantErr {
 				require.Error(t, err)

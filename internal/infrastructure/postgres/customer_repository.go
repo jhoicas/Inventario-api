@@ -120,7 +120,7 @@ func (r *CustomerRepo) buildFilters(companyID, search string) (string, string, [
 		WHERE c.company_id = $1 AND c.is_active = true`
 	args := []any{companyID}
 	if search != "" {
-		where += ` AND (c.name ILIKE $2 OR c.tax_id ILIKE $2)`
+		where += ` AND (c.name ILIKE $2 OR c.email ILIKE $2 OR c.tax_id ILIKE $2)`
 		args = append(args, "%"+search+"%")
 	}
 	return joins, where, args

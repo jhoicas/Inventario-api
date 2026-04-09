@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jhoicas/Inventario-api/internal/domain"
@@ -132,8 +133,8 @@ func (r *ProductRepo) UpdateCost(productID string, cost decimal.Decimal) error {
 }
 
 // ListByCompany lista productos por empresa con paginación.
-func (r *ProductRepo) ListByCompany(companyID string, limit, offset int) ([]*entity.Product, int64, error) {
-	where, args := r.buildFilters(companyID)
+func (r *ProductRepo) ListByCompany(companyID, search string, limit, offset int) ([]*entity.Product, int64, error) {
+	where, args := r.buildFilters(companyID, search)
 	items, err := r.list(where, args, limit, offset)
 	if err != nil {
 		return nil, 0, err
@@ -145,11 +146,16 @@ func (r *ProductRepo) ListByCompany(companyID string, limit, offset int) ([]*ent
 	return items, total, nil
 }
 
-func (r *ProductRepo) buildFilters(companyID string) (string, []any) {
+func (r *ProductRepo) buildFilters(companyID, search string) (string, []any) {
 	where := `
 		FROM products
 		WHERE company_id = $1`
-	return where, []any{companyID}
+	args := []any{companyID}
+	if strings.TrimSpace(search) != "" {
+		args = append(args, "%"+strings.TrimSpace(search)+"%")
+		where += fmt.Sprintf(` AND (sku ILIKE $%d OR name ILIKE $%d OR COALESCE(description, '') ILIKE $%d)`, len(args), len(args), len(args))
+	}
+	return where, args
 }
 
 func (r *ProductRepo) list(where string, args []any, limit, offset int) ([]*entity.Product, error) {

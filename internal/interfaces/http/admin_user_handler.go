@@ -8,7 +8,7 @@ import (
 
 // AdminUserUseCase define el contrato para administrar usuarios de una empresa desde super_admin.
 type AdminUserUseCase interface {
-	ListByCompany(companyID string, limit, offset int) (*dto.UserListResponse, error)
+	ListByCompany(companyID, search string, limit, offset int) (*dto.UserListResponse, error)
 	CreateForCompany(companyID string, in dto.AdminCreateUserRequest) (*dto.UserResponse, error)
 	UpdateForCompany(companyID, userID string, in dto.AdminUpdateUserRequest) (*dto.UserResponse, error)
 }
@@ -40,7 +40,8 @@ func (h *AdminUserHandler) ListByCompany(c *fiber.Ctx) error {
 	if offset < 0 {
 		offset = 0
 	}
-	list, err := h.uc.ListByCompany(companyID, limit, offset)
+	search := c.Query("search")
+	list, err := h.uc.ListByCompany(companyID, search, limit, offset)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}

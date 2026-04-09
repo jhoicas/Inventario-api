@@ -22,7 +22,7 @@ func NewAdminUserUseCase(repo repository.UserRepository) *AdminUserUseCase {
 }
 
 // ListByCompany lista usuarios de una empresa.
-func (uc *AdminUserUseCase) ListByCompany(companyID string, limit, offset int) (*dto.UserListResponse, error) {
+func (uc *AdminUserUseCase) ListByCompany(companyID, search string, limit, offset int) (*dto.UserListResponse, error) {
 	if companyID == "" {
 		return nil, domain.ErrInvalidInput
 	}
@@ -32,7 +32,7 @@ func (uc *AdminUserUseCase) ListByCompany(companyID string, limit, offset int) (
 	if offset < 0 {
 		offset = 0
 	}
-	list, total, err := uc.repo.ListByCompany(companyID, limit, offset)
+	list, total, err := uc.repo.ListByCompany(companyID, search, limit, offset)
 	if err != nil {
 		return nil, err
 	}

@@ -329,6 +329,22 @@ func (r *InvoiceRepo) List(filter repository.InvoiceListFilter) ([]*entity.Invoi
 		conds = append(conds, fmt.Sprintf("prefix = $%d", idx))
 		idx++
 	}
+	if strings.TrimSpace(filter.Search) != "" {
+		term := "%" + strings.TrimSpace(filter.Search) + "%"
+		args = append(args, term)
+		conds = append(conds, fmt.Sprintf(`(
+			COALESCE(prefix, '') ILIKE $%d OR
+			COALESCE(number, '') ILIKE $%d OR
+			COALESCE(cufe, '') ILIKE $%d OR
+			EXISTS (
+				SELECT 1 FROM customers c
+				WHERE c.id = invoices.customer_id
+				  AND c.company_id = invoices.company_id
+				  AND (c.name ILIKE $%d OR COALESCE(c.email, '') ILIKE $%d OR COALESCE(c.tax_id, '') ILIKE $%d)
+			)
+		)`, idx, idx, idx, idx, idx, idx))
+		idx++
+	}
 
 	where := strings.Join(conds, " AND ")
 

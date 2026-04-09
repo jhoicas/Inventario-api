@@ -221,7 +221,7 @@ type fakeProductRepo struct {
 	getByCompanyAndSKUFunc func(companyID, sku string) (*entity.Product, error)
 	updateFunc             func(product *entity.Product) error
 	updateCostFunc         func(productID string, cost decimal.Decimal) error
-	listByCompanyFunc      func(companyID string, limit, offset int) ([]*entity.Product, error)
+	listByCompanyFunc      func(companyID, search string, limit, offset int) ([]*entity.Product, int64, error)
 	deleteFunc             func(id string) error
 }
 
@@ -255,11 +255,11 @@ func (f *fakeProductRepo) UpdateCost(productID string, cost decimal.Decimal) err
 	}
 	return nil
 }
-func (f *fakeProductRepo) ListByCompany(companyID string, limit, offset int) ([]*entity.Product, error) {
+func (f *fakeProductRepo) ListByCompany(companyID, search string, limit, offset int) ([]*entity.Product, int64, error) {
 	if f.listByCompanyFunc != nil {
-		return f.listByCompanyFunc(companyID, limit, offset)
+		return f.listByCompanyFunc(companyID, search, limit, offset)
 	}
-	return nil, nil
+	return nil, 0, nil
 }
 func (f *fakeProductRepo) Delete(id string) error {
 	if f.deleteFunc != nil {

@@ -23,7 +23,7 @@ import (
 type fakeProductUseCase struct {
 	createFunc  func(companyID string, in dto.CreateProductRequest) (*dto.ProductResponse, error)
 	getByIDFunc func(id string) (*dto.ProductResponse, error)
-	listFunc    func(companyID string, limit, offset int) (*dto.ProductListResponse, error)
+	listFunc    func(companyID, search string, limit, offset int) (*dto.ProductListResponse, error)
 	updateFunc  func(id string, in dto.UpdateProductRequest) (*dto.ProductResponse, error)
 }
 
@@ -41,9 +41,9 @@ func (f *fakeProductUseCase) GetByID(id string) (*dto.ProductResponse, error) {
 	return nil, errors.New("getByID not configured")
 }
 
-func (f *fakeProductUseCase) List(companyID string, limit, offset int) (*dto.ProductListResponse, error) {
+func (f *fakeProductUseCase) List(companyID, search string, limit, offset int) (*dto.ProductListResponse, error) {
 	if f.listFunc != nil {
-		return f.listFunc(companyID, limit, offset)
+		return f.listFunc(companyID, search, limit, offset)
 	}
 	return nil, errors.New("list not configured")
 }
@@ -348,7 +348,7 @@ func TestProductHandler_List(t *testing.T) {
 			query: "",
 			mockSetup: func() *fakeProductUseCase {
 				return &fakeProductUseCase{
-					listFunc: func(_ string, limit, offset int) (*dto.ProductListResponse, error) {
+					listFunc: func(_ string, _ string, limit, offset int) (*dto.ProductListResponse, error) {
 						return &dto.ProductListResponse{
 							Items:  []dto.ProductResponse{*validProductResponse()},
 							Total:  1,
@@ -374,7 +374,7 @@ func TestProductHandler_List(t *testing.T) {
 			query: "?limit=10&offset=5",
 			mockSetup: func() *fakeProductUseCase {
 				return &fakeProductUseCase{
-					listFunc: func(_ string, limit, offset int) (*dto.ProductListResponse, error) {
+					listFunc: func(_ string, _ string, limit, offset int) (*dto.ProductListResponse, error) {
 						return &dto.ProductListResponse{
 							Items:  []dto.ProductResponse{},
 							Total:  0,
@@ -411,7 +411,7 @@ func TestProductHandler_List(t *testing.T) {
 			query: "",
 			mockSetup: func() *fakeProductUseCase {
 				return &fakeProductUseCase{
-					listFunc: func(_ string, _, _ int) (*dto.ProductListResponse, error) {
+					listFunc: func(_ string, _ string, _, _ int) (*dto.ProductListResponse, error) {
 						return nil, errors.New("db error")
 					},
 				}

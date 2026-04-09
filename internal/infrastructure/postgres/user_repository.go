@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -135,8 +136,8 @@ func (r *UserRepo) Update(user *entity.User) error {
 }
 
 // ListByCompany lista usuarios por company con paginación.
-func (r *UserRepo) ListByCompany(companyID string, limit, offset int) ([]*entity.User, int64, error) {
-	where, args := r.buildFilters(companyID)
+func (r *UserRepo) ListByCompany(companyID, search string, limit, offset int) ([]*entity.User, int64, error) {
+	where, args := r.buildFilters(companyID, search)
 	items, err := r.list(where, args, limit, offset)
 	if err != nil {
 		return nil, 0, err
@@ -148,11 +149,16 @@ func (r *UserRepo) ListByCompany(companyID string, limit, offset int) ([]*entity
 	return items, total, nil
 }
 
-func (r *UserRepo) buildFilters(companyID string) (string, []any) {
+func (r *UserRepo) buildFilters(companyID, search string) (string, []any) {
 	where := `
 		FROM users
 		WHERE company_id = $1`
-	return where, []any{companyID}
+	args := []any{companyID}
+	if strings.TrimSpace(search) != "" {
+		args = append(args, "%"+strings.TrimSpace(search)+"%")
+		where += fmt.Sprintf(` AND (email ILIKE $%d OR name ILIKE $%d)`, len(args), len(args))
+	}
+	return where, args
 }
 
 func (r *UserRepo) list(where string, args []any, limit, offset int) ([]*entity.User, error) {

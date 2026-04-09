@@ -15,14 +15,14 @@ import (
 )
 
 type fakeAdminUserUseCase struct {
-	listByCompanyFunc   func(companyID string, limit, offset int) (*dto.UserListResponse, error)
+	listByCompanyFunc   func(companyID, search string, limit, offset int) (*dto.UserListResponse, error)
 	createForCompanyFun func(companyID string, in dto.AdminCreateUserRequest) (*dto.UserResponse, error)
 	updateForCompanyFun func(companyID, userID string, in dto.AdminUpdateUserRequest) (*dto.UserResponse, error)
 }
 
-func (f *fakeAdminUserUseCase) ListByCompany(companyID string, limit, offset int) (*dto.UserListResponse, error) {
+func (f *fakeAdminUserUseCase) ListByCompany(companyID, search string, limit, offset int) (*dto.UserListResponse, error) {
 	if f.listByCompanyFunc != nil {
-		return f.listByCompanyFunc(companyID, limit, offset)
+		return f.listByCompanyFunc(companyID, search, limit, offset)
 	}
 	return nil, errors.New("ListByCompany not configured")
 }
@@ -45,8 +45,9 @@ func TestAdminUserHandler_ListByCompany_TotalInvariantAcrossPagination(t *testin
 	totalByCompany := map[string]int{"comp-1": 37}
 
 	uc := &fakeAdminUserUseCase{
-		listByCompanyFunc: func(companyID string, limit, offset int) (*dto.UserListResponse, error) {
+		listByCompanyFunc: func(companyID, search string, limit, offset int) (*dto.UserListResponse, error) {
 			total := totalByCompany[companyID]
+			_ = search
 			items := []dto.UserResponse{}
 			if offset < total {
 				items = append(items, dto.UserResponse{ID: "u-1", CompanyID: companyID, Email: "a@acme.com", Name: "A"})

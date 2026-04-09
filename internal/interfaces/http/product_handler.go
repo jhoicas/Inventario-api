@@ -10,7 +10,7 @@ import (
 type ProductUseCase interface {
 	Create(companyID string, in dto.CreateProductRequest) (*dto.ProductResponse, error)
 	GetByID(id string) (*dto.ProductResponse, error)
-	List(companyID string, limit, offset int) (*dto.ProductListResponse, error)
+	List(companyID, search string, limit, offset int) (*dto.ProductListResponse, error)
 	Update(id string, in dto.UpdateProductRequest) (*dto.ProductResponse, error)
 }
 
@@ -89,6 +89,7 @@ func (h *ProductHandler) GetByID(c *fiber.Ctx) error {
 // @Tags         products
 // @Security     Bearer
 // @Produce      json
+// @Param        search  query  string  false  "Búsqueda libre por sku, nombre o descripción"
 // @Param        limit   query  int  false  "Límite"   default(20)
 // @Param        offset  query  int  false  "Offset"   default(0)
 // @Success      200     {object}  dto.ProductListResponse
@@ -109,7 +110,8 @@ func (h *ProductHandler) List(c *fiber.Ctx) error {
 	if offset < 0 {
 		offset = 0
 	}
-	out, err := h.uc.List(companyID, limit, offset)
+	search := c.Query("search")
+	out, err := h.uc.List(companyID, search, limit, offset)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}

@@ -40,6 +40,7 @@ type InvoiceRepository interface {
 // InvoiceListFilter parámetros de consulta para el listado de facturas.
 type InvoiceListFilter struct {
 	CompanyID    string
+	Search       string
 	StartDate    string // YYYY-MM-DD; vacío = sin límite inferior
 	EndDate      string // YYYY-MM-DD; vacío = sin límite superior
 	CustomerID   string
