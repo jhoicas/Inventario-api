@@ -30,6 +30,16 @@ type CustomerListResponse struct {
 	Offset int                `json:"offset"`
 }
 
+// CustomerListFilters filtros de consulta para listados de clientes.
+type CustomerListFilters struct {
+	Search             string `query:"search"`
+	Filter             string `query:"filter"`
+	CategoryID         string `query:"category_id"`
+	CategoryIDFallback string `query:"categoryId"`
+	CategoryName       string `query:"category_name"`
+	WithoutCategory    bool   `query:"without_category"`
+}
+
 // UpdateCustomerRequest body para actualizar un cliente.
 type UpdateCustomerRequest struct {
 	Name  string `json:"name"`

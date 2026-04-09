@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -100,7 +101,13 @@ func (r *CustomerRepo) GetByCompanyAndEmail(companyID, email string) (*entity.Cu
 
 // ListByCompany lista clientes de la empresa con paginación.
 func (r *CustomerRepo) ListByCompany(companyID string, search string, limit, offset int) ([]*entity.Customer, int64, error) {
-	joins, where, args := r.buildFilters(companyID, search)
+	filters := repository.CustomerListFilters{Search: search}
+	return r.ListByCompanyWithFilters(companyID, filters, limit, offset)
+}
+
+// ListByCompanyWithFilters lista clientes de la empresa con filtros avanzados y paginación.
+func (r *CustomerRepo) ListByCompanyWithFilters(companyID string, filters repository.CustomerListFilters, limit, offset int) ([]*entity.Customer, int64, error) {
+	joins, where, args := r.buildFilters(companyID, filters)
 	items, err := r.list(joins, where, args, limit, offset)
 	if err != nil {
 		return nil, 0, err
@@ -112,16 +119,32 @@ func (r *CustomerRepo) ListByCompany(companyID string, search string, limit, off
 	return items, total, nil
 }
 
-func (r *CustomerRepo) buildFilters(companyID, search string) (string, string, []any) {
+func (r *CustomerRepo) buildFilters(companyID string, filters repository.CustomerListFilters) (string, string, []any) {
 	joins := `
 		LEFT JOIN crm_customer_profiles cp ON c.id = cp.customer_id
 		LEFT JOIN crm_categories cat ON cp.category_id = cat.id`
 	where := `
 		WHERE c.company_id = $1 AND c.is_active = true`
 	args := []any{companyID}
-	if search != "" {
-		where += ` AND (c.name ILIKE $2 OR c.email ILIKE $2 OR c.tax_id ILIKE $2)`
-		args = append(args, "%"+search+"%")
+
+	if filters.WithoutCategory {
+		where += ` AND cp.category_id IS NULL`
+	}
+
+	if !filters.WithoutCategory && strings.TrimSpace(filters.CategoryID) != "" {
+		args = append(args, strings.TrimSpace(filters.CategoryID))
+		where += fmt.Sprintf(" AND cp.category_id = $%d", len(args))
+	} else if !filters.WithoutCategory && strings.TrimSpace(filters.CategoryNameLegacy) != "" {
+		args = append(args, "%"+strings.TrimSpace(filters.CategoryNameLegacy)+"%")
+		where += fmt.Sprintf(` AND cp.category_id IN (
+			SELECT id FROM crm_categories
+			WHERE company_id = $1 AND is_active = true AND name ILIKE $%d
+		)`, len(args))
+	}
+
+	if strings.TrimSpace(filters.Search) != "" {
+		args = append(args, "%"+strings.TrimSpace(filters.Search)+"%")
+		where += fmt.Sprintf(" AND (c.name ILIKE $%d OR c.email ILIKE $%d OR c.tax_id ILIKE $%d)", len(args), len(args), len(args))
 	}
 	return joins, where, args
 }

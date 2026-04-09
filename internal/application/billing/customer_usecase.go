@@ -15,6 +15,10 @@ type CustomerUseCase struct {
 	repo repository.CustomerRepository
 }
 
+type customerListWithFiltersRepository interface {
+	ListByCompanyWithFilters(companyID string, filters repository.CustomerListFilters, limit, offset int) ([]*entity.Customer, int64, error)
+}
+
 // NewCustomerUseCase construye el caso de uso.
 func NewCustomerUseCase(repo repository.CustomerRepository) *CustomerUseCase {
 	return &CustomerUseCase{repo: repo}
@@ -76,13 +80,24 @@ func (uc *CustomerUseCase) Deactivate(companyID, customerID string) error {
 
 // List lista clientes de la empresa.
 func (uc *CustomerUseCase) List(companyID string, search string, limit, offset int) (*dto.CustomerListResponse, error) {
+	return uc.ListWithFilters(companyID, dto.CustomerListFilters{Search: search}, limit, offset)
+}
+
+// ListWithFilters lista clientes de la empresa con filtros avanzados.
+func (uc *CustomerUseCase) ListWithFilters(companyID string, filters dto.CustomerListFilters, limit, offset int) (*dto.CustomerListResponse, error) {
 	if limit <= 0 {
 		limit = 20
 	}
 	if offset < 0 {
 		offset = 0
 	}
-	list, total, err := uc.repo.ListByCompany(companyID, search, limit, offset)
+	repoFilters := repository.CustomerListFilters{
+		Search:             filters.Search,
+		CategoryID:         firstNonEmpty(filters.CategoryID, filters.CategoryIDFallback),
+		CategoryNameLegacy: filters.CategoryName,
+		WithoutCategory:    filters.WithoutCategory,
+	}
+	list, total, err := uc.listByFilters(companyID, repoFilters, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -100,6 +115,22 @@ func (uc *CustomerUseCase) List(companyID string, search string, limit, offset i
 		})
 	}
 	return &dto.CustomerListResponse{Items: out, Total: int(total), Limit: limit, Offset: offset}, nil
+}
+
+func (uc *CustomerUseCase) listByFilters(companyID string, filters repository.CustomerListFilters, limit, offset int) ([]*entity.Customer, int64, error) {
+	if advancedRepo, ok := uc.repo.(customerListWithFiltersRepository); ok {
+		return advancedRepo.ListByCompanyWithFilters(companyID, filters, limit, offset)
+	}
+	return uc.repo.ListByCompany(companyID, filters.Search, limit, offset)
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 // Update actualiza un cliente existente de la empresa.

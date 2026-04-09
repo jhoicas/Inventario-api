@@ -16,6 +16,10 @@ type CustomerUseCase interface {
 	Deactivate(companyID, customerID string) error
 }
 
+type CustomerUseCaseWithFilters interface {
+	ListWithFilters(companyID string, filters dto.CustomerListFilters, limit, offset int) (*dto.CustomerListResponse, error)
+}
+
 // CustomerHandler maneja las peticiones HTTP de clientes (facturación, protegido).
 type CustomerHandler struct {
 	uc CustomerUseCase
@@ -69,7 +73,13 @@ func (h *CustomerHandler) Create(c *fiber.Ctx) error {
 // @Security     Bearer
 // @Accept       json
 // @Produce      json
-// @Param        search  query     string  false  "Buscar por nombre o NIT (tax_id)"
+// @Param        search            query     string  false  "Buscar por nombre, email o NIT (tax_id)"
+// @Param        filter            query     string  false  "Compat: category_id:<uuid>, category:<name>, category_name:<name>"
+// @Param        category_id       query     string  false  "ID de categoría CRM"
+// @Param        categoryId        query     string  false  "Compat: ID de categoría CRM"
+// @Param        category_name     query     string  false  "Compat legacy por nombre de categoría"
+// @Param        without_category  query     bool    false  "Solo clientes sin categoría"
+// @Param        withoutCategory   query     bool    false  "Compat: solo clientes sin categoría"
 // @Param        limit   query     int   false  "Límite de resultados"
 // @Param        offset  query     int   false  "Desplazamiento"
 // @Success      200     {object}  dto.CustomerListResponse
@@ -81,10 +91,18 @@ func (h *CustomerHandler) List(c *fiber.Ctx) error {
 	if companyID == "" {
 		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
 	}
-	search := c.Query("search")
+	filters := parseCustomerListFilters(c)
 	limit, _ := strconv.Atoi(c.Query("limit", "20"))
 	offset, _ := strconv.Atoi(c.Query("offset", "0"))
-	list, err := h.uc.List(companyID, search, limit, offset)
+	var (
+		list *dto.CustomerListResponse
+		err  error
+	)
+	if advanced, ok := h.uc.(CustomerUseCaseWithFilters); ok {
+		list, err = advanced.ListWithFilters(companyID, filters, limit, offset)
+	} else {
+		list, err = h.uc.List(companyID, filters.Search, limit, offset)
+	}
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}

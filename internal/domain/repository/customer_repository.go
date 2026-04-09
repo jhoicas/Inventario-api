@@ -2,6 +2,14 @@ package repository
 
 import "github.com/jhoicas/Inventario-api/internal/domain/entity"
 
+// CustomerListFilters define filtros avanzados para listado de clientes.
+type CustomerListFilters struct {
+	Search             string
+	CategoryID         string
+	CategoryNameLegacy string
+	WithoutCategory    bool
+}
+
 // CustomerRepository define el puerto de persistencia para Customer (facturación).
 type CustomerRepository interface {
 	Create(customer *entity.Customer) error
