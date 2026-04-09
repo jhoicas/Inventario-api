@@ -47,6 +47,19 @@ type ImportPreviewRow struct {
 	LastPurchase    string   `json:"last_purchase,omitempty"`
 }
 
+// ImportJobRowStatus describe el estado final o intermedio de una fila durante el job.
+type ImportJobRowStatus struct {
+	Row             int      `json:"row"`
+	Email           string   `json:"email,omitempty"`
+	NormalizedEmail string   `json:"normalized_email,omitempty"`
+	Valid           bool     `json:"valid"`
+	Action          string   `json:"action"` // skipped|pending|inserted|updated|failed
+	Errors          []string `json:"errors,omitempty"`
+	Warnings        []string `json:"warnings,omitempty"`
+	IDCliente       string   `json:"id_cliente,omitempty"`
+	LastPurchase    string   `json:"last_purchase,omitempty"`
+}
+
 // ImportPreviewSummary resume el resultado del análisis previo al submit.
 type ImportPreviewSummary struct {
 	TotalRows        int `json:"total_rows"`

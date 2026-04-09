@@ -2004,9 +2004,10 @@ func (h *CRMHandler) PreviewImport(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(preview)
 }
 
-// GetImportStatus retorna el progreso actual de un job de importación en background.
+// GetImportStatus retorna el progreso actual de un job de importación en background,
+// incluyendo filas insertadas, actualizadas, omitidas, fallidas y el detalle por fila.
 // @Summary      Estado de importación CRM
-// @Description  Consulta el estado de una importación por jobID
+// @Description  Consulta el estado de una importación por jobID con métricas claras de inserción, actualización, omisión y error
 // @Tags         crm
 // @Security     Bearer
 // @Produce      json

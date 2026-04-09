@@ -26,15 +26,28 @@ import (
 var importJobs = sync.Map{}
 
 // JobProgress representa el estado de un job de importación en background.
+// ProcessedRows representa filas válidas que entraron al pipeline, no necesariamente filas insertadas.
 type JobProgress struct {
-	TotalRows        int
-	ValidRows        int
-	InvalidRows      int
-	DuplicateRows    int
-	MissingEmailRows int
-	WarningRows      int
-	ProcessedRows    int
-	Status           string
+	JobID            string                   `json:"job_id"`
+	Status           string                   `json:"status"`
+	TotalRows        int                      `json:"total_rows"`
+	ValidRows        int                      `json:"valid_rows"`
+	InvalidRows      int                      `json:"invalid_rows"`
+	DuplicateRows    int                      `json:"duplicate_rows"`
+	MissingEmailRows int                      `json:"missing_email_rows"`
+	WarningRows      int                      `json:"warning_rows"`
+	InsertedRows     int                      `json:"inserted_rows"`
+	UpdatedRows      int                      `json:"updated_rows"`
+	SkippedRows      int                      `json:"skipped_rows"`
+	FailedRows       int                      `json:"failed_rows"`
+	ProcessedRows    int                      `json:"processed_rows"`
+	UpdatedAt        time.Time                `json:"updated_at"`
+	Rows             []dto.ImportJobRowStatus `json:"rows,omitempty"`
+}
+
+type importJobState struct {
+	mu       sync.Mutex
+	progress JobProgress
 }
 
 type importValidatedRow struct {
@@ -84,16 +97,7 @@ func (uc *ImportUseCase) ImportProfilesFromFile(
 	validatedRows, preview := uc.validateImportRows(rows)
 
 	jobID := uuid.NewString()
-	importJobs.Store(jobID, JobProgress{
-		TotalRows:        preview.Summary.TotalRows,
-		ValidRows:        preview.Summary.ValidRows,
-		InvalidRows:      preview.Summary.InvalidRows,
-		DuplicateRows:    preview.Summary.DuplicateRows,
-		MissingEmailRows: preview.Summary.MissingEmailRows,
-		WarningRows:      preview.Summary.WarningRows,
-		ProcessedRows:    0,
-		Status:           "processing",
-	})
+	importJobs.Store(jobID, newImportJobState(jobID, preview))
 
 	// Desacoplar del request actual para que el job continúe aunque el cliente cierre conexión.
 	go uc.processRowsAsync(context.Background(), companyID, userID, validatedRows, preview.Summary.TotalRows, jobID)
@@ -183,11 +187,13 @@ func (uc *ImportUseCase) GetJobProgress(jobID string) (JobProgress, bool) {
 	if !ok {
 		return JobProgress{}, false
 	}
-	p, castOK := v.(JobProgress)
+	state, castOK := v.(*importJobState)
 	if !castOK {
 		return JobProgress{}, false
 	}
-	return p, true
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	return cloneJobProgress(state.progress), true
 }
 
 // processRowsAsync procesa filas en background y actualiza el progreso del job.
@@ -232,7 +238,19 @@ func (uc *ImportUseCase) processRowsAsync(ctx context.Context, companyID string,
 					mu.Lock()
 					defer mu.Unlock()
 
-					_, _ = uc.upsertProfile(ctx, companyID, userID, item.Profile)
+					inserted, err := uc.upsertProfile(ctx, companyID, userID, item.Profile)
+					if err != nil {
+						uc.markJobRowFailed(jobID, item.RowNumber, err.Error())
+						uc.incrementJobCounter(jobID, func(p *JobProgress) { p.FailedRows++ })
+						return
+					}
+					if inserted {
+						uc.markJobRowAction(jobID, item.RowNumber, "inserted", nil)
+						uc.incrementJobCounter(jobID, func(p *JobProgress) { p.InsertedRows++ })
+						return
+					}
+					uc.markJobRowAction(jobID, item.RowNumber, "updated", nil)
+					uc.incrementJobCounter(jobID, func(p *JobProgress) { p.UpdatedRows++ })
 				}(item)
 			}
 		}()
@@ -245,6 +263,7 @@ func (uc *ImportUseCase) processRowsAsync(ctx context.Context, companyID string,
 
 	wg.Wait()
 	uc.updateJobProcessed(jobID, int(processedCount.Load()), "completed")
+	uc.finalizeJob(jobID)
 }
 
 func (uc *ImportUseCase) updateProcessed(jobID string, totalRows int, processedRows int) {
@@ -253,24 +272,136 @@ func (uc *ImportUseCase) updateProcessed(jobID string, totalRows int, processedR
 }
 
 func (uc *ImportUseCase) setJobProgress(jobID string, progress JobProgress) {
-	importJobs.Store(jobID, progress)
+	importJobs.Store(jobID, &importJobState{progress: progress})
 }
 
 // updateJobProcessed conserva los contadores de validación al actualizar el progreso.
 func (uc *ImportUseCase) updateJobProcessed(jobID string, processedRows int, status string) {
 	v, ok := importJobs.Load(jobID)
 	if !ok {
-		importJobs.Store(jobID, JobProgress{ProcessedRows: processedRows, Status: status})
+		importJobs.Store(jobID, &importJobState{progress: JobProgress{ProcessedRows: processedRows, Status: status, UpdatedAt: time.Now()}})
 		return
 	}
-	current, castOK := v.(JobProgress)
+	state, castOK := v.(*importJobState)
 	if !castOK {
-		importJobs.Store(jobID, JobProgress{ProcessedRows: processedRows, Status: status})
+		importJobs.Store(jobID, &importJobState{progress: JobProgress{ProcessedRows: processedRows, Status: status, UpdatedAt: time.Now()}})
 		return
 	}
-	current.ProcessedRows = processedRows
-	current.Status = status
-	importJobs.Store(jobID, current)
+	state.mu.Lock()
+	state.progress.ProcessedRows = processedRows
+	state.progress.Status = status
+	state.progress.UpdatedAt = time.Now()
+	state.mu.Unlock()
+}
+
+func (uc *ImportUseCase) incrementJobCounter(jobID string, fn func(*JobProgress)) {
+	uc.withJobState(jobID, func(progress *JobProgress) {
+		fn(progress)
+		progress.UpdatedAt = time.Now()
+	})
+}
+
+func (uc *ImportUseCase) markJobRowAction(jobID string, rowNumber int, action string, errMsg []string) {
+	uc.withJobState(jobID, func(progress *JobProgress) {
+		if idx, ok := findRowIndex(progress.Rows, rowNumber); ok {
+			progress.Rows[idx].Action = action
+			if len(errMsg) > 0 {
+				progress.Rows[idx].Errors = append([]string(nil), errMsg...)
+			}
+			progress.Rows[idx].Valid = action != "failed" && action != "skipped"
+		}
+		progress.UpdatedAt = time.Now()
+	})
+}
+
+func (uc *ImportUseCase) markJobRowFailed(jobID string, rowNumber int, msg string) {
+	uc.withJobState(jobID, func(progress *JobProgress) {
+		if idx, ok := findRowIndex(progress.Rows, rowNumber); ok {
+			progress.Rows[idx].Action = "failed"
+			progress.Rows[idx].Errors = append(progress.Rows[idx].Errors, msg)
+			progress.Rows[idx].Valid = false
+		}
+		progress.UpdatedAt = time.Now()
+	})
+}
+
+func (uc *ImportUseCase) finalizeJob(jobID string) {
+	uc.withJobState(jobID, func(progress *JobProgress) {
+		progress.SkippedRows = progress.InvalidRows
+		if progress.FailedRows > 0 {
+			progress.Status = "completed_with_errors"
+		} else {
+			progress.Status = "completed"
+		}
+		progress.UpdatedAt = time.Now()
+	})
+}
+
+func (uc *ImportUseCase) withJobState(jobID string, fn func(*JobProgress)) {
+	v, ok := importJobs.Load(jobID)
+	if !ok {
+		return
+	}
+	state, castOK := v.(*importJobState)
+	if !castOK {
+		return
+	}
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	fn(&state.progress)
+}
+
+func newImportJobState(jobID string, preview *dto.CRMImportPreviewResponse) *importJobState {
+	progress := JobProgress{
+		JobID:            jobID,
+		Status:           "processing",
+		TotalRows:        preview.Summary.TotalRows,
+		ValidRows:        preview.Summary.ValidRows,
+		InvalidRows:      preview.Summary.InvalidRows,
+		DuplicateRows:    preview.Summary.DuplicateRows,
+		MissingEmailRows: preview.Summary.MissingEmailRows,
+		WarningRows:      preview.Summary.WarningRows,
+		SkippedRows:      preview.Summary.InvalidRows,
+		Rows:             make([]dto.ImportJobRowStatus, 0, len(preview.Rows)),
+		UpdatedAt:        time.Now(),
+	}
+	for _, row := range preview.Rows {
+		status := dto.ImportJobRowStatus{
+			Row:             row.Row,
+			Email:           row.Email,
+			NormalizedEmail: row.NormalizedEmail,
+			Valid:           row.Valid,
+			Warnings:        append([]string(nil), row.Warnings...),
+			Errors:          append([]string(nil), row.Errors...),
+			IDCliente:       row.IDCliente,
+			LastPurchase:    row.LastPurchase,
+		}
+		if row.Valid {
+			status.Action = "pending"
+		} else {
+			status.Action = "skipped"
+		}
+		progress.Rows = append(progress.Rows, status)
+	}
+	return &importJobState{progress: progress}
+}
+
+func cloneJobProgress(progress JobProgress) JobProgress {
+	out := progress
+	if len(progress.Rows) > 0 {
+		out.Rows = make([]dto.ImportJobRowStatus, len(progress.Rows))
+		copy(out.Rows, progress.Rows)
+	}
+	return out
+}
+
+func findRowIndex(rows []dto.ImportJobRowStatus, rowNumber int) (int, bool) {
+	for i, row := range rows {
+		if row.Row == rowNumber {
+			return i, true
+		}
+	}
+	return 0, false
 }
 
 // mapHeaders crea un mapa de índices de columnas basado en los encabezados.
@@ -476,12 +607,14 @@ func (uc *ImportUseCase) upsertProfile(
 	var (
 		customer *entity.Customer
 		err      error
+		created  bool
 	)
 	customer, err = uc.customerRepo.GetByCompanyAndEmail(companyID, profile.Email)
 	if err != nil {
 		return false, fmt.Errorf("buscar cliente por email: %w", err)
 	}
 	if customer == nil {
+		created = true
 		now := time.Now()
 		name := strings.TrimSpace(profile.Nombre)
 		if name == "" {
@@ -560,7 +693,7 @@ func (uc *ImportUseCase) upsertProfile(
 		return false, err
 	}
 
-	return existingProfile == nil, nil
+	return created, nil
 }
 
 func (uc *ImportUseCase) resolveCategoryID(companyID, segment string) (string, error) {
