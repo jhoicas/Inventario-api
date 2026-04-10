@@ -412,6 +412,46 @@ type RemarketingProspect struct {
 	MensajeSugerido string  `json:"mensajeSugerido"`
 }
 
+// RemarketingAudienceDTO representa un cliente elegible para remarketing omnicanal.
+type RemarketingAudienceDTO struct {
+	ID                string  `json:"id"`
+	Nombre            string  `json:"nombre"`
+	Email             string  `json:"email,omitempty"`
+	Telefono          string  `json:"telefono,omitempty"`
+	VentasTotales     float64 `json:"ventas_totales"`
+	UltimaCompra      string  `json:"ultima_compra,omitempty"`
+	Segmento          string  `json:"segmento,omitempty"`
+	CategoriaProducto string  `json:"categoria_producto,omitempty"`
+}
+
+// RemarketingBatchRequest body para envío masivo omnicanal.
+type RemarketingBatchRequest struct {
+	CompanyID    string   `json:"company_id"`
+	Channel      string   `json:"channel"` // whatsapp|sms|email
+	TemplateText string   `json:"template_text"`
+	CustomerIDs  []string `json:"customer_ids"`
+}
+
+// RemarketingBatchResult resultado por cliente en el envío masivo.
+type RemarketingBatchResult struct {
+	CustomerID  string `json:"customer_id"`
+	Destination string `json:"destination,omitempty"`
+	Channel     string `json:"channel"`
+	Message     string `json:"message,omitempty"`
+	Status      string `json:"status"` // success|failed
+	Error       string `json:"error,omitempty"`
+}
+
+// RemarketingBatchResponse resumen del envío masivo omnicanal.
+type RemarketingBatchResponse struct {
+	CompanyID  string                   `json:"company_id"`
+	Channel    string                   `json:"channel"`
+	Processed  int                      `json:"processed"`
+	Successful int                      `json:"successful"`
+	Failed     int                      `json:"failed"`
+	Results    []RemarketingBatchResult `json:"results,omitempty"`
+}
+
 type CRMAnalyticsKPIsResponse struct {
 	TotalCustomers int64           `json:"total_customers"`
 	TotalSales     decimal.Decimal `json:"total_sales"`

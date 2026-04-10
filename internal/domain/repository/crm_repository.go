@@ -36,6 +36,8 @@ type CRMProfileRepository interface {
 	ListByCompany(companyID string, limit, offset int) ([]*entity.CRMCustomerProfile, error)
 	GetAnalytics(ctx context.Context, companyID string) (*dto.CRMAnalyticsResponse, error)
 	GetRemarketingProspects(ctx context.Context, companyID string) ([]dto.RemarketingProspect, error)
+	GetRemarketingAudience(ctx context.Context, companyID, segmento, estrategia string) ([]dto.RemarketingAudienceDTO, error)
+	GetRemarketingTargetsByCustomerIDs(ctx context.Context, companyID string, customerIDs []string) ([]dto.RemarketingAudienceDTO, error)
 
 	// GetDashboardKPIs retorna KPIs agregados del dashboard CRM para una empresa.
 	GetDashboardKPIs(companyID string) (*CRMDashboardKPIs, error)

@@ -6,6 +6,7 @@ import (
 	"math"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jhoicas/Inventario-api/internal/application/dto"
@@ -16,6 +17,11 @@ import (
 // AnalyticsUseCase expone las estadísticas CRM de una empresa.
 type AnalyticsUseCase struct {
 	profileRepo repository.CRMProfileRepository
+}
+
+type remarketingRepository interface {
+	GetRemarketingAudience(ctx context.Context, companyID, segmento, estrategia string) ([]dto.RemarketingAudienceDTO, error)
+	GetRemarketingTargetsByCustomerIDs(ctx context.Context, companyID string, customerIDs []string) ([]dto.RemarketingAudienceDTO, error)
 }
 
 // NewAnalyticsUseCase construye el caso de uso de analytics CRM.
@@ -58,6 +64,107 @@ func (uc *AnalyticsUseCase) GetRemarketingProspects(ctx context.Context, company
 	}
 
 	return prospects, nil
+}
+
+// GetRemarketingAudience devuelve la audiencia omnicanal filtrada por company, segmento y estrategia.
+func (uc *AnalyticsUseCase) GetRemarketingAudience(ctx context.Context, companyID, segmento, estrategia string) ([]dto.RemarketingAudienceDTO, error) {
+	if companyID == "" {
+		return nil, domain.ErrInvalidInput
+	}
+	if uc.profileRepo == nil {
+		return nil, domain.ErrConflict
+	}
+	repo, ok := uc.profileRepo.(remarketingRepository)
+	if !ok {
+		return nil, domain.ErrConflict
+	}
+	return repo.GetRemarketingAudience(ctx, companyID, segmento, estrategia)
+}
+
+// SendRemarketingBatch procesa envíos omnicanal concurrentes por customer IDs.
+func (uc *AnalyticsUseCase) SendRemarketingBatch(ctx context.Context, in dto.RemarketingBatchRequest) (*dto.RemarketingBatchResponse, error) {
+	if in.CompanyID == "" || strings.TrimSpace(in.TemplateText) == "" || len(in.CustomerIDs) == 0 {
+		return nil, domain.ErrInvalidInput
+	}
+	channel := strings.ToLower(strings.TrimSpace(in.Channel))
+	switch channel {
+	case "whatsapp", "sms", "email":
+	default:
+		return nil, domain.ErrInvalidInput
+	}
+	if uc.profileRepo == nil {
+		return nil, domain.ErrConflict
+	}
+	repo, ok := uc.profileRepo.(remarketingRepository)
+	if !ok {
+		return nil, domain.ErrConflict
+	}
+
+	targets, err := repo.GetRemarketingTargetsByCustomerIDs(ctx, in.CompanyID, in.CustomerIDs)
+	if err != nil {
+		return nil, err
+	}
+	targetMap := make(map[string]dto.RemarketingAudienceDTO, len(targets))
+	for _, target := range targets {
+		targetMap[target.ID] = target
+	}
+
+	type jobResult struct {
+		result dto.RemarketingBatchResult
+	}
+	jobs := make(chan string, len(in.CustomerIDs))
+	results := make(chan jobResult, len(in.CustomerIDs))
+	workerCount := 8
+	if len(in.CustomerIDs) < workerCount {
+		workerCount = len(in.CustomerIDs)
+	}
+	if workerCount <= 0 {
+		workerCount = 1
+	}
+	var wg sync.WaitGroup
+	for i := 0; i < workerCount; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for customerID := range jobs {
+				target, ok := targetMap[customerID]
+				if !ok {
+					results <- jobResult{result: dto.RemarketingBatchResult{CustomerID: customerID, Channel: channel, Status: "failed", Error: "cliente no encontrado o fuera de la compañía"}}
+					continue
+				}
+				message := renderRemarketingTemplate(in.TemplateText, target)
+				destination, destErr := remarketingDestinationForChannel(channel, target)
+				if destErr != nil {
+					results <- jobResult{result: dto.RemarketingBatchResult{CustomerID: customerID, Channel: channel, Status: "failed", Error: destErr.Error()}}
+					continue
+				}
+				fmt.Printf("[REMARKETING - %s] Enviando a %s: %s\n", strings.ToUpper(channel), destination, message)
+				results <- jobResult{result: dto.RemarketingBatchResult{CustomerID: customerID, Channel: channel, Destination: destination, Message: message, Status: "success"}}
+			}
+		}()
+	}
+
+	for _, customerID := range in.CustomerIDs {
+		jobs <- strings.TrimSpace(customerID)
+	}
+	close(jobs)
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	out := &dto.RemarketingBatchResponse{CompanyID: in.CompanyID, Channel: channel}
+	for item := range results {
+		out.Processed++
+		out.Results = append(out.Results, item.result)
+		if item.result.Status == "success" {
+			out.Successful++
+		} else {
+			out.Failed++
+		}
+	}
+	_ = ctx
+	return out, nil
 }
 
 // GetAnalyticsSegmentation retorna segmentación CRM con ventas y ticket promedio calculados.
@@ -162,4 +269,32 @@ func formatAnalyticsVariation(current, previous float64) string {
 		return fmt.Sprintf("+%.2f%%", variation)
 	}
 	return fmt.Sprintf("%.2f%%", variation)
+}
+
+func renderRemarketingTemplate(template string, target dto.RemarketingAudienceDTO) string {
+	replacer := strings.NewReplacer(
+		"{{Nombre}}", target.Nombre,
+		"{{Segmento}}", target.Segmento,
+		"{{Ventas_Totales}}", fmt.Sprintf("%.2f", target.VentasTotales),
+		"{{Categoria_Producto}}", target.CategoriaProducto,
+		"{{Ultima_Compra}}", target.UltimaCompra,
+	)
+	return replacer.Replace(template)
+}
+
+func remarketingDestinationForChannel(channel string, target dto.RemarketingAudienceDTO) (string, error) {
+	switch channel {
+	case "email":
+		if strings.TrimSpace(target.Email) == "" {
+			return "", domain.ErrInvalidInput
+		}
+		return target.Email, nil
+	case "sms", "whatsapp":
+		if strings.TrimSpace(target.Telefono) == "" {
+			return "", domain.ErrInvalidInput
+		}
+		return target.Telefono, nil
+	default:
+		return "", domain.ErrInvalidInput
+	}
 }

@@ -329,6 +329,8 @@ func Router(app *fiber.App, deps RouterDeps) {
 		h := deps.CRMHandler
 		crmGroup.Get("/analytics", h.GetAnalytics)
 		crmGroup.Get("/remarketing", h.GetRemarketing)
+		crmGroup.Get("/remarketing/audience", h.GetRemarketingAudience)
+		crmGroup.Post("/remarketing/send-batch", h.SendRemarketingBatch)
 		crmGroup.Get("/import/status/:jobID", RequireRole(entity.RoleAdmin, "gerente"), h.GetImportStatus)
 		crmGroup.Get("/customers", h.ListCustomers)
 		crmGroup.Post("/customers", h.CreateCustomer)

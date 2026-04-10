@@ -459,6 +459,135 @@ func (r *CRMProfileRepo) GetRemarketingProspects(ctx context.Context, companyID 
 	return out, nil
 }
 
+func (r *CRMProfileRepo) GetRemarketingAudience(ctx context.Context, companyID, segmento, estrategia string) ([]dto.RemarketingAudienceDTO, error) {
+	if companyID == "" {
+		return nil, fmt.Errorf("company_id requerido")
+	}
+
+	var (
+		conds  []string
+		args   []any
+		argPos = 1
+	)
+	conds = append(conds, fmt.Sprintf("c.company_id = $%d", argPos))
+	args = append(args, companyID)
+	argPos++
+	conds = append(conds, "c.is_active = true")
+	if strings.TrimSpace(segmento) != "" {
+		conds = append(conds, fmt.Sprintf("LOWER(COALESCE(NULLIF(TRIM(cat.name), ''), 'SIN_SEGMENTO')) = LOWER($%d)", argPos))
+		args = append(args, strings.TrimSpace(segmento))
+		argPos++
+	}
+	if strings.TrimSpace(estrategia) != "" {
+		conds = append(conds, fmt.Sprintf("LOWER(COALESCE(NULLIF(TRIM(p.metadata->>'followUpStrategy'), ''), 'SIN_ESTRATEGIA')) = LOWER($%d)", argPos))
+		args = append(args, strings.TrimSpace(estrategia))
+		argPos++
+	}
+
+	query := `
+		SELECT
+			c.id,
+			COALESCE(c.name, '') AS nombre,
+			COALESCE(c.email, '') AS email,
+			COALESCE(c.phone, '') AS telefono,
+			COALESCE(p.ltv, 0)::double precision AS ventas_totales,
+			COALESCE(NULLIF(TRIM(p.metadata->>'lastPurchaseDate'), ''), '') AS ultima_compra,
+			COALESCE(NULLIF(TRIM(cat.name), ''), 'SIN_SEGMENTO') AS segmento,
+			COALESCE(NULLIF(TRIM(p.metadata->>'mainCategory'), ''), 'SIN_CATEGORIA') AS categoria_producto
+		FROM crm_customer_profiles p
+		INNER JOIN customers c ON c.id = p.customer_id
+		LEFT JOIN crm_categories cat ON cat.id = p.category_id`
+	query += "\n\t\tWHERE " + strings.Join(conds, " AND ") + "\n\t\tORDER BY ventas_totales DESC, nombre ASC"
+
+	rows, err := r.q.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("get crm remarketing audience: %w", err)
+	}
+	defer rows.Close()
+
+	out := make([]dto.RemarketingAudienceDTO, 0)
+	for rows.Next() {
+		var item dto.RemarketingAudienceDTO
+		if err := rows.Scan(&item.ID, &item.Nombre, &item.Email, &item.Telefono, &item.VentasTotales, &item.UltimaCompra, &item.Segmento, &item.CategoriaProducto); err != nil {
+			return nil, fmt.Errorf("scan crm remarketing audience: %w", err)
+		}
+		out = append(out, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate crm remarketing audience: %w", err)
+	}
+
+	return out, nil
+}
+
+func (r *CRMProfileRepo) GetRemarketingTargetsByCustomerIDs(ctx context.Context, companyID string, customerIDs []string) ([]dto.RemarketingAudienceDTO, error) {
+	if companyID == "" {
+		return nil, fmt.Errorf("company_id requerido")
+	}
+	cleanIDs := make([]string, 0, len(customerIDs))
+	seen := make(map[string]struct{}, len(customerIDs))
+	for _, id := range customerIDs {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		cleanIDs = append(cleanIDs, id)
+	}
+	if len(cleanIDs) == 0 {
+		return []dto.RemarketingAudienceDTO{}, nil
+	}
+
+	placeholders := make([]string, 0, len(cleanIDs))
+	args := make([]any, 0, len(cleanIDs)+1)
+	args = append(args, companyID)
+	for i, id := range cleanIDs {
+		placeholders = append(placeholders, fmt.Sprintf("$%d", i+2))
+		args = append(args, id)
+	}
+
+	query := fmt.Sprintf(`
+		SELECT
+			c.id,
+			COALESCE(c.name, '') AS nombre,
+			COALESCE(c.email, '') AS email,
+			COALESCE(c.phone, '') AS telefono,
+			COALESCE(p.ltv, 0)::double precision AS ventas_totales,
+			COALESCE(NULLIF(TRIM(p.metadata->>'lastPurchaseDate'), ''), '') AS ultima_compra,
+			COALESCE(NULLIF(TRIM(cat.name), ''), 'SIN_SEGMENTO') AS segmento,
+			COALESCE(NULLIF(TRIM(p.metadata->>'mainCategory'), ''), 'SIN_CATEGORIA') AS categoria_producto
+		FROM crm_customer_profiles p
+		INNER JOIN customers c ON c.id = p.customer_id
+		LEFT JOIN crm_categories cat ON cat.id = p.category_id
+		WHERE c.company_id = $1
+		  AND c.is_active = true
+		  AND c.id IN (%s)
+		ORDER BY c.name ASC`, strings.Join(placeholders, ", "))
+
+	rows, err := r.q.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("get crm remarketing targets: %w", err)
+	}
+	defer rows.Close()
+
+	out := make([]dto.RemarketingAudienceDTO, 0, len(cleanIDs))
+	for rows.Next() {
+		var item dto.RemarketingAudienceDTO
+		if err := rows.Scan(&item.ID, &item.Nombre, &item.Email, &item.Telefono, &item.VentasTotales, &item.UltimaCompra, &item.Segmento, &item.CategoriaProducto); err != nil {
+			return nil, fmt.Errorf("scan crm remarketing target: %w", err)
+		}
+		out = append(out, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate crm remarketing targets: %w", err)
+	}
+
+	return out, nil
+}
+
 func (r *CRMProfileRepo) getAnalyticsSegmentation(ctx context.Context, companyID string, totalCustomers int) ([]dto.CRMAnalyticsSegmentItem, error) {
 	rows, err := r.q.Query(ctx, `
 		SELECT
