@@ -3,7 +3,10 @@ package crm
 import (
 	"context"
 	"fmt"
+	"math"
+	"sort"
 	"strings"
+	"time"
 
 	"github.com/jhoicas/Inventario-api/internal/application/dto"
 	"github.com/jhoicas/Inventario-api/internal/domain"
@@ -28,7 +31,12 @@ func (uc *AnalyticsUseCase) GetAnalytics(ctx context.Context, companyID string) 
 	if uc.profileRepo == nil {
 		return nil, domain.ErrConflict
 	}
-	return uc.profileRepo.GetAnalytics(ctx, companyID)
+	out, err := uc.profileRepo.GetAnalytics(ctx, companyID)
+	if err != nil {
+		return nil, err
+	}
+	out.EvolucionMensual = rebuildEvolutionVariation(out.EvolucionMensual)
+	return out, nil
 }
 
 // GetRemarketingProspects retorna prospectos ideales para campañas de remarketing.
@@ -104,4 +112,54 @@ func buildRemarketingMessage(segmento, categoria string) string {
 	default:
 		return fmt.Sprintf("Conoce nuestras novedades en %s.", cat)
 	}
+}
+
+func rebuildEvolutionVariation(items []dto.CRMAnalyticsEvolutionItem) []dto.CRMAnalyticsEvolutionItem {
+	if len(items) == 0 {
+		return items
+	}
+	out := make([]dto.CRMAnalyticsEvolutionItem, len(items))
+	copy(out, items)
+	sort.Slice(out, func(i, j int) bool {
+		return parseAnalyticsMonth(out[i].Mes).Before(parseAnalyticsMonth(out[j].Mes))
+	})
+	for i := range out {
+		if i == 0 {
+			out[i].Variacion = "-"
+			continue
+		}
+		out[i].Variacion = formatAnalyticsVariation(out[i].Ventas, out[i-1].Ventas)
+	}
+	return out
+}
+
+func parseAnalyticsMonth(value string) time.Time {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return time.Time{}
+	}
+	if t, err := time.Parse("01/2006", value); err == nil {
+		return t
+	}
+	if t, err := time.Parse("2006-01", value); err == nil {
+		return t
+	}
+	return time.Time{}
+}
+
+func formatAnalyticsVariation(current, previous float64) string {
+	if previous <= 0 {
+		if current <= 0 {
+			return "-"
+		}
+		return "+100.00%"
+	}
+	variation := ((current - previous) / previous) * 100
+	if math.IsNaN(variation) || math.IsInf(variation, 0) {
+		return "-"
+	}
+	if variation >= 0 {
+		return fmt.Sprintf("+%.2f%%", variation)
+	}
+	return fmt.Sprintf("%.2f%%", variation)
 }

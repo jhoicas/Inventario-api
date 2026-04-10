@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sort"
 	"strings"
 	"time"
 
@@ -361,16 +362,24 @@ func (r *CRMProfileRepo) GetAnalytics(ctx context.Context, companyID string) (*d
 
 	const kpisQuery = `
 		SELECT
-			COUNT(DISTINCT c.id)::bigint AS total_customers,
-			COALESCE(SUM(i.grand_total), 0)::double precision AS total_sales,
-			COALESCE(AVG(i.grand_total), 0)::double precision AS average_ticket,
-			COUNT(DISTINCT CASE WHEN LOWER(COALESCE(cat.name, '')) LIKE '%vip%' THEN c.id END)::bigint AS vip_customers
-		FROM customers c
-		LEFT JOIN crm_customer_profiles p ON p.customer_id = c.id
+			COUNT(p.id)::bigint AS total_customers,
+			COALESCE(SUM(p.ltv), 0)::double precision AS total_sales,
+			COALESCE(
+				SUM(p.ltv) / NULLIF(
+					SUM(
+						CASE
+							WHEN COALESCE(p.metadata->>'ordersCount', '') ~ '^[0-9]+(\\.[0-9]+)?$' THEN (p.metadata->>'ordersCount')::numeric
+							ELSE 0
+						END
+					),
+					0
+				),
+				0
+			)::double precision AS average_ticket,
+			COUNT(p.id) FILTER (WHERE LOWER(COALESCE(cat.name, '')) LIKE '%vip%')::bigint AS vip_customers
+		FROM crm_customer_profiles p
 		LEFT JOIN crm_categories cat ON cat.id = p.category_id
-		LEFT JOIN invoices i ON i.customer_id = c.id AND i.company_id = c.company_id
-		WHERE c.company_id = $1
-		  AND c.is_active = true
+		WHERE p.company_id = $1
 	`
 	if err := r.q.QueryRow(ctx, kpisQuery, companyID).Scan(&totalCustomers, &totalSales, &averageTicket, &vipCustomers); err != nil {
 		return nil, fmt.Errorf("get crm analytics kpis: %w", err)
@@ -491,6 +500,45 @@ func (r *CRMProfileRepo) getAnalyticsSegmentation(ctx context.Context, companyID
 }
 
 func (r *CRMProfileRepo) getAnalyticsEvolution(ctx context.Context, companyID string) ([]dto.CRMAnalyticsEvolutionItem, error) {
+	rawItems, err := r.queryEvolutionFromInvoices(ctx, companyID)
+	if err != nil {
+		return nil, err
+	}
+
+	if allEvolutionSalesZero(rawItems) {
+		rawItems, err = r.queryEvolutionFromProfiles(ctx, companyID)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	sort.Slice(rawItems, func(i, j int) bool {
+		return parseEvolutionMonth(rawItems[i].Mes).Before(parseEvolutionMonth(rawItems[j].Mes))
+	})
+
+	out := make([]dto.CRMAnalyticsEvolutionItem, 0, len(rawItems))
+	for i, item := range rawItems {
+		variacion := "-"
+		if i > 0 {
+			prev := rawItems[i-1].Ventas
+			variacion = formatVariation(item.Ventas, prev)
+		}
+		out = append(out, dto.CRMAnalyticsEvolutionItem{
+			Mes:       item.Mes,
+			Ventas:    item.Ventas,
+			Variacion: variacion,
+		})
+	}
+
+	return out, nil
+}
+
+type rawEvolution struct {
+	Mes    string
+	Ventas float64
+}
+
+func (r *CRMProfileRepo) queryEvolutionFromInvoices(ctx context.Context, companyID string) ([]rawEvolution, error) {
 	rows, err := r.q.Query(ctx, `
 		WITH month_series AS (
 			SELECT date_trunc('month', now()) - (interval '1 month' * gs.i) AS month_start
@@ -511,41 +559,86 @@ func (r *CRMProfileRepo) getAnalyticsEvolution(ctx context.Context, companyID st
 		ORDER BY ms.month_start ASC
 	`, companyID)
 	if err != nil {
-		return nil, fmt.Errorf("get crm analytics evolution: %w", err)
+		return nil, fmt.Errorf("get crm analytics evolution from invoices: %w", err)
 	}
 	defer rows.Close()
 
-	type rawEvolution struct {
-		Mes    string
-		Ventas float64
-	}
 	rawItems := make([]rawEvolution, 0, 12)
 	for rows.Next() {
 		var item rawEvolution
 		if err := rows.Scan(&item.Mes, &item.Ventas); err != nil {
-			return nil, fmt.Errorf("scan crm analytics evolution: %w", err)
+			return nil, fmt.Errorf("scan crm analytics evolution from invoices: %w", err)
 		}
 		rawItems = append(rawItems, item)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate crm analytics evolution: %w", err)
+		return nil, fmt.Errorf("iterate crm analytics evolution from invoices: %w", err)
 	}
+	return rawItems, nil
+}
 
-	out := make([]dto.CRMAnalyticsEvolutionItem, 0, len(rawItems))
-	for i, item := range rawItems {
-		variacion := "-"
-		if i > 0 {
-			prev := rawItems[i-1].Ventas
-			variacion = formatVariation(item.Ventas, prev)
+func (r *CRMProfileRepo) queryEvolutionFromProfiles(ctx context.Context, companyID string) ([]rawEvolution, error) {
+	rows, err := r.q.Query(ctx, `
+		WITH month_series AS (
+			SELECT date_trunc('month', now()) - (interval '1 month' * gs.i) AS month_start
+			FROM generate_series(0, 11) AS gs(i)
+		),
+		profile_totals AS (
+			SELECT
+				to_date(p.metadata->>'lastPurchaseDate', 'MM/YYYY') AS month_start,
+				COALESCE(SUM(p.ltv), 0)::double precision AS sales
+			FROM crm_customer_profiles p
+			WHERE p.company_id = $1
+			  AND COALESCE(p.metadata->>'lastPurchaseDate', '') ~ '^(0[1-9]|1[0-2])/[0-9]{4}$'
+			GROUP BY 1
+		)
+		SELECT
+			to_char(ms.month_start, 'MM/YYYY') AS mes,
+			COALESCE(pt.sales, 0)::double precision AS ventas
+		FROM month_series ms
+		LEFT JOIN profile_totals pt ON pt.month_start = ms.month_start
+		ORDER BY ms.month_start ASC
+	`, companyID)
+	if err != nil {
+		return nil, fmt.Errorf("get crm analytics evolution from profiles: %w", err)
+	}
+	defer rows.Close()
+
+	rawItems := make([]rawEvolution, 0, 12)
+	for rows.Next() {
+		var item rawEvolution
+		if err := rows.Scan(&item.Mes, &item.Ventas); err != nil {
+			return nil, fmt.Errorf("scan crm analytics evolution from profiles: %w", err)
 		}
-		out = append(out, dto.CRMAnalyticsEvolutionItem{
-			Mes:       item.Mes,
-			Ventas:    item.Ventas,
-			Variacion: variacion,
-		})
+		rawItems = append(rawItems, item)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate crm analytics evolution from profiles: %w", err)
+	}
+	return rawItems, nil
+}
 
-	return out, nil
+func allEvolutionSalesZero(items []rawEvolution) bool {
+	for _, item := range items {
+		if item.Ventas != 0 {
+			return false
+		}
+	}
+	return true
+}
+
+func parseEvolutionMonth(value string) time.Time {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return time.Time{}
+	}
+	if t, err := time.Parse("01/2006", value); err == nil {
+		return t
+	}
+	if t, err := time.Parse("2006-01", value); err == nil {
+		return t
+	}
+	return time.Time{}
 }
 
 func analyticsActionForSegment(segmento, porcentaje string) string {
