@@ -52,6 +52,39 @@ func (uc *AnalyticsUseCase) GetRemarketingProspects(ctx context.Context, company
 	return prospects, nil
 }
 
+// GetAnalyticsSegmentation retorna segmentación CRM con ventas y ticket promedio calculados.
+func (uc *AnalyticsUseCase) GetAnalyticsSegmentation(ctx context.Context, companyID string) ([]dto.CRMAnalyticsSegmentationItem, error) {
+	if companyID == "" {
+		return nil, domain.ErrInvalidInput
+	}
+	if uc.profileRepo == nil {
+		return nil, domain.ErrConflict
+	}
+
+	items, err := uc.profileRepo.GetDashboardSegmentation(companyID)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]dto.CRMAnalyticsSegmentationItem, 0, len(items))
+	for _, item := range items {
+		totalSales := item.TotalSales.InexactFloat64()
+		ticket := 0.0
+		if item.Count > 0 {
+			ticket = totalSales / float64(item.Count)
+		}
+		out = append(out, dto.CRMAnalyticsSegmentationItem{
+			Category:       item.Category,
+			Count:          item.Count,
+			VentasTotales:  totalSales,
+			TicketPromedio: ticket,
+		})
+	}
+
+	_ = ctx
+	return out, nil
+}
+
 func buildRemarketingMessage(segmento, categoria string) string {
 	seg := strings.ToUpper(strings.TrimSpace(segmento))
 	cat := strings.TrimSpace(categoria)

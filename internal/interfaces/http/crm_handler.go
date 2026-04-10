@@ -1821,8 +1821,15 @@ func (h *CRMHandler) GetAnalyticsSegmentation(c *fiber.Ctx) error {
 	if companyID == "" {
 		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
 	}
-	if h.ProfileRepo == nil {
+	if h.AnalyticsUC == nil && h.ProfileRepo == nil {
 		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "analytics crm no configurado"})
+	}
+	if h.AnalyticsUC != nil {
+		items, err := h.AnalyticsUC.GetAnalyticsSegmentation(c.Context(), companyID)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+		}
+		return c.JSON(items)
 	}
 
 	items, err := h.ProfileRepo.GetDashboardSegmentation(companyID)
@@ -1832,9 +1839,16 @@ func (h *CRMHandler) GetAnalyticsSegmentation(c *fiber.Ctx) error {
 
 	out := make([]dto.CRMAnalyticsSegmentationItem, 0, len(items))
 	for _, item := range items {
+		totalSales := item.TotalSales.InexactFloat64()
+		ticket := 0.0
+		if item.Count > 0 {
+			ticket = totalSales / float64(item.Count)
+		}
 		out = append(out, dto.CRMAnalyticsSegmentationItem{
-			Category: item.Category,
-			Count:    item.Count,
+			Category:       item.Category,
+			Count:          item.Count,
+			VentasTotales:  totalSales,
+			TicketPromedio: ticket,
 		})
 	}
 	return c.JSON(out)

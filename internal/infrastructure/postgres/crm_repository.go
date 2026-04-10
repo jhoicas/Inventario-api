@@ -454,15 +454,11 @@ func (r *CRMProfileRepo) getAnalyticsSegmentation(ctx context.Context, companyID
 	rows, err := r.q.Query(ctx, `
 		SELECT
 			COALESCE(NULLIF(TRIM(cat.name), ''), 'SIN_SEGMENTO') AS segmento,
-			COUNT(DISTINCT c.id)::bigint AS clientes,
-			COALESCE(SUM(i.grand_total), 0)::double precision AS ventas_totales,
-			COALESCE(AVG(i.grand_total), 0)::double precision AS ticket_promedio
-		FROM customers c
-		LEFT JOIN crm_customer_profiles p ON p.customer_id = c.id
+			COUNT(1)::bigint AS clientes,
+			COALESCE(SUM(p.ltv), 0)::double precision AS ventas_totales
+		FROM crm_customer_profiles p
 		LEFT JOIN crm_categories cat ON cat.id = p.category_id
-		LEFT JOIN invoices i ON i.customer_id = c.id AND i.company_id = c.company_id
-		WHERE c.company_id = $1
-		  AND c.is_active = true
+		WHERE p.company_id = $1
 		GROUP BY 1
 		ORDER BY clientes DESC, segmento ASC
 	`, companyID)
@@ -474,8 +470,11 @@ func (r *CRMProfileRepo) getAnalyticsSegmentation(ctx context.Context, companyID
 	items := make([]dto.CRMAnalyticsSegmentItem, 0)
 	for rows.Next() {
 		var item dto.CRMAnalyticsSegmentItem
-		if err := rows.Scan(&item.Segmento, &item.Clientes, &item.VentasTotales, &item.TicketPromedio); err != nil {
+		if err := rows.Scan(&item.Segmento, &item.Clientes, &item.VentasTotales); err != nil {
 			return nil, fmt.Errorf("scan crm analytics segmentation: %w", err)
+		}
+		if item.Clientes > 0 {
+			item.TicketPromedio = item.VentasTotales / float64(item.Clientes)
 		}
 		if totalCustomers > 0 {
 			item.Porcentaje = fmt.Sprintf("%.2f%%", (float64(item.Clientes)/float64(totalCustomers))*100)
@@ -612,7 +611,8 @@ func (r *CRMProfileRepo) GetDashboardSegmentation(companyID string) ([]*reposito
 	rows, err := r.q.Query(context.Background(), `
 		SELECT
 			COALESCE(cat.name, 'SIN_CATEGORIA') AS category,
-			COUNT(1)::bigint AS count
+			COUNT(1)::bigint AS count,
+			COALESCE(SUM(p.ltv), 0) AS total_sales
 		FROM crm_customer_profiles p
 		LEFT JOIN crm_categories cat ON cat.id = p.category_id
 		WHERE p.company_id = $1
@@ -627,8 +627,14 @@ func (r *CRMProfileRepo) GetDashboardSegmentation(companyID string) ([]*reposito
 	out := make([]*repository.CRMSegmentDistribution, 0)
 	for rows.Next() {
 		var item repository.CRMSegmentDistribution
-		if err := rows.Scan(&item.Category, &item.Count); err != nil {
+		var totalSales pgtype.Numeric
+		if err := rows.Scan(&item.Category, &item.Count, &totalSales); err != nil {
 			return nil, err
+		}
+		if totalSales.Valid && totalSales.Int != nil {
+			item.TotalSales = decimal.NewFromBigInt(totalSales.Int, totalSales.Exp)
+		} else {
+			item.TotalSales = decimal.Zero
 		}
 		out = append(out, &item)
 	}

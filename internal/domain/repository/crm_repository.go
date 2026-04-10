@@ -52,8 +52,9 @@ type CRMDashboardKPIs struct {
 }
 
 type CRMSegmentDistribution struct {
-	Category string
-	Count    int64
+	Category   string
+	Count      int64
+	TotalSales decimal.Decimal
 }
 
 type CRMMonthlySales struct {

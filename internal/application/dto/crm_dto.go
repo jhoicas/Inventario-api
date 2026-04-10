@@ -419,8 +419,10 @@ type CRMAnalyticsKPIsResponse struct {
 }
 
 type CRMAnalyticsSegmentationItem struct {
-	Category string `json:"category"`
-	Count    int64  `json:"count"`
+	Category       string  `json:"category"`
+	Count          int64   `json:"count"`
+	VentasTotales  float64 `json:"ventas_totales"`
+	TicketPromedio float64 `json:"ticket_promedio"`
 }
 
 type CRMAnalyticsMonthlyEvolutionItem struct {
