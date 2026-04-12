@@ -34,6 +34,7 @@ type CRMProfileRepository interface {
 	GetProfile360(ctx context.Context, companyID, customerID string) (*entity.Profile360, error)
 	Upsert(profile *entity.CRMCustomerProfile) error
 	ListByCompany(companyID string, limit, offset int) ([]*entity.CRMCustomerProfile, error)
+	ResolveCampaignRecipientsByCategory(ctx context.Context, companyID, categoryID string) ([]dto.CampaignRecipientDTO, error)
 	GetAnalytics(ctx context.Context, companyID string) (*dto.CRMAnalyticsResponse, error)
 	GetRemarketingProspects(ctx context.Context, companyID string) ([]dto.RemarketingProspect, error)
 	GetRemarketingAudience(ctx context.Context, companyID, segmento, estrategia string) ([]dto.RemarketingAudienceDTO, error)

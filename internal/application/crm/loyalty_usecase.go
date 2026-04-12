@@ -244,35 +244,15 @@ func (uc *LoyaltyUseCase) ResolveCampaignRecipients(ctx context.Context, company
 		return nil, domain.ErrInvalidInput
 	}
 
-	recipients := make(map[string]dto.CampaignRecipientDTO)
-
-	profiles, err := uc.profileRepo.ListByCompany(companyID, 2000, 0)
+	recipients, err := uc.profileRepo.ResolveCampaignRecipientsByCategory(ctx, companyID, strings.TrimSpace(strategy.CategoryID))
 	if err != nil {
 		return nil, err
 	}
-	for _, p := range profiles {
-		if strings.TrimSpace(p.CategoryID) != strings.TrimSpace(strategy.CategoryID) {
-			continue
-		}
-		cust, err := uc.customerRepo.GetByID(p.CustomerID)
-		if err != nil || cust == nil || cust.CompanyID != companyID {
-			continue
-		}
-		recipients[cust.ID] = dto.CampaignRecipientDTO{
-			CustomerID: cust.ID,
-			Name:       cust.Name,
-			Email:      cust.Email,
-			Segment:    "category",
-		}
+	for i := range recipients {
+		recipients[i].Segment = "category"
 	}
 
-	out := &dto.ResolveCampaignRecipientsResponse{
-		Recipients: make([]dto.CampaignRecipientDTO, 0, len(recipients)),
-	}
-	for _, r := range recipients {
-		out.Recipients = append(out.Recipients, r)
-	}
-	return out, nil
+	return &dto.ResolveCampaignRecipientsResponse{Recipients: recipients}, nil
 }
 
 // GetProfile360 devuelve la vista 360 del cliente (datos base + perfil CRM + categoría y beneficios si aplica).

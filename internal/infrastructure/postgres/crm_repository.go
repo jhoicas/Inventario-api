@@ -350,6 +350,48 @@ func (r *CRMProfileRepo) ListByCompany(companyID string, limit, offset int) ([]*
 	return list, rows.Err()
 }
 
+func (r *CRMProfileRepo) ResolveCampaignRecipientsByCategory(ctx context.Context, companyID, categoryID string) ([]dto.CampaignRecipientDTO, error) {
+	if strings.TrimSpace(companyID) == "" || strings.TrimSpace(categoryID) == "" {
+		return nil, fmt.Errorf("company_id y category_id requeridos")
+	}
+
+	rows, err := r.q.Query(ctx, `
+		SELECT
+			c.id,
+			COALESCE(c.name, '') AS name,
+			COALESCE(c.email, '') AS email
+		FROM customers c
+		WHERE c.company_id = $1
+		  AND c.is_active = true
+		  AND COALESCE(NULLIF(TRIM(c.email), ''), '') <> ''
+		  AND EXISTS (
+			SELECT 1
+			FROM crm_customer_profiles p
+			WHERE p.customer_id = c.id
+			  AND p.company_id = $1
+			  AND p.category_id = $2
+		  )
+		ORDER BY c.name ASC`, companyID, categoryID)
+	if err != nil {
+		return nil, fmt.Errorf("resolve campaign recipients by category: %w", err)
+	}
+	defer rows.Close()
+
+	recipients := make([]dto.CampaignRecipientDTO, 0)
+	for rows.Next() {
+		var item dto.CampaignRecipientDTO
+		if err := rows.Scan(&item.CustomerID, &item.Name, &item.Email); err != nil {
+			return nil, fmt.Errorf("scan campaign recipient: %w", err)
+		}
+		recipients = append(recipients, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate campaign recipients: %w", err)
+	}
+
+	return recipients, nil
+}
+
 func (r *CRMProfileRepo) GetAnalytics(ctx context.Context, companyID string) (*dto.CRMAnalyticsResponse, error) {
 	if companyID == "" {
 		return nil, fmt.Errorf("company_id requerido")
