@@ -50,6 +50,12 @@ func (uc *CampaignUseCase) Create(ctx context.Context, companyID, userID string,
 		status = entity.CampaignStatusPending
 	}
 	scheduledAt := normalizeTimePtrToUTC(req.ScheduledAt)
+	isScheduled := strings.EqualFold(status, "PROGRAMADA") || strings.EqualFold(status, entity.CampaignStatusScheduled)
+	if isScheduled {
+		if strings.TrimSpace(req.Subject) == "" || strings.TrimSpace(req.Body) == "" {
+			return nil, domain.ErrInvalidInput
+		}
+	}
 
 	now := time.Now()
 	c := &entity.Campaign{
@@ -64,8 +70,40 @@ func (uc *CampaignUseCase) Create(ctx context.Context, companyID, userID string,
 		UpdatedAt:   now,
 	}
 
-	if err := uc.repo.Create(ctx, c); err != nil {
-		return nil, err
+	if isScheduled {
+		recipientsDTO, err := uc.profileRepo.ResolveCampaignRecipients(ctx, companyID, strings.TrimSpace(req.CategoryID))
+		if err != nil {
+			return nil, err
+		}
+		if len(recipientsDTO) == 0 {
+			return nil, domain.ErrInvalidInput
+		}
+
+		recipients := make([]*entity.CampaignRecipient, 0, len(recipientsDTO))
+		for _, recipient := range recipientsDTO {
+			if strings.TrimSpace(recipient.Email) == "" {
+				continue
+			}
+			recipients = append(recipients, &entity.CampaignRecipient{
+				CustomerID: recipient.CustomerID,
+				CompanyID:  companyID,
+				Email:      strings.TrimSpace(recipient.Email),
+				Subject:    req.Subject,
+				Body:       req.Body,
+				Status:     "QUEUED",
+				QueuedAt:   now,
+			})
+		}
+		if len(recipients) == 0 {
+			return nil, domain.ErrInvalidInput
+		}
+		if err := uc.repo.CreateWithRecipients(ctx, c, recipients); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := uc.repo.Create(ctx, c); err != nil {
+			return nil, err
+		}
 	}
 	return toCampaignResponse(c), nil
 }

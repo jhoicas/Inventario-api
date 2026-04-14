@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jhoicas/Inventario-api/internal/application/dto"
 	"github.com/jhoicas/Inventario-api/internal/domain/entity"
 	"github.com/jhoicas/Inventario-api/internal/domain/repository"
@@ -351,29 +352,48 @@ func (r *CRMProfileRepo) ListByCompany(companyID string, limit, offset int) ([]*
 }
 
 func (r *CRMProfileRepo) ResolveCampaignRecipientsByCategory(ctx context.Context, companyID, categoryID string) ([]dto.CampaignRecipientDTO, error) {
-	if strings.TrimSpace(companyID) == "" || strings.TrimSpace(categoryID) == "" {
-		return nil, fmt.Errorf("company_id y category_id requeridos")
+	return r.ResolveCampaignRecipients(ctx, companyID, categoryID)
+}
+
+func (r *CRMProfileRepo) ResolveCampaignRecipients(ctx context.Context, companyID, categoryID string) ([]dto.CampaignRecipientDTO, error) {
+	if strings.TrimSpace(companyID) == "" {
+		return nil, fmt.Errorf("company_id requerido")
 	}
 
-	rows, err := r.q.Query(ctx, `
-		SELECT
-			c.id,
-			COALESCE(c.name, '') AS name,
-			COALESCE(c.email, '') AS email
-		FROM customers c
-		WHERE c.company_id = $1
-		  AND c.is_active = true
-		  AND COALESCE(NULLIF(TRIM(c.email), ''), '') <> ''
-		  AND EXISTS (
-			SELECT 1
-			FROM crm_customer_profiles p
-			WHERE p.customer_id = c.id
-			  AND p.company_id = $1
-			  AND p.category_id = $2
-		  )
-		ORDER BY c.name ASC`, companyID, categoryID)
+	var (
+		query string
+		args  []any
+	)
+	if strings.TrimSpace(categoryID) == "" {
+		query = `
+			SELECT c.id, COALESCE(c.name, '') AS name, COALESCE(c.email, '') AS email
+			FROM customers c
+			WHERE c.company_id = $1
+			  AND c.is_active = true
+			  AND COALESCE(NULLIF(TRIM(c.email), ''), '') <> ''
+			ORDER BY c.name ASC`
+		args = []any{companyID}
+	} else {
+		query = `
+			SELECT c.id, COALESCE(c.name, '') AS name, COALESCE(c.email, '') AS email
+			FROM customers c
+			WHERE c.company_id = $1
+			  AND c.is_active = true
+			  AND COALESCE(NULLIF(TRIM(c.email), ''), '') <> ''
+			  AND EXISTS (
+				SELECT 1
+				FROM crm_customer_profiles p
+				WHERE p.customer_id = c.id
+				  AND p.company_id = $1
+				  AND p.category_id = $2
+			  )
+			ORDER BY c.name ASC`
+		args = []any{companyID, categoryID}
+	}
+
+	rows, err := r.q.Query(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("resolve campaign recipients by category: %w", err)
+		return nil, fmt.Errorf("resolve campaign recipients: %w", err)
 	}
 	defer rows.Close()
 
@@ -1546,6 +1566,41 @@ func (r *CRMCampaignRepo) Create(ctx context.Context, c *entity.Campaign) error 
 	return err
 }
 
+func (r *CRMCampaignRepo) CreateWithRecipients(ctx context.Context, c *entity.Campaign, recipients []*entity.CampaignRecipient) error {
+	var tx pgx.Tx
+	var err error
+	switch starter := any(r.q).(type) {
+	case interface {
+		BeginTx(context.Context, pgx.TxOptions) (pgx.Tx, error)
+	}:
+		tx, err = starter.BeginTx(ctx, pgx.TxOptions{})
+	case *pgxpool.Pool:
+		tx, err = starter.BeginTx(ctx, pgx.TxOptions{})
+	default:
+		return fmt.Errorf("el repositorio no soporta transacciones")
+	}
+	if err != nil {
+		return fmt.Errorf("iniciar transacción de campaña: %w", err)
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	campaignRepo := &CRMCampaignRepo{q: tx}
+	if err := campaignRepo.Create(ctx, c); err != nil {
+		return err
+	}
+	if len(recipients) > 0 {
+		if _, err := campaignRepo.queueRecipientsBulk(ctx, c.ID, recipients); err != nil {
+			return err
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("confirmar transacción de campaña: %w", err)
+	}
+	return nil
+}
+
 func (r *CRMCampaignRepo) Update(ctx context.Context, c *entity.Campaign) error {
 	if strings.TrimSpace(c.ID) == "" {
 		return fmt.Errorf("campaign id requerido")
@@ -1619,42 +1674,66 @@ func (r *CRMCampaignRepo) GetMetrics(ctx context.Context, campaignID string) (*e
 }
 
 func (r *CRMCampaignRepo) QueueRecipients(ctx context.Context, campaignID string, recipients []*entity.CampaignRecipient) (int, error) {
+	return r.queueRecipientsBulk(ctx, campaignID, recipients)
+}
+
+func (r *CRMCampaignRepo) queueRecipientsBulk(ctx context.Context, campaignID string, recipients []*entity.CampaignRecipient) (int, error) {
 	queued := 0
-	for _, rec := range recipients {
-		if rec == nil {
+	if len(recipients) == 0 {
+		return 0, nil
+	}
+
+	const chunkSize = 250
+	for start := 0; start < len(recipients); start += chunkSize {
+		end := start + chunkSize
+		if end > len(recipients) {
+			end = len(recipients)
+		}
+
+		values := make([]string, 0, end-start)
+		args := make([]any, 0, (end-start)*12)
+		argPos := 1
+		for _, rec := range recipients[start:end] {
+			if rec == nil {
+				continue
+			}
+			if rec.ID == "" {
+				rec.ID = uuid.New().String()
+			}
+			if strings.TrimSpace(rec.Status) == "" {
+				rec.Status = "QUEUED"
+			}
+			if rec.QueuedAt.IsZero() {
+				rec.QueuedAt = time.Now().UTC()
+			}
+			values = append(values, fmt.Sprintf("($%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d)", argPos, argPos+1, argPos+2, argPos+3, argPos+4, argPos+5, argPos+6, argPos+7, argPos+8, argPos+9, argPos+10, argPos+11))
+			args = append(args,
+				rec.ID,
+				campaignID,
+				rec.CustomerID,
+				rec.CompanyID,
+				rec.Email,
+				rec.Subject,
+				rec.Body,
+				rec.Status,
+				nullIfEmpty(rec.Error),
+				rec.QueuedAt,
+				rec.SentAt,
+				rec.ProcessedAt,
+			)
+			argPos += 12
+			queued++
+		}
+		if len(values) == 0 {
 			continue
-		}
-		if rec.ID == "" {
-			rec.ID = uuid.New().String()
-		}
-		if strings.TrimSpace(rec.Status) == "" {
-			rec.Status = "QUEUED"
-		}
-		if rec.QueuedAt.IsZero() {
-			rec.QueuedAt = time.Now()
 		}
 		_, err := r.q.Exec(ctx, `
 			INSERT INTO crm_campaign_recipients (
 				id, campaign_id, customer_id, company_id, email, subject, body, status, error_message, queued_at, sent_at, processed_at
-			)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
-			rec.ID,
-			campaignID,
-			rec.CustomerID,
-			rec.CompanyID,
-			rec.Email,
-			rec.Subject,
-			rec.Body,
-			rec.Status,
-			nullIfEmpty(rec.Error),
-			rec.QueuedAt,
-			rec.SentAt,
-			rec.ProcessedAt,
-		)
+			) VALUES `+strings.Join(values, ","), args...)
 		if err != nil {
 			return queued, err
 		}
-		queued++
 	}
 	return queued, nil
 }

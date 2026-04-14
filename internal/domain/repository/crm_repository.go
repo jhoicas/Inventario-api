@@ -35,6 +35,7 @@ type CRMProfileRepository interface {
 	Upsert(profile *entity.CRMCustomerProfile) error
 	ListByCompany(companyID string, limit, offset int) ([]*entity.CRMCustomerProfile, error)
 	ResolveCampaignRecipientsByCategory(ctx context.Context, companyID, categoryID string) ([]dto.CampaignRecipientDTO, error)
+	ResolveCampaignRecipients(ctx context.Context, companyID, categoryID string) ([]dto.CampaignRecipientDTO, error)
 	GetAnalytics(ctx context.Context, companyID string) (*dto.CRMAnalyticsResponse, error)
 	GetRemarketingProspects(ctx context.Context, companyID string) ([]dto.RemarketingProspect, error)
 	GetRemarketingAudience(ctx context.Context, companyID, segmento, estrategia string) ([]dto.RemarketingAudienceDTO, error)
@@ -134,6 +135,7 @@ type CRMOpportunityRepository interface {
 // CRMCampaignRepository puerto de persistencia para campañas CRM.
 type CRMCampaignRepository interface {
 	Create(ctx context.Context, c *entity.Campaign) error
+	CreateWithRecipients(ctx context.Context, c *entity.Campaign, recipients []*entity.CampaignRecipient) error
 	Update(ctx context.Context, c *entity.Campaign) error
 	GetByID(ctx context.Context, id string) (*entity.Campaign, error)
 	GetMetrics(ctx context.Context, campaignID string) (*entity.CampaignMetrics, error)

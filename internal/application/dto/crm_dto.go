@@ -295,6 +295,9 @@ type FunnelStageDTO struct {
 type CreateCampaignRequest struct {
 	Name        string `json:"name" validate:"required"`
 	Description string `json:"description"`
+	Subject     string `json:"subject,omitempty"`
+	Body        string `json:"body,omitempty"`
+	CategoryID  string `json:"category_id,omitempty"`
 	// ScheduledAt debe venir en ISO 8601 (RFC3339), idealmente con offset (ej: 2026-04-20T10:00:00-05:00).
 	ScheduledAt *time.Time `json:"scheduled_at"`
 	Status      string     `json:"status,omitempty"`
