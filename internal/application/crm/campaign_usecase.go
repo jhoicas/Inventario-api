@@ -40,11 +40,16 @@ func NewCampaignUseCase(
 	}
 }
 
-// Create crea una campaña en estado BORRADOR.
+// Create crea una campaña en estado pending.
 func (uc *CampaignUseCase) Create(ctx context.Context, companyID, userID string, req dto.CreateCampaignRequest) (*dto.CampaignResponse, error) {
 	if req.Name == "" {
 		return nil, domain.ErrInvalidInput
 	}
+	status := strings.TrimSpace(req.Status)
+	if status == "" {
+		status = entity.CampaignStatusPending
+	}
+	scheduledAt := normalizeTimePtrToUTC(req.ScheduledAt)
 
 	now := time.Now()
 	c := &entity.Campaign{
@@ -52,8 +57,8 @@ func (uc *CampaignUseCase) Create(ctx context.Context, companyID, userID string,
 		CompanyID:   companyID,
 		Name:        req.Name,
 		Description: req.Description,
-		Status:      entity.CampaignStatusBorrador,
-		ScheduledAt: req.ScheduledAt,
+		Status:      status,
+		ScheduledAt: scheduledAt,
 		CreatedBy:   userID,
 		CreatedAt:   now,
 		UpdatedAt:   now,
@@ -231,13 +236,22 @@ func toCampaignResponse(c *entity.Campaign) *dto.CampaignResponse {
 		CompanyID:   c.CompanyID,
 		Name:        c.Name,
 		Description: c.Description,
-		Status:      string(c.Status),
+		Status:      c.Status,
 		CreatedBy:   c.CreatedBy,
 		CreatedAt:   c.CreatedAt,
 		UpdatedAt:   c.UpdatedAt,
 	}
 	if c.ScheduledAt != nil {
-		resp.ScheduledAt = c.ScheduledAt
+		s := c.ScheduledAt.UTC()
+		resp.ScheduledAt = &s
 	}
 	return resp
+}
+
+func normalizeTimePtrToUTC(t *time.Time) *time.Time {
+	if t == nil {
+		return nil
+	}
+	utc := t.UTC()
+	return &utc
 }

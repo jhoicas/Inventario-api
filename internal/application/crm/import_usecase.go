@@ -427,6 +427,9 @@ func (uc *ImportUseCase) parseRow(headerMap map[string]int, row []string) dto.Im
 	if idx, ok := findHeaderIndex(headerMap, "email"); ok && idx < len(row) {
 		profile.Email = normalizeImportEmail(row[idx])
 	}
+	if idx, ok := findHeaderIndex(headerMap, "telefono", "teléfono", "phone", "celular"); ok && idx < len(row) {
+		profile.Telefono = strings.TrimSpace(row[idx])
+	}
 	if idx, ok := findHeaderIndex(headerMap, "segmento"); ok && idx < len(row) {
 		profile.Segmento = strings.TrimSpace(row[idx])
 	}
@@ -631,13 +634,22 @@ func (uc *ImportUseCase) upsertProfile(
 			Name:      name,
 			TaxID:     taxID,
 			Email:     profile.Email,
-			Phone:     "",
+			Phone:     strings.TrimSpace(profile.Telefono),
 			IsActive:  true,
 			CreatedAt: now,
 			UpdatedAt: now,
 		}
 		if err := uc.customerRepo.Create(customer); err != nil {
 			return false, fmt.Errorf("crear cliente automático: %w", err)
+		}
+	} else {
+		incomingPhone := strings.TrimSpace(profile.Telefono)
+		if incomingPhone != "" && strings.TrimSpace(customer.Phone) != incomingPhone {
+			customer.Phone = incomingPhone
+			customer.UpdatedAt = time.Now()
+			if err := uc.customerRepo.Update(customer); err != nil {
+				return false, fmt.Errorf("actualizar teléfono de cliente: %w", err)
+			}
 		}
 	}
 

@@ -134,6 +134,7 @@ type CRMOpportunityRepository interface {
 // CRMCampaignRepository puerto de persistencia para campañas CRM.
 type CRMCampaignRepository interface {
 	Create(ctx context.Context, c *entity.Campaign) error
+	Update(ctx context.Context, c *entity.Campaign) error
 	GetByID(ctx context.Context, id string) (*entity.Campaign, error)
 	GetMetrics(ctx context.Context, campaignID string) (*entity.CampaignMetrics, error)
 	QueueRecipients(ctx context.Context, campaignID string, recipients []*entity.CampaignRecipient) (int, error)

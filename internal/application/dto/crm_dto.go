@@ -293,9 +293,20 @@ type FunnelStageDTO struct {
 
 // CreateCampaignRequest body para crear una campaña de marketing.
 type CreateCampaignRequest struct {
-	Name        string     `json:"name" validate:"required"`
-	Description string     `json:"description"`
+	Name        string `json:"name" validate:"required"`
+	Description string `json:"description"`
+	// ScheduledAt debe venir en ISO 8601 (RFC3339), idealmente con offset (ej: 2026-04-20T10:00:00-05:00).
 	ScheduledAt *time.Time `json:"scheduled_at"`
+	Status      string     `json:"status,omitempty"`
+}
+
+// UpdateCampaignRequest body para actualizar una campaña de marketing.
+type UpdateCampaignRequest struct {
+	Name        *string `json:"name,omitempty"`
+	Description *string `json:"description,omitempty"`
+	// ScheduledAt debe venir en ISO 8601 (RFC3339), idealmente con offset.
+	ScheduledAt *time.Time `json:"scheduled_at,omitempty"`
+	Status      *string    `json:"status,omitempty"`
 }
 
 // CampaignResponse campaña en respuestas.

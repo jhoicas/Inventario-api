@@ -7,6 +7,7 @@ type ImportCRMProfileRequest struct {
 	IDCliente             string  `json:"idCliente"`
 	Nombre                string  `json:"nombre"`
 	Email                 string  `json:"email"`
+	Telefono              string  `json:"telefono"`
 	Segmento              string  `json:"segmento"`
 	VentasTotales         float64 `json:"ventasTotales"`
 	Pedidos               int     `json:"pedidos"`

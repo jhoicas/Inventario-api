@@ -1526,10 +1526,14 @@ func (r *CRMCampaignRepo) Create(ctx context.Context, c *entity.Campaign) error 
 	if c.ID == "" {
 		c.ID = uuid.New().String()
 	}
+	if strings.TrimSpace(c.Status) == "" {
+		c.Status = entity.CampaignStatusPending
+	}
+	scheduledAt := toUTCTimePtr(c.ScheduledAt)
 	_, err := r.q.Exec(ctx, `
 		INSERT INTO crm_campaigns (id, company_id, name, description, status, scheduled_at, created_by, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-		c.ID, c.CompanyID, c.Name, nullIfEmpty(c.Description), string(c.Status), c.ScheduledAt, nullIfEmpty(c.CreatedBy), c.CreatedAt, c.UpdatedAt,
+		c.ID, c.CompanyID, c.Name, nullIfEmpty(c.Description), c.Status, scheduledAt, nullIfEmpty(c.CreatedBy), c.CreatedAt, c.UpdatedAt,
 	)
 	if err != nil {
 		return err
@@ -1538,6 +1542,27 @@ func (r *CRMCampaignRepo) Create(ctx context.Context, c *entity.Campaign) error 
 		INSERT INTO crm_campaign_metrics (campaign_id, sent, opened, clicked, converted, revenue, updated_at)
 		VALUES ($1, 0, 0, 0, 0, 0, now())
 		ON CONFLICT (campaign_id) DO NOTHING`, c.ID,
+	)
+	return err
+}
+
+func (r *CRMCampaignRepo) Update(ctx context.Context, c *entity.Campaign) error {
+	if strings.TrimSpace(c.ID) == "" {
+		return fmt.Errorf("campaign id requerido")
+	}
+	if strings.TrimSpace(c.Status) == "" {
+		c.Status = entity.CampaignStatusPending
+	}
+	scheduledAt := toUTCTimePtr(c.ScheduledAt)
+	_, err := r.q.Exec(ctx, `
+		UPDATE crm_campaigns
+		SET name = $2,
+			description = $3,
+			status = $4,
+			scheduled_at = $5,
+			updated_at = $6
+		WHERE id = $1`,
+		c.ID, c.Name, nullIfEmpty(c.Description), c.Status, scheduledAt, c.UpdatedAt,
 	)
 	return err
 }
@@ -1561,7 +1586,16 @@ func (r *CRMCampaignRepo) GetByID(ctx context.Context, id string) (*entity.Campa
 	if createdBy != nil {
 		c.CreatedBy = *createdBy
 	}
+	c.ScheduledAt = toUTCTimePtr(c.ScheduledAt)
 	return &c, nil
+}
+
+func toUTCTimePtr(t *time.Time) *time.Time {
+	if t == nil {
+		return nil
+	}
+	utc := t.UTC()
+	return &utc
 }
 
 func (r *CRMCampaignRepo) GetMetrics(ctx context.Context, campaignID string) (*entity.CampaignMetrics, error) {

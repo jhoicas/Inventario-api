@@ -6,28 +6,28 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// CampaignStatus estado de una campaña de marketing CRM.
-type CampaignStatus string
-
 const (
-	CampaignStatusBorrador   CampaignStatus = "BORRADOR"
-	CampaignStatusProgramada CampaignStatus = "PROGRAMADA"
-	CampaignStatusEnviando   CampaignStatus = "ENVIANDO"
-	CampaignStatusCompletada CampaignStatus = "COMPLETADA"
+	CampaignStatusPending   = "pending"
+	CampaignStatusScheduled = "scheduled"
+	CampaignStatusSending   = "sending"
+	CampaignStatusCompleted = "completed"
 )
 
-// Campaign representa una campaña de marketing CRM.
-type Campaign struct {
+// CRMCampaign representa una campaña de marketing CRM.
+type CRMCampaign struct {
 	ID          string
 	CompanyID   string
 	Name        string
 	Description string
-	Status      CampaignStatus
+	Status      string
 	ScheduledAt *time.Time
 	CreatedBy   string
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }
+
+// Campaign se mantiene como alias por compatibilidad con el código existente.
+type Campaign = CRMCampaign
 
 // CampaignMetrics métricas de envío y conversión de una campaña.
 type CampaignMetrics struct {
