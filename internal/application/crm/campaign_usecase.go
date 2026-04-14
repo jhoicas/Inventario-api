@@ -50,11 +50,12 @@ func (uc *CampaignUseCase) Create(ctx context.Context, companyID, userID string,
 		status = entity.CampaignStatusPending
 	}
 	scheduledAt := normalizeTimePtrToUTC(req.ScheduledAt)
-	isScheduled := strings.EqualFold(status, "PROGRAMADA") || strings.EqualFold(status, entity.CampaignStatusScheduled)
+	isScheduled := req.ScheduledAt != nil
 	if isScheduled {
 		if strings.TrimSpace(req.Subject) == "" || strings.TrimSpace(req.Body) == "" {
 			return nil, domain.ErrInvalidInput
 		}
+		status = entity.CampaignStatusScheduled
 	}
 
 	now := time.Now()
