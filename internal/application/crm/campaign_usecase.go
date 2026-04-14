@@ -85,12 +85,18 @@ func (uc *CampaignUseCase) Create(ctx context.Context, companyID, userID string,
 			if strings.TrimSpace(recipient.Email) == "" {
 				continue
 			}
+			custName := "Cliente"
+			cust, err := uc.customerRepo.GetByID(recipient.CustomerID)
+			if err == nil && cust != nil && strings.TrimSpace(cust.Name) != "" {
+				custName = strings.TrimSpace(cust.Name)
+			}
+			customBody := strings.ReplaceAll(req.Body, "[Nombre]", custName)
 			recipients = append(recipients, &entity.CampaignRecipient{
 				CustomerID: recipient.CustomerID,
 				CompanyID:  companyID,
 				Email:      strings.TrimSpace(recipient.Email),
 				Subject:    req.Subject,
-				Body:       req.Body,
+				Body:       customBody,
 				Status:     "QUEUED",
 				QueuedAt:   now,
 			})
