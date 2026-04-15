@@ -159,3 +159,30 @@ type CRMCampaignTemplateRepository interface {
 	FindAllByCompany(ctx context.Context, companyID string) ([]*entity.CampaignTemplate, error)
 	Delete(ctx context.Context, id, companyID string) error
 }
+
+// CRMProductHubRepository puerto de persistencia para productos en el hub de analytics.
+type CRMProductHubRepository interface {
+	CreateBatch(ctx context.Context, products []*entity.ProductHub) error
+	GetByCompanyAndCode(ctx context.Context, companyID, productCode string) (*entity.ProductHub, error)
+	ListByCompany(ctx context.Context, companyID string) ([]*entity.ProductHub, error)
+	Upsert(ctx context.Context, product *entity.ProductHub) error
+}
+
+// CRMSalesHubRepository puerto de persistencia para ventas en el hub de analytics.
+type CRMSalesHubRepository interface {
+	CreateBatch(ctx context.Context, sales []*entity.SaleHub) error
+	GetByID(ctx context.Context, saleID string) (*entity.SaleHub, error)
+	ListByCompanyAndDateRange(ctx context.Context, companyID string, startDate, endDate time.Time) ([]*entity.SaleHub, error)
+}
+
+// CRMSaleItemHubRepository puerto de persistencia para items de venta en el hub de analytics.
+type CRMSaleItemHubRepository interface {
+	CreateBatch(ctx context.Context, items []*entity.SaleItemHub) error
+	GetBySaleID(ctx context.Context, saleID string) ([]*entity.SaleItemHub, error)
+}
+
+// AIAnalyticsRepository puerto de persistencia para queries en la vista de analytics.
+type AIAnalyticsRepository interface {
+	QueryView(ctx context.Context, companyID, sqlQuery string) ([]*entity.AIAnalyticsRow, error)
+	RunAggregateQuery(ctx context.Context, companyID, sqlQuery string) (interface{}, error)
+}
