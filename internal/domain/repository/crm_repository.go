@@ -4,7 +4,9 @@ import (
 	"context"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jhoicas/Inventario-api/internal/application/dto"
+	"github.com/jhoicas/Inventario-api/internal/domain"
 	"github.com/jhoicas/Inventario-api/internal/domain/entity"
 	"github.com/shopspring/decimal"
 )
@@ -140,11 +142,20 @@ type CRMCampaignRepository interface {
 	GetByID(ctx context.Context, id string) (*entity.Campaign, error)
 	GetMetrics(ctx context.Context, campaignID string) (*entity.CampaignMetrics, error)
 	QueueRecipients(ctx context.Context, campaignID string, recipients []*entity.CampaignRecipient) (int, error)
+	BatchInsertCampaignRecipients(ctx context.Context, recipients []domain.CampaignRecipient) error
+}
+
+// CRMAutomationRepository puerto de persistencia para automatizaciones CRM.
+type CRMAutomationRepository interface {
+	GetActiveAutomations(ctx context.Context) ([]*entity.CRMAutomation, error)
+	GetCustomersForBirthday(ctx context.Context, companyID uuid.UUID) ([]*entity.Customer, error)
+	GetCustomersForRepurchase(ctx context.Context, companyID uuid.UUID, productID uuid.UUID, daysSincePurchase int) ([]*entity.Customer, error)
 }
 
 // CRMCampaignTemplateRepository puerto de persistencia para plantillas de campañas.
 type CRMCampaignTemplateRepository interface {
 	Create(ctx context.Context, t *entity.CampaignTemplate) error
+	GetByID(ctx context.Context, id string) (*entity.CampaignTemplate, error)
 	FindAllByCompany(ctx context.Context, companyID string) ([]*entity.CampaignTemplate, error)
 	Delete(ctx context.Context, id, companyID string) error
 }

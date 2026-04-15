@@ -14,6 +14,7 @@ type Customer struct {
 	TaxID        string // NIT o Cédula (Colombia)
 	Email        string
 	Phone        string
+	BirthDate    *time.Time
 	LTV          decimal.Decimal
 	CategoryName string
 	IsActive     bool

@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jhoicas/Inventario-api/internal/application/dto"
+	"github.com/jhoicas/Inventario-api/internal/domain"
 	"github.com/jhoicas/Inventario-api/internal/domain/entity"
 	"github.com/jhoicas/Inventario-api/internal/domain/repository"
 	"github.com/shopspring/decimal"
@@ -27,6 +28,7 @@ var _ repository.CRMInteractionRepository = (*CRMInteractionRepo)(nil)
 var _ repository.CRMTaskRepository = (*CRMTaskRepo)(nil)
 var _ repository.CRMTicketRepository = (*CRMTicketRepo)(nil)
 var _ repository.CRMCampaignRepository = (*CRMCampaignRepo)(nil)
+var _ repository.CRMAutomationRepository = (*CRMAutomationRepo)(nil)
 var _ repository.CRMOpportunityRepository = (*CRMOpportunityRepo)(nil)
 
 // CRMCategoryRepo implementación de CRMCategoryRepository.
@@ -1251,6 +1253,22 @@ func (r *CRMCampaignTemplateRepo) Create(ctx context.Context, t *entity.Campaign
 	return err
 }
 
+func (r *CRMCampaignTemplateRepo) GetByID(ctx context.Context, id string) (*entity.CampaignTemplate, error) {
+	var t entity.CampaignTemplate
+	err := r.q.QueryRow(ctx, `
+		SELECT id, company_id, name, subject, body, created_at, updated_at
+		FROM crm_campaign_templates
+		WHERE id = $1`, id,
+	).Scan(&t.ID, &t.CompanyID, &t.Name, &t.Subject, &t.Body, &t.CreatedAt, &t.UpdatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &t, nil
+}
+
 func (r *CRMCampaignTemplateRepo) FindAllByCompany(ctx context.Context, companyID string) ([]*entity.CampaignTemplate, error) {
 	rows, err := r.q.Query(ctx, `
 		SELECT id, company_id, name, subject, body, created_at, updated_at
@@ -1566,6 +1584,74 @@ func (r *CRMCampaignRepo) Create(ctx context.Context, c *entity.Campaign) error 
 	return err
 }
 
+func (r *CRMCampaignRepo) BatchInsertCampaignRecipients(ctx context.Context, recipients []domain.CampaignRecipient) error {
+	_, err := r.batchInsertCampaignRecipients(ctx, recipients)
+	return err
+}
+
+func (r *CRMCampaignRepo) batchInsertCampaignRecipients(ctx context.Context, recipients []domain.CampaignRecipient) (int, error) {
+	if len(recipients) == 0 {
+		return 0, nil
+	}
+
+	inserted := 0
+	const batchSize = 1000
+	for start := 0; start < len(recipients); start += batchSize {
+		end := start + batchSize
+		if end > len(recipients) {
+			end = len(recipients)
+		}
+
+		chunk := recipients[start:end]
+		values := make([]string, 0, len(chunk))
+		args := make([]any, 0, len(chunk)*12)
+		argPos := 1
+		for _, rec := range chunk {
+			if strings.TrimSpace(rec.CampaignID) == "" || strings.TrimSpace(rec.CustomerID) == "" || strings.TrimSpace(rec.CompanyID) == "" {
+				continue
+			}
+			if rec.ID == "" {
+				rec.ID = uuid.New().String()
+			}
+			if strings.TrimSpace(rec.Status) == "" {
+				rec.Status = "QUEUED"
+			}
+			if rec.QueuedAt.IsZero() {
+				rec.QueuedAt = time.Now().UTC()
+			}
+			values = append(values, fmt.Sprintf("($%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d)", argPos, argPos+1, argPos+2, argPos+3, argPos+4, argPos+5, argPos+6, argPos+7, argPos+8, argPos+9, argPos+10, argPos+11))
+			args = append(args,
+				rec.ID,
+				rec.CampaignID,
+				rec.CustomerID,
+				rec.CompanyID,
+				rec.Email,
+				rec.Subject,
+				rec.Body,
+				rec.Status,
+				nullIfEmpty(rec.Error),
+				rec.QueuedAt,
+				rec.SentAt,
+				rec.ProcessedAt,
+			)
+			argPos += 12
+			inserted++
+		}
+		if len(values) == 0 {
+			continue
+		}
+		query := `
+			INSERT INTO crm_campaign_recipients (
+				id, campaign_id, customer_id, company_id, email, subject, body, status, error_message, queued_at, sent_at, processed_at
+			) VALUES ` + strings.Join(values, ",")
+		if _, err := r.q.Exec(ctx, query, args...); err != nil {
+			return inserted, fmt.Errorf("batch insert campaign recipients: %w", err)
+		}
+	}
+
+	return inserted, nil
+}
+
 func (r *CRMCampaignRepo) CreateWithRecipients(ctx context.Context, c *entity.Campaign, recipients []*entity.CampaignRecipient) error {
 	var tx pgx.Tx
 	var err error
@@ -1591,7 +1677,17 @@ func (r *CRMCampaignRepo) CreateWithRecipients(ctx context.Context, c *entity.Ca
 		return err
 	}
 	if len(recipients) > 0 {
-		if _, err := campaignRepo.queueRecipientsBulk(ctx, c.ID, recipients); err != nil {
+		payload := make([]domain.CampaignRecipient, 0, len(recipients))
+		for _, rec := range recipients {
+			if rec == nil {
+				continue
+			}
+			if strings.TrimSpace(rec.CampaignID) == "" {
+				rec.CampaignID = c.ID
+			}
+			payload = append(payload, *rec)
+		}
+		if err := campaignRepo.BatchInsertCampaignRecipients(ctx, payload); err != nil {
 			return err
 		}
 	}
@@ -1674,68 +1770,130 @@ func (r *CRMCampaignRepo) GetMetrics(ctx context.Context, campaignID string) (*e
 }
 
 func (r *CRMCampaignRepo) QueueRecipients(ctx context.Context, campaignID string, recipients []*entity.CampaignRecipient) (int, error) {
-	return r.queueRecipientsBulk(ctx, campaignID, recipients)
-}
-
-func (r *CRMCampaignRepo) queueRecipientsBulk(ctx context.Context, campaignID string, recipients []*entity.CampaignRecipient) (int, error) {
-	queued := 0
-	if len(recipients) == 0 {
-		return 0, nil
-	}
-
-	const chunkSize = 250
-	for start := 0; start < len(recipients); start += chunkSize {
-		end := start + chunkSize
-		if end > len(recipients) {
-			end = len(recipients)
-		}
-
-		values := make([]string, 0, end-start)
-		args := make([]any, 0, (end-start)*12)
-		argPos := 1
-		for _, rec := range recipients[start:end] {
-			if rec == nil {
-				continue
-			}
-			if rec.ID == "" {
-				rec.ID = uuid.New().String()
-			}
-			if strings.TrimSpace(rec.Status) == "" {
-				rec.Status = "QUEUED"
-			}
-			if rec.QueuedAt.IsZero() {
-				rec.QueuedAt = time.Now().UTC()
-			}
-			values = append(values, fmt.Sprintf("($%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d)", argPos, argPos+1, argPos+2, argPos+3, argPos+4, argPos+5, argPos+6, argPos+7, argPos+8, argPos+9, argPos+10, argPos+11))
-			args = append(args,
-				rec.ID,
-				campaignID,
-				rec.CustomerID,
-				rec.CompanyID,
-				rec.Email,
-				rec.Subject,
-				rec.Body,
-				rec.Status,
-				nullIfEmpty(rec.Error),
-				rec.QueuedAt,
-				rec.SentAt,
-				rec.ProcessedAt,
-			)
-			argPos += 12
-			queued++
-		}
-		if len(values) == 0 {
+	payload := make([]domain.CampaignRecipient, 0, len(recipients))
+	for _, rec := range recipients {
+		if rec == nil {
 			continue
 		}
-		_, err := r.q.Exec(ctx, `
-			INSERT INTO crm_campaign_recipients (
-				id, campaign_id, customer_id, company_id, email, subject, body, status, error_message, queued_at, sent_at, processed_at
-			) VALUES `+strings.Join(values, ","), args...)
-		if err != nil {
-			return queued, err
+		if strings.TrimSpace(rec.CampaignID) == "" {
+			rec.CampaignID = campaignID
 		}
+		payload = append(payload, *rec)
 	}
-	return queued, nil
+	if err := r.BatchInsertCampaignRecipients(ctx, payload); err != nil {
+		return 0, err
+	}
+	return len(payload), nil
+}
+
+// CRMAutomationRepo implementación de CRMAutomationRepository.
+type CRMAutomationRepo struct{ q Querier }
+
+func NewCRMAutomationRepository(q Querier) *CRMAutomationRepo { return &CRMAutomationRepo{q: q} }
+
+func (r *CRMAutomationRepo) GetActiveAutomations(ctx context.Context) ([]*entity.CRMAutomation, error) {
+	rows, err := r.q.Query(ctx, `
+		SELECT id, company_id, name, type, template_id, schedule_cron, config, is_active, last_run_at
+		FROM crm_automations
+		WHERE is_active = true
+		ORDER BY company_id ASC, name ASC`)
+	if err != nil {
+		return nil, fmt.Errorf("get active automations: %w", err)
+	}
+	defer rows.Close()
+
+	out := make([]*entity.CRMAutomation, 0)
+	for rows.Next() {
+		var item entity.CRMAutomation
+		var templateID, scheduleCron *string
+		var configRaw []byte
+		if err := rows.Scan(&item.ID, &item.CompanyID, &item.Name, &item.Type, &templateID, &scheduleCron, &configRaw, &item.IsActive, &item.LastRunAt); err != nil {
+			return nil, fmt.Errorf("scan active automation: %w", err)
+		}
+		item.TemplateID = templateID
+		item.ScheduleCron = scheduleCron
+		if len(configRaw) > 0 {
+			item.Config = append(json.RawMessage(nil), configRaw...)
+		}
+		out = append(out, &item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate active automations: %w", err)
+	}
+	return out, nil
+}
+
+func (r *CRMAutomationRepo) GetCustomersForBirthday(ctx context.Context, companyID uuid.UUID) ([]*entity.Customer, error) {
+	rows, err := r.q.Query(ctx, `
+		SELECT c.id, c.company_id, c.name, c.tax_id, COALESCE(c.email, ''), COALESCE(c.phone, ''), c.birth_date, COALESCE(p.ltv, 0), COALESCE(cat.name, ''), c.is_active, c.created_at, c.updated_at
+		FROM customers c
+		LEFT JOIN crm_customer_profiles p ON p.customer_id = c.id
+		LEFT JOIN crm_categories cat ON cat.id = p.category_id
+		WHERE c.company_id = $1
+		  AND c.is_active = true
+		  AND c.birth_date IS NOT NULL
+		  AND EXTRACT(MONTH FROM c.birth_date) = EXTRACT(MONTH FROM CURRENT_DATE)
+		  AND EXTRACT(DAY FROM c.birth_date) = EXTRACT(DAY FROM CURRENT_DATE)
+		ORDER BY c.name ASC`, companyID)
+	if err != nil {
+		return nil, fmt.Errorf("get customers for birthday: %w", err)
+	}
+	defer rows.Close()
+
+	out := make([]*entity.Customer, 0)
+	for rows.Next() {
+		var c entity.Customer
+		var birthDate *time.Time
+		if err := rows.Scan(&c.ID, &c.CompanyID, &c.Name, &c.TaxID, &c.Email, &c.Phone, &birthDate, &c.LTV, &c.CategoryName, &c.IsActive, &c.CreatedAt, &c.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan birthday customer: %w", err)
+		}
+		c.BirthDate = birthDate
+		out = append(out, &c)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate birthday customers: %w", err)
+	}
+	return out, nil
+}
+
+func (r *CRMAutomationRepo) GetCustomersForRepurchase(ctx context.Context, companyID uuid.UUID, productID uuid.UUID, daysSincePurchase int) ([]*entity.Customer, error) {
+	rows, err := r.q.Query(ctx, `
+		WITH last_purchase AS (
+			SELECT i.customer_id, MAX(i.date) AS last_purchase_date
+			FROM invoices i
+			INNER JOIN invoice_details d ON d.invoice_id = i.id
+			WHERE i.company_id = $1
+			  AND d.product_id = $2
+			GROUP BY i.customer_id
+		)
+		SELECT c.id, c.company_id, c.name, c.tax_id, COALESCE(c.email, ''), COALESCE(c.phone, ''), c.birth_date, COALESCE(p.ltv, 0), COALESCE(cat.name, ''), c.is_active, c.created_at, c.updated_at
+		FROM customers c
+		INNER JOIN last_purchase lp ON lp.customer_id = c.id
+		LEFT JOIN crm_customer_profiles p ON p.customer_id = c.id
+		LEFT JOIN crm_categories cat ON cat.id = p.category_id
+		WHERE c.company_id = $1
+		  AND c.is_active = true
+		  AND (CURRENT_DATE - lp.last_purchase_date) = $3
+		ORDER BY c.name ASC`, companyID, productID, daysSincePurchase)
+	if err != nil {
+		return nil, fmt.Errorf("get customers for repurchase: %w", err)
+	}
+	defer rows.Close()
+
+	out := make([]*entity.Customer, 0)
+	for rows.Next() {
+		var c entity.Customer
+		var birthDate *time.Time
+		if err := rows.Scan(&c.ID, &c.CompanyID, &c.Name, &c.TaxID, &c.Email, &c.Phone, &birthDate, &c.LTV, &c.CategoryName, &c.IsActive, &c.CreatedAt, &c.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan repurchase customer: %w", err)
+		}
+		c.BirthDate = birthDate
+		out = append(out, &c)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate repurchase customers: %w", err)
+	}
+	return out, nil
 }
 
 // ---------------------------------------------------------------------------

@@ -11,6 +11,9 @@ const (
 	CampaignStatusScheduled = "scheduled"
 	CampaignStatusSending   = "sending"
 	CampaignStatusCompleted = "completed"
+
+	// CampaignRecipientStatusQueued indica que el destinatario quedó encolado para envío.
+	CampaignRecipientStatusQueued = "QUEUED"
 )
 
 // CRMCampaign representa una campaña de marketing CRM.
