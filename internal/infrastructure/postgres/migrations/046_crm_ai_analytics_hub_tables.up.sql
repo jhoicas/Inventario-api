@@ -32,9 +32,9 @@ CREATE TABLE IF NOT EXISTS crm_sales_hub (
     profit NUMERIC(12, 2),
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     
-    -- Foreign key to crm_customers via email for multi-company isolation
-    CONSTRAINT fk_crm_sales_hub_customer FOREIGN KEY (company_id, customer_email) 
-        REFERENCES crm_customers(company_id, email) ON DELETE CASCADE MATCH FULL
+    -- Foreign key to customers by email
+    CONSTRAINT fk_crm_sales_hub_customer_email FOREIGN KEY (customer_email) 
+        REFERENCES customers(email) ON DELETE SET NULL
 );
 
 CREATE INDEX idx_crm_sales_hub_company_id ON crm_sales_hub(company_id);
@@ -60,7 +60,7 @@ CREATE INDEX idx_crm_sale_items_hub_product_id ON crm_sale_items_hub(product_id)
 CREATE OR REPLACE VIEW v_crm_ai_analytics AS
 SELECT 
     sh.company_id,
-    s.sale_date::DATE as fecha,
+    sh.sale_date::DATE as fecha,
     sh.customer_name as cliente_nombre,
     sh.customer_city as ciudad,
     ph.product_name as producto,
@@ -76,7 +76,6 @@ SELECT
 FROM crm_sales_hub sh
 INNER JOIN crm_sale_items_hub sih ON sh.id = sih.sales_id
 INNER JOIN crm_products_hub ph ON sih.product_id = ph.id
-INNER JOIN crm_sales s ON sh.id = s.id
 WHERE sh.created_at IS NOT NULL; -- Placeholder for company_id filtering in queries
 
 -- 5. Function to ensure company isolation on analytics view
