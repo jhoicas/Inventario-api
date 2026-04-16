@@ -56,3 +56,13 @@ type AIAnalyticsRow struct {
 	SaleID         string
 	ItemID         string
 }
+
+// CustomerChurnRisk representa un cliente potencialmente inactivo para campañas de retención.
+type CustomerChurnRisk struct {
+	CompanyID        string
+	CustomerEmail    string
+	CustomerName     string
+	FavoriteProduct  string
+	LastPurchaseDate time.Time
+	DaysInactive     int
+}

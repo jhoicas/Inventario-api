@@ -43,6 +43,7 @@ type RouterDeps struct {
 	DashboardUC            *appanalytics.DashboardUseCase
 	AIUC                   *usecase.AIUseCase
 	CRMHandler             *CRMHandler
+	CRMAIHandler           *CRMAIHandler
 	EmailHandler           *EmailHandler
 	CustomerLookup         *dianws.CustomerLookupHandler
 	InvoiceMailer          InvoiceMailerUseCase
@@ -327,6 +328,10 @@ func Router(app *fiber.App, deps RouterDeps) {
 	if deps.CRMHandler != nil {
 		crmGroup := protected.Group("/crm", RequireModule(entity.ModuleCRM, deps.ModuleService), screenAccess)
 		h := deps.CRMHandler
+		if deps.CRMAIHandler != nil {
+			crmGroup.Post("/ai/ask", deps.CRMAIHandler.AskAI)
+			crmGroup.Post("/sales/import", RequireRole(entity.RoleAdmin, "gerente"), deps.CRMAIHandler.ImportSalesFile)
+		}
 		crmGroup.Get("/analytics", h.GetAnalytics)
 		crmGroup.Get("/remarketing", h.GetRemarketing)
 		crmGroup.Get("/remarketing/audience", h.GetRemarketingAudience)

@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jhoicas/Inventario-api/internal/application/dto"
 	"github.com/jhoicas/Inventario-api/internal/domain"
 	"github.com/jhoicas/Inventario-api/internal/domain/entity"
 	"github.com/jhoicas/Inventario-api/internal/domain/repository"
@@ -34,6 +35,42 @@ func (f *loyaltyProfileRepoFake) ListByCompany(companyID string, limit, offset i
 	return nil, nil
 }
 
+func (f *loyaltyProfileRepoFake) ResolveCampaignRecipientsByCategory(ctx context.Context, companyID, categoryID string) ([]dto.CampaignRecipientDTO, error) {
+	return nil, nil
+}
+
+func (f *loyaltyProfileRepoFake) ResolveCampaignRecipients(ctx context.Context, companyID, categoryID string) ([]dto.CampaignRecipientDTO, error) {
+	return nil, nil
+}
+
+func (f *loyaltyProfileRepoFake) GetAnalytics(ctx context.Context, companyID string) (*dto.CRMAnalyticsResponse, error) {
+	return nil, nil
+}
+
+func (f *loyaltyProfileRepoFake) GetRemarketingProspects(ctx context.Context, companyID string) ([]dto.RemarketingProspect, error) {
+	return nil, nil
+}
+
+func (f *loyaltyProfileRepoFake) GetRemarketingAudience(ctx context.Context, companyID, segmento, estrategia string) ([]dto.RemarketingAudienceDTO, error) {
+	return nil, nil
+}
+
+func (f *loyaltyProfileRepoFake) GetRemarketingTargetsByCustomerIDs(ctx context.Context, companyID string, customerIDs []string) ([]dto.RemarketingAudienceDTO, error) {
+	return nil, nil
+}
+
+func (f *loyaltyProfileRepoFake) GetDashboardKPIs(companyID string) (*repository.CRMDashboardKPIs, error) {
+	return nil, nil
+}
+
+func (f *loyaltyProfileRepoFake) GetDashboardSegmentation(companyID string) ([]*repository.CRMSegmentDistribution, error) {
+	return nil, nil
+}
+
+func (f *loyaltyProfileRepoFake) GetDashboardMonthlyEvolution(companyID string, months int) ([]*repository.CRMMonthlySales, error) {
+	return nil, nil
+}
+
 type loyaltyCustomerRepoFake struct {
 	customer *entity.Customer
 }
@@ -51,8 +88,12 @@ func (f *loyaltyCustomerRepoFake) GetByCompanyAndTaxID(companyID, taxID string) 
 	return nil, nil
 }
 
-func (f *loyaltyCustomerRepoFake) ListByCompany(companyID string, search string, limit, offset int) ([]*entity.Customer, error) {
+func (f *loyaltyCustomerRepoFake) GetByCompanyAndEmail(companyID, email string) (*entity.Customer, error) {
 	return nil, nil
+}
+
+func (f *loyaltyCustomerRepoFake) ListByCompany(companyID string, search string, limit, offset int) ([]*entity.Customer, int64, error) {
+	return nil, 0, nil
 }
 
 func (f *loyaltyCustomerRepoFake) Update(customer *entity.Customer) error { return nil }
@@ -67,8 +108,8 @@ func (f *loyaltyCategoryRepoFake) Create(category *entity.CRMCategory) error { r
 
 func (f *loyaltyCategoryRepoFake) GetByID(id string) (*entity.CRMCategory, error) { return nil, nil }
 
-func (f *loyaltyCategoryRepoFake) ListByCompany(companyID string, limit, offset int) ([]*entity.CRMCategory, error) {
-	return []*entity.CRMCategory{}, nil
+func (f *loyaltyCategoryRepoFake) ListByCompany(companyID string, limit, offset int) ([]*entity.CRMCategory, int64, error) {
+	return []*entity.CRMCategory{}, 0, nil
 }
 
 func (f *loyaltyCategoryRepoFake) Update(category *entity.CRMCategory) error { return nil }
@@ -85,13 +126,13 @@ func (f *loyaltyBenefitRepoFake) Create(benefit *entity.CRMBenefit) error { retu
 
 func (f *loyaltyBenefitRepoFake) GetByID(id string) (*entity.CRMBenefit, error) { return nil, nil }
 
-func (f *loyaltyBenefitRepoFake) ListByCategory(categoryID string, limit, offset int) ([]*entity.CRMBenefit, error) {
-	return nil, nil
+func (f *loyaltyBenefitRepoFake) ListByCategory(categoryID string, limit, offset int) ([]*entity.CRMBenefit, int64, error) {
+	return nil, 0, nil
 }
 
 func (f *loyaltyBenefitRepoFake) Update(benefit *entity.CRMBenefit) error { return nil }
 
-func (f *loyaltyBenefitRepoFake) Delete(id string) error { return nil }
+func (f *loyaltyBenefitRepoFake) SetActive(companyID, id string, isActive bool) error { return nil }
 
 type loyaltyInteractionRepoFake struct {
 	events      []*entity.CRMInteraction

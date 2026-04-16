@@ -30,11 +30,7 @@ CREATE TABLE IF NOT EXISTS crm_sales_hub (
     total_amount NUMERIC(12, 2) NOT NULL,
     cost_total NUMERIC(12, 2),
     profit NUMERIC(12, 2),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    
-    -- Foreign key to customers by email
-    CONSTRAINT fk_crm_sales_hub_customer_email FOREIGN KEY (customer_email) 
-        REFERENCES customers(email) ON DELETE SET NULL
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX idx_crm_sales_hub_company_id ON crm_sales_hub(company_id);

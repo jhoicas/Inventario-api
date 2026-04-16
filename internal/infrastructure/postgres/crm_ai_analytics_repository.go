@@ -344,3 +344,93 @@ func (r *AIAnalyticsRepository) RunAggregateQuery(ctx context.Context, companyID
 
 	return results, rows.Err()
 }
+
+// GetCustomersAtRiskOfChurn lista clientes cuya ultima compra fue exactamente hace N dias.
+// Incluye el producto que mas compran (por cantidad total).
+func (r *AIAnalyticsRepository) GetCustomersAtRiskOfChurn(ctx context.Context, daysThreshold int) ([]*entity.CustomerChurnRisk, error) {
+	if daysThreshold <= 0 {
+		return nil, fmt.Errorf("daysThreshold debe ser mayor que cero")
+	}
+
+	rows, err := r.pool.Query(ctx, `
+		WITH last_purchase AS (
+			SELECT
+				sh.company_id,
+				sh.customer_email,
+				MAX(sh.sale_date::date) AS last_purchase_date
+			FROM crm_sales_hub sh
+			WHERE sh.customer_email IS NOT NULL
+			GROUP BY sh.company_id, sh.customer_email
+		),
+		last_purchase_name AS (
+			SELECT
+				sh.company_id,
+				sh.customer_email,
+				COALESCE(NULLIF(TRIM(sh.customer_name), ''), sh.customer_email) AS customer_name,
+				ROW_NUMBER() OVER (
+					PARTITION BY sh.company_id, sh.customer_email
+					ORDER BY sh.sale_date DESC, sh.created_at DESC
+				) AS rn
+			FROM crm_sales_hub sh
+			WHERE sh.customer_email IS NOT NULL
+		),
+		favorite_product AS (
+			SELECT
+				sh.company_id,
+				sh.customer_email,
+				COALESCE(NULLIF(TRIM(ph.product_name), ''), 'Producto no identificado') AS favorite_product,
+				ROW_NUMBER() OVER (
+					PARTITION BY sh.company_id, sh.customer_email
+					ORDER BY SUM(si.quantity) DESC, MAX(sh.sale_date) DESC, COALESCE(NULLIF(TRIM(ph.product_name), ''), 'Producto no identificado')
+				) AS rn
+			FROM crm_sales_hub sh
+			JOIN crm_sale_items_hub si ON si.sales_id = sh.id
+			LEFT JOIN crm_products_hub ph ON ph.id = si.product_id
+			WHERE sh.customer_email IS NOT NULL
+			GROUP BY sh.company_id, sh.customer_email, COALESCE(NULLIF(TRIM(ph.product_name), ''), 'Producto no identificado')
+		)
+		SELECT
+			lp.company_id,
+			lp.customer_email,
+			COALESCE(lpn.customer_name, lp.customer_email) AS customer_name,
+			COALESCE(fp.favorite_product, 'Producto no identificado') AS favorite_product,
+			lp.last_purchase_date,
+			$1::int AS days_inactive
+		FROM last_purchase lp
+		LEFT JOIN last_purchase_name lpn
+			ON lpn.company_id = lp.company_id
+			AND lpn.customer_email = lp.customer_email
+			AND lpn.rn = 1
+		LEFT JOIN favorite_product fp
+			ON fp.company_id = lp.company_id
+			AND fp.customer_email = lp.customer_email
+			AND fp.rn = 1
+		WHERE (CURRENT_DATE - lp.last_purchase_date) = $1
+		ORDER BY lp.company_id, customer_name`, daysThreshold)
+	if err != nil {
+		return nil, fmt.Errorf("consultar clientes en riesgo de churn: %w", err)
+	}
+	defer rows.Close()
+
+	var risks []*entity.CustomerChurnRisk
+	for rows.Next() {
+		var risk entity.CustomerChurnRisk
+		if err := rows.Scan(
+			&risk.CompanyID,
+			&risk.CustomerEmail,
+			&risk.CustomerName,
+			&risk.FavoriteProduct,
+			&risk.LastPurchaseDate,
+			&risk.DaysInactive,
+		); err != nil {
+			return nil, fmt.Errorf("scan cliente en riesgo de churn: %w", err)
+		}
+		risks = append(risks, &risk)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterar clientes en riesgo de churn: %w", err)
+	}
+
+	return risks, nil
+}

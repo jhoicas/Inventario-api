@@ -7,6 +7,7 @@ import (
 	"syscall"
 
 	"github.com/jhoicas/Inventario-api/internal/application/crm"
+	infraai "github.com/jhoicas/Inventario-api/internal/infrastructure/ai"
 	"github.com/jhoicas/Inventario-api/internal/infrastructure/postgres"
 	"github.com/jhoicas/Inventario-api/pkg/config"
 	"github.com/jhoicas/Inventario-api/pkg/logger"
@@ -31,14 +32,26 @@ func main() {
 	automationRepo := postgres.NewCRMAutomationRepository(pool)
 	campaignRepo := postgres.NewCRMCampaignRepository(pool)
 	templateRepo := postgres.NewCRMCampaignTemplateRepository(pool)
+	taskRepo := postgres.NewCRMTaskRepository(pool)
+	aiAnalyticsRepo := postgres.NewAIAnalyticsRepository(pool)
+	anthropicSvc := infraai.NewAnthropicService(cfg.AI.AnthropicAPIKey, cfg.AI.AnthropicModel)
+	salesAssistant := crm.NewAISalesAssistant(anthropicSvc, logg)
 	automationUC := crm.NewAutomationUseCase(automationRepo, campaignRepo, templateRepo, nil, logg)
 
-	worker, err := crm.NewAutomationCronWorker(automationUC, logg)
+	automationWorker, err := crm.NewAutomationCronWorker(automationUC, logg)
 	if err != nil {
 		logg.Fatal().Err(err).Msg("configurar worker de automatizaciones")
 	}
 
-	logg.Info().Msg("worker de automatizaciones listo")
-	worker.Start(ctx)
-	logg.Info().Msg("worker de automatizaciones finalizado")
+	churnWorker, err := crm.NewChurnWorker(aiAnalyticsRepo, taskRepo, salesAssistant, logg, 60)
+	if err != nil {
+		logg.Fatal().Err(err).Msg("configurar worker de churn")
+	}
+
+	logg.Info().Msg("workers de automatizaciones y churn listos")
+	go automationWorker.Start(ctx)
+	go churnWorker.Start(ctx)
+
+	<-ctx.Done()
+	logg.Info().Msg("workers detenidos")
 }

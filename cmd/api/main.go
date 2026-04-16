@@ -210,6 +210,12 @@ func main() {
 	crmAnalyticsUC := crm.NewAnalyticsUseCase(crmProfileRepo)
 	taskUC := crm.NewTaskUseCase(crmTaskRepo)
 	aiCRMUC := crm.NewAICRMUseCase(anthropicSvc)
+	aiAnalyticsRepo := postgres.NewAIAnalyticsRepository(pool)
+	aiAnalystSvc := infraai.NewAIAnalystService(anthropicSvc, aiAnalyticsRepo, log)
+	productHubRepo := postgres.NewCRMProductHubRepository(pool)
+	salesHubRepo := postgres.NewCRMSalesHubRepository(pool)
+	saleItemHubRepo := postgres.NewCRMSaleItemHubRepository(pool)
+	bulkImporterSvc := infraai.NewBulkImporterService(productHubRepo, salesHubRepo, saleItemHubRepo, log)
 	pqrUC := crm.NewPQRUseCase(crmTicketRepo, customerRepo, aiCRMUC, crmInteractionRepo)
 	mailSender, err := inframail.NewSMTPSenderFromEnv()
 	if err != nil {
@@ -220,6 +226,7 @@ func main() {
 	opportunityUC := crm.NewOpportunityUseCase(crmOpportunityRepo)
 	importUC := crm.NewImportUseCase(crmProfileRepo, customerRepo, crmCategoryRepo, crmTaskRepo, crmOpportunityRepo)
 	crmHandler := httpRouter.NewCRMHandler(loyaltyUC, crmAnalyticsUC, taskUC, pqrUC, aiCRMUC, customerUC, crmInteractionRepo, opportunityUC, invoiceRepo, campaignUC, templateUC, importUC)
+	crmAIHandler := httpRouter.NewCRMAIHandler(aiAnalystSvc, bulkImporterSvc, log)
 	emailHandler := httpRouter.NewEmailHandler(emailUC)
 
 	// Worker diario de reposición crítica → crea tareas CRM de reabastecimiento.
@@ -377,6 +384,7 @@ func main() {
 		DashboardUC:            dashboardUC,
 		AIUC:                   aiUC,
 		CRMHandler:             crmHandler,
+		CRMAIHandler:           crmAIHandler,
 		EmailHandler:           emailHandler,
 		CustomerLookup:         customerLookupHandler,
 		InvoiceMailer:          invoiceMailer,

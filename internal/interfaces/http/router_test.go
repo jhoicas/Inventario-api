@@ -33,8 +33,11 @@ func (f *fakeCompanyRepoForRouter) Create(company *entity.Company) error        
 func (f *fakeCompanyRepoForRouter) GetByID(id string) (*entity.Company, error)   { return nil, nil }
 func (f *fakeCompanyRepoForRouter) GetByNIT(nit string) (*entity.Company, error) { return nil, nil }
 func (f *fakeCompanyRepoForRouter) Update(company *entity.Company) error         { return nil }
-func (f *fakeCompanyRepoForRouter) List(limit, offset int) ([]*entity.Company, error) {
-	return nil, nil
+func (f *fakeCompanyRepoForRouter) List(limit, offset int) ([]*entity.Company, int64, error) {
+	return nil, 0, nil
+}
+func (f *fakeCompanyRepoForRouter) ListForAdmin(limit, offset int) ([]*entity.Company, int64, error) {
+	return nil, 0, nil
 }
 func (f *fakeCompanyRepoForRouter) Delete(id string) error { return nil }
 func (f *fakeCompanyRepoForRouter) ListModules(ctx context.Context, companyID string) ([]*entity.CompanyModule, error) {
@@ -47,6 +50,24 @@ func (f *fakeCompanyRepoForRouter) UpsertModule(ctx context.Context, module *ent
 	return nil
 }
 func (f *fakeCompanyRepoForRouter) DeleteModule(ctx context.Context, companyID, moduleName string) error {
+	return nil
+}
+func (f *fakeCompanyRepoForRouter) HasActiveScreen(ctx context.Context, companyID, screenID string) (bool, error) {
+	return true, nil
+}
+func (f *fakeCompanyRepoForRouter) ListScreens(ctx context.Context, companyID string) ([]*entity.CompanyScreen, error) {
+	return []*entity.CompanyScreen{}, nil
+}
+func (f *fakeCompanyRepoForRouter) GetScreen(ctx context.Context, companyID, screenID string) (*entity.CompanyScreen, error) {
+	return nil, nil
+}
+func (f *fakeCompanyRepoForRouter) UpsertScreen(ctx context.Context, screen *entity.CompanyScreen) error {
+	return nil
+}
+func (f *fakeCompanyRepoForRouter) ReplaceScreens(ctx context.Context, companyID string, screenIDs []string) error {
+	return nil
+}
+func (f *fakeCompanyRepoForRouter) DeleteScreen(ctx context.Context, companyID, screenID string) error {
 	return nil
 }
 func (f *fakeCompanyRepoForRouter) HasActiveModule(ctx context.Context, companyID, moduleName string) (bool, error) {

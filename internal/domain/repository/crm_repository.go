@@ -93,6 +93,7 @@ type CRMTaskRepository interface {
 	GetByID(id string) (*entity.CRMTask, error)
 	Update(task *entity.CRMTask) error
 	ListByCompany(companyID string, status string, limit, offset int) ([]*entity.CRMTask, int64, error)
+	CheckTaskExistsForToday(ctx context.Context, companyID, customerName, titlePrefix string) (bool, error)
 }
 
 // CRMTicketRepository puerto de persistencia para tickets PQR.
@@ -185,4 +186,5 @@ type CRMSaleItemHubRepository interface {
 type AIAnalyticsRepository interface {
 	QueryView(ctx context.Context, companyID, sqlQuery string) ([]*entity.AIAnalyticsRow, error)
 	RunAggregateQuery(ctx context.Context, companyID, sqlQuery string) (interface{}, error)
+	GetCustomersAtRiskOfChurn(ctx context.Context, daysThreshold int) ([]*entity.CustomerChurnRisk, error)
 }

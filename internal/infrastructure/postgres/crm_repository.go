@@ -1176,6 +1176,25 @@ func (r *CRMTaskRepo) ListByCompany(companyID string, status string, limit, offs
 	return items, total, nil
 }
 
+func (r *CRMTaskRepo) CheckTaskExistsForToday(ctx context.Context, companyID, customerName, titlePrefix string) (bool, error) {
+	query := `
+		SELECT EXISTS (
+			SELECT 1
+			FROM crm_tasks
+			WHERE company_id = $1
+			  AND title ILIKE ($2 || '%')
+			  AND title ILIKE ('%' || $3 || '%')
+			  AND (created_at AT TIME ZONE 'America/Bogota')::date = (NOW() AT TIME ZONE 'America/Bogota')::date
+		)`
+
+	var exists bool
+	if err := r.q.QueryRow(ctx, query, companyID, titlePrefix, customerName).Scan(&exists); err != nil {
+		return false, err
+	}
+
+	return exists, nil
+}
+
 func (r *CRMTaskRepo) buildFilters(companyID, status string) (string, []any) {
 	where := `
 		FROM crm_tasks
