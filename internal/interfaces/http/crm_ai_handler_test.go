@@ -134,3 +134,42 @@ func TestImportSalesFile_Success(t *testing.T) {
 	assert.Equal(t, float64(1), out["processed_records"])
 	bulkMock.AssertExpectations(t)
 }
+
+func TestImportSalesFile_Success_WithColumnMappingsUTF8(t *testing.T) {
+	// Arrange
+	const companyID = "company-test-123"
+	aiMock := new(mockAIAnalystService)
+	bulkMock := new(mockBulkImporterService)
+	log := logger.New(logger.Config{Env: "test", Level: "error"})
+	handler := NewCRMAIHandler(aiMock, bulkMock, log)
+	app := newCRMAITestApp(handler, companyID)
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	part, err := writer.CreateFormFile("file", "ventas.csv")
+	require.NoError(t, err)
+	_, err = part.Write([]byte("Email,Fecha,Producto,Categoria\nfoo@bar.com,2026-04-01,Café Premium,Categoría\n"))
+	require.NoError(t, err)
+
+	columnMappings := `[{"sourceIndex":0,"sourceHeader":"Email","targetField":"correo"},{"sourceIndex":4,"sourceHeader":"Categoría","targetField":"categoria"}]`
+	require.NoError(t, writer.WriteField("columnMappings", columnMappings))
+	require.NoError(t, writer.Close())
+
+	bulkMock.
+		On("ImportFromCSV", mock.Anything, companyID, mock.AnythingOfType("string"), "sales").
+		Return(1, nil).
+		Once()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/crm/sales/import", body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	// Act
+	resp, err := app.Test(req, -1)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	// Assert
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	bulkMock.AssertExpectations(t)
+}

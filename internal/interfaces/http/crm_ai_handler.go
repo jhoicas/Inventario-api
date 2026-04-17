@@ -71,14 +71,27 @@ func (h *CRMAIHandler) ImportSalesFile(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"code": "INVALID_REQUEST", "message": "file es requerido"})
 	}
 
+	// Compatibilidad frontend: aceptar tanto "mappings" como "columnMappings".
 	mappingsRaw := strings.TrimSpace(c.FormValue("mappings"))
 	if mappingsRaw == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"code": "VALIDATION", "message": "mappings es requerido"})
+		mappingsRaw = strings.TrimSpace(c.FormValue("columnMappings"))
+	}
+	if mappingsRaw == "" {
+		mappingsRaw = strings.TrimSpace(c.FormValue("column_mappings"))
+	}
+	mappingsRaw = strings.TrimPrefix(mappingsRaw, "\ufeff")
+	if mappingsRaw == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"code": "VALIDATION", "message": "mappings o columnMappings es requerido"})
 	}
 
-	var mappings map[string]interface{}
-	if err := json.Unmarshal([]byte(mappingsRaw), &mappings); err != nil {
+	var mappingsAny interface{}
+	if err := json.Unmarshal([]byte(mappingsRaw), &mappingsAny); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"code": "INVALID_MAPPINGS", "message": "mappings debe ser un JSON válido"})
+	}
+
+	mappings, _ := mappingsAny.(map[string]interface{})
+	if mappings == nil {
+		mappings = map[string]interface{}{}
 	}
 
 	tableName := mapString(mappings, "table_name", "tableName", "target_table", "targetTable")
