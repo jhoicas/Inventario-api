@@ -67,6 +67,8 @@ func (uc *CampaignUseCase) Create(ctx context.Context, companyID, userID string,
 		CompanyID:   companyID,
 		Name:        req.Name,
 		Description: req.Description,
+		Subject:     req.Subject,
+		Body:        req.Body,
 		Status:      status,
 		Channel:     req.Channel,
 		ScheduledAt: scheduledAt,
@@ -141,6 +143,71 @@ func (uc *CampaignUseCase) GetMetrics(ctx context.Context, campaignID string) (*
 		Converted:  m.Converted,
 		Revenue:    m.Revenue,
 	}, nil
+}
+
+// ListCampaigns devuelve la lista de campañas de la empresa.
+func (uc *CampaignUseCase) ListCampaigns(ctx context.Context, companyID string, limit, offset int) (*dto.CampaignListResponse, error) {
+	campaigns, total, err := uc.repo.ListByCompany(ctx, companyID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+
+	items := make([]dto.CampaignResponse, 0, len(campaigns))
+	for _, c := range campaigns {
+		items = append(items, *toCampaignResponse(c))
+	}
+
+	return &dto.CampaignListResponse{
+		Items:  items,
+		Total:  total,
+		Limit:  limit,
+		Offset: offset,
+	}, nil
+}
+
+// ExecuteCampaign procesa una campaña pendiente o programada de forma manual.
+func (uc *CampaignUseCase) ExecuteCampaign(ctx context.Context, companyID, userID, campaignID string) error {
+	c, err := uc.repo.GetByID(ctx, campaignID)
+	if err != nil {
+		return err
+	}
+	if c == nil || c.CompanyID != companyID {
+		return domain.ErrNotFound
+	}
+
+	// Solo permitir ejecutar si está pendiente o programada
+	if c.Status != entity.CampaignStatusPending && c.Status != entity.CampaignStatusScheduled {
+		return domain.ErrConflict
+	}
+
+	// Reutilizamos la lógica de envío masivo
+	req := dto.SendCampaignRequest{
+		Channel:    c.Channel,
+		Subject:    c.Subject,
+		Body:       c.Body,
+		CategoryID: "", // Podríamos guardar la categoría en la entidad si fuera necesario
+	}
+
+	err = uc.SendCampaign(ctx, companyID, userID, req)
+	if err != nil {
+		return err
+	}
+
+	// Marcar como completada
+	c.Status = entity.CampaignStatusCompleted
+	c.UpdatedAt = time.Now()
+	return uc.repo.Update(ctx, c)
+}
+
+// SendTestMessage envía un mensaje directo a un destino sin guardarlo en la base de datos.
+func (uc *CampaignUseCase) SendTestMessage(ctx context.Context, companyID string, req dto.SendTestMessageRequest) error {
+	channel := strings.ToUpper(req.Channel)
+	provider, exists := uc.providers[channel]
+	if !exists || isNil(provider) {
+		return domain.ErrConflict
+	}
+
+	return provider.Send(ctx, req.DestinationPhone, req.Content)
 }
 
 // SendCampaign envía una campaña de email a los clientes filtrados por categoría (opcional)

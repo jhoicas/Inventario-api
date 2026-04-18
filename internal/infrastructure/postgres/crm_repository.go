@@ -1588,9 +1588,9 @@ func (r *CRMCampaignRepo) Create(ctx context.Context, c *entity.Campaign) error 
 	}
 	scheduledAt := toUTCTimePtr(c.ScheduledAt)
 	_, err := r.q.Exec(ctx, `
-		INSERT INTO crm_campaigns (id, company_id, name, description, status, scheduled_at, created_by, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-		c.ID, c.CompanyID, c.Name, nullIfEmpty(c.Description), c.Status, scheduledAt, nullIfEmpty(c.CreatedBy), c.CreatedAt, c.UpdatedAt,
+		INSERT INTO crm_campaigns (id, company_id, name, description, subject, body, status, scheduled_at, created_by, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+		c.ID, c.CompanyID, c.Name, nullIfEmpty(c.Description), nullIfEmpty(c.Subject), nullIfEmpty(c.Body), c.Status, scheduledAt, nullIfEmpty(c.CreatedBy), c.CreatedAt, c.UpdatedAt,
 	)
 	if err != nil {
 		return err
@@ -1803,6 +1803,51 @@ func (r *CRMCampaignRepo) QueueRecipients(ctx context.Context, campaignID string
 		return 0, err
 	}
 	return len(payload), nil
+}
+
+func (r *CRMCampaignRepo) ListByCompany(ctx context.Context, companyID string, limit, offset int) ([]*entity.Campaign, int64, error) {
+	query := `
+		SELECT id, company_id, name, description, subject, body, status, channel, scheduled_at, created_by, created_at, updated_at
+		FROM crm_campaigns
+		WHERE company_id = $1
+		ORDER BY created_at DESC
+		LIMIT $2 OFFSET $3`
+	
+	rows, err := r.q.Query(ctx, query, companyID, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var list []*entity.Campaign
+	for rows.Next() {
+		var c entity.Campaign
+		var description, subject, body, createdBy *string
+		if err := rows.Scan(&c.ID, &c.CompanyID, &c.Name, &description, &subject, &body, &c.Status, &c.Channel, &c.ScheduledAt, &createdBy, &c.CreatedAt, &c.UpdatedAt); err != nil {
+			return nil, 0, err
+		}
+		if description != nil {
+			c.Description = *description
+		}
+		if subject != nil {
+			c.Subject = *subject
+		}
+		if body != nil {
+			c.Body = *body
+		}
+		if createdBy != nil {
+			c.CreatedBy = *createdBy
+		}
+		c.ScheduledAt = toUTCTimePtr(c.ScheduledAt)
+		list = append(list, &c)
+	}
+
+	var total int64
+	if err := r.q.QueryRow(ctx, `SELECT COUNT(*) FROM crm_campaigns WHERE company_id = $1`, companyID).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	return list, total, nil
 }
 
 // CRMAutomationRepo implementación de CRMAutomationRepository.

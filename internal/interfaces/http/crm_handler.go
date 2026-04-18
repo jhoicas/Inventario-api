@@ -1860,6 +1860,86 @@ func (h *CRMHandler) SendCampaign(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"status": "sent"})
 }
 
+// ListCampaigns devuelve la lista de campañas de la empresa.
+// @Summary      Listar campañas
+// @Description  Devuelve la lista paginada de campañas del CRM
+// @Tags         crm
+// @Security     Bearer
+// @Produce      json
+// @Param        limit   query  int     false "Límite de resultados"
+// @Param        offset  query  int     false "Offset para paginación"
+// @Success      200  {object}  dto.CampaignListResponse
+// @Router       /api/crm/campaigns [get]
+func (h *CRMHandler) ListCampaigns(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	if companyID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	limit := c.QueryInt("limit", 20)
+	offset := c.QueryInt("offset", 0)
+
+	out, err := h.CampaignUC.ListCampaigns(c.Context(), companyID, limit, offset)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.JSON(out)
+}
+
+// ExecuteCampaign ejecuta una campaña manualmente.
+// @Summary      Ejecutar campaña
+// @Description  Ejecuta una campaña pendiente o programada manualmente
+// @Tags         crm
+// @Security     Bearer
+// @Param        id  path  string  true  "Campaign ID"
+// @Success      200  {object}  map[string]string
+// @Router       /api/crm/campaigns/{id}/execute [post]
+func (h *CRMHandler) ExecuteCampaign(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	userID := GetUserID(c)
+	id := c.Params("id")
+	if companyID == "" || userID == "" || id == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if err := h.CampaignUC.ExecuteCampaign(c.Context(), companyID, userID, id); err != nil {
+		if err == domain.ErrNotFound {
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "campaña no encontrada"})
+		}
+		if err == domain.ErrConflict {
+			return c.Status(fiber.StatusConflict).JSON(dto.ErrorResponse{Code: "CONFLICT", Message: "la campaña no está en un estado ejecutable"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.JSON(fiber.Map{"status": "executed"})
+}
+
+// SendTestMessage envía un mensaje de prueba directo.
+// @Summary      Mensaje de prueba directo
+// @Description  Envía un mensaje de SMS o WhatsApp sin guardar en BD
+// @Tags         crm
+// @Security     Bearer
+// @Accept       json
+// @Produce      json
+// @Param        body  body  dto.SendTestMessageRequest  true  "Datos del mensaje"
+// @Success      200   {object} map[string]string
+// @Router       /api/crm/campaigns/test-message [post]
+func (h *CRMHandler) SendTestMessage(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	if companyID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	var in dto.SendTestMessageRequest
+	if err := c.BodyParser(&in); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
+	}
+	if err := h.CampaignUC.SendTestMessage(c.Context(), companyID, in); err != nil {
+		if err == domain.ErrConflict {
+			return c.Status(fiber.StatusConflict).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "proveedor no configurado"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.JSON(fiber.Map{"status": "sent"})
+}
+
 // SendTestCampaign envía un correo de prueba a una dirección específica.
 // @Summary      Enviar campaña de prueba
 // @Description  Envía el subject/body a un email específico (solo prueba)

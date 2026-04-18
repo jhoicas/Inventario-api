@@ -22,6 +22,8 @@ type CRMCampaign struct {
 	CompanyID   string
 	Name        string
 	Description string
+	Subject     string
+	Body        string
 	Status      string
 	Channel     string
 	ScheduledAt *time.Time

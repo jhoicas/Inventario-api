@@ -525,3 +525,18 @@ type SendBulkCampaignResponse struct {
 	Queued     int    `json:"queued"`
 	Status     string `json:"status"`
 }
+
+// SendTestMessageRequest body para enviar un mensaje de prueba directo (SMS o WHATSAPP).
+type SendTestMessageRequest struct {
+	Channel          string `json:"channel" validate:"required,oneof=SMS WHATSAPP"`
+	DestinationPhone string `json:"destination_phone" validate:"required"`
+	Content          string `json:"content" validate:"required"`
+}
+
+// CampaignListResponse lista paginada de campañas.
+type CampaignListResponse struct {
+	Items  []CampaignResponse `json:"items"`
+	Total  int64              `json:"total"`
+	Limit  int                `json:"limit"`
+	Offset int                `json:"offset"`
+}

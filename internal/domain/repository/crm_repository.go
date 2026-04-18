@@ -144,6 +144,7 @@ type CRMCampaignRepository interface {
 	GetMetrics(ctx context.Context, campaignID string) (*entity.CampaignMetrics, error)
 	QueueRecipients(ctx context.Context, campaignID string, recipients []*entity.CampaignRecipient) (int, error)
 	BatchInsertCampaignRecipients(ctx context.Context, recipients []domain.CampaignRecipient) error
+	ListByCompany(ctx context.Context, companyID string, limit, offset int) ([]*entity.Campaign, int64, error)
 }
 
 // CRMAutomationRepository puerto de persistencia para automatizaciones CRM.
