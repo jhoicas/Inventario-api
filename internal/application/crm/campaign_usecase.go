@@ -48,6 +48,7 @@ func (uc *CampaignUseCase) Create(ctx context.Context, companyID, userID string,
 	if req.Name == "" {
 		return nil, domain.ErrInvalidInput
 	}
+	channel := strings.ToUpper(strings.TrimSpace(req.Channel))
 	status := strings.TrimSpace(req.Status)
 	if status == "" {
 		status = entity.CampaignStatusPending
@@ -55,7 +56,10 @@ func (uc *CampaignUseCase) Create(ctx context.Context, companyID, userID string,
 	scheduledAt := normalizeTimePtrToUTC(req.ScheduledAt)
 	isScheduled := req.ScheduledAt != nil
 	if isScheduled {
-		if strings.TrimSpace(req.Subject) == "" || strings.TrimSpace(req.Body) == "" {
+		if strings.TrimSpace(req.Body) == "" {
+			return nil, domain.ErrInvalidInput
+		}
+		if channel == "EMAIL" && strings.TrimSpace(req.Subject) == "" {
 			return nil, domain.ErrInvalidInput
 		}
 		status = entity.CampaignStatusScheduled
@@ -88,7 +92,16 @@ func (uc *CampaignUseCase) Create(ctx context.Context, companyID, userID string,
 
 		recipients := make([]*entity.CampaignRecipient, 0, len(recipientsDTO))
 		for _, recipient := range recipientsDTO {
-			if strings.TrimSpace(recipient.Email) == "" {
+			if channel == "EMAIL" {
+				if strings.TrimSpace(recipient.Email) == "" {
+					continue
+				}
+			} else if channel == "WHATSAPP" || channel == "SMS" {
+				if strings.TrimSpace(recipient.Phone) == "" {
+					continue
+				}
+			}
+			if strings.TrimSpace(recipient.Email) == "" && strings.TrimSpace(recipient.Phone) == "" {
 				continue
 			}
 			custName := "Cliente"

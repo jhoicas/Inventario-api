@@ -1661,7 +1661,7 @@ func (h *CRMHandler) CreateCampaign(c *fiber.Ctx) error {
 	out, err := h.CampaignUC.Create(c.Context(), companyID, userID, in)
 	if err != nil {
 		if err == domain.ErrInvalidInput {
-			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "name requerido"})
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "Datos de la campaña inválidos o incompletos (verifica nombre, asunto, cuerpo y canal)"})
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}
