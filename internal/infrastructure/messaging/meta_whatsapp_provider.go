@@ -33,10 +33,12 @@ func (p *MetaWhatsAppProvider) Send(ctx context.Context, to string, content stri
 
 	payload := map[string]interface{}{
 		"messaging_product": "whatsapp",
+		"recipient_type":    "individual",
 		"to":                cleanTo,
 		"type":              "text",
-		"text": map[string]string{
-			"body": content,
+		"text": map[string]interface{}{
+			"preview_url": false,
+			"body":        content,
 		},
 	}
 
