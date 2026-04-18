@@ -1638,13 +1638,14 @@ func (r *CRMCampaignRepo) batchInsertCampaignRecipients(ctx context.Context, rec
 			if rec.QueuedAt.IsZero() {
 				rec.QueuedAt = time.Now().UTC()
 			}
-			values = append(values, fmt.Sprintf("($%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d)", argPos, argPos+1, argPos+2, argPos+3, argPos+4, argPos+5, argPos+6, argPos+7, argPos+8, argPos+9, argPos+10, argPos+11))
+			values = append(values, fmt.Sprintf("($%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d)", argPos, argPos+1, argPos+2, argPos+3, argPos+4, argPos+5, argPos+6, argPos+7, argPos+8, argPos+9, argPos+10, argPos+11, argPos+12))
 			args = append(args,
 				rec.ID,
 				rec.CampaignID,
 				rec.CustomerID,
 				rec.CompanyID,
 				rec.Email,
+				rec.Phone,
 				rec.Subject,
 				rec.Body,
 				rec.Status,
@@ -1653,7 +1654,7 @@ func (r *CRMCampaignRepo) batchInsertCampaignRecipients(ctx context.Context, rec
 				rec.SentAt,
 				rec.ProcessedAt,
 			)
-			argPos += 12
+			argPos += 13
 			inserted++
 		}
 		if len(values) == 0 {
@@ -1661,7 +1662,7 @@ func (r *CRMCampaignRepo) batchInsertCampaignRecipients(ctx context.Context, rec
 		}
 		query := `
 			INSERT INTO crm_campaign_recipients (
-				id, campaign_id, customer_id, company_id, email, subject, body, status, error_message, queued_at, sent_at, processed_at
+				id, campaign_id, customer_id, company_id, email, phone, subject, body, status, error_message, queued_at, sent_at, processed_at
 			) VALUES ` + strings.Join(values, ",")
 		if _, err := r.q.Exec(ctx, query, args...); err != nil {
 			return inserted, fmt.Errorf("batch insert campaign recipients: %w", err)

@@ -63,6 +63,7 @@ type CampaignRecipient struct {
 	CustomerID  string
 	CompanyID   string
 	Email       string
+	Phone       string
 	Subject     string
 	Body        string
 	Status      string

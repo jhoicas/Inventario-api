@@ -101,6 +101,7 @@ func (uc *CampaignUseCase) Create(ctx context.Context, companyID, userID string,
 				CustomerID: recipient.CustomerID,
 				CompanyID:  companyID,
 				Email:      strings.TrimSpace(recipient.Email),
+				Phone:      strings.TrimSpace(recipient.Phone),
 				Subject:    req.Subject,
 				Body:       customBody,
 				Status:     "QUEUED",
@@ -361,7 +362,7 @@ func (uc *CampaignUseCase) SendTest(ctx context.Context, companyID, userID strin
 	if toEmail == "" {
 		return domain.ErrInvalidInput
 	}
-	
+
 	if channel == "EMAIL" {
 		return uc.mailSender.Send(toEmail, req.Subject, body)
 	}
