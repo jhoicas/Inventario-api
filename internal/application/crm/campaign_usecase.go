@@ -54,14 +54,21 @@ func (uc *CampaignUseCase) Create(ctx context.Context, companyID, userID string,
 		status = entity.CampaignStatusPending
 	}
 	scheduledAt := normalizeTimePtrToUTC(req.ScheduledAt)
-	isScheduled := req.ScheduledAt != nil
-	if isScheduled {
-		if strings.TrimSpace(req.Body) == "" {
-			return nil, domain.ErrInvalidInput
-		}
-		if channel == "EMAIL" && strings.TrimSpace(req.Subject) == "" {
-			return nil, domain.ErrInvalidInput
-		}
+	if scheduledAt == nil {
+		nowUTC := time.Now().UTC()
+		scheduledAt = &nowUTC
+		status = entity.CampaignStatusScheduled
+	}
+
+	if strings.TrimSpace(req.Body) == "" {
+		return nil, domain.ErrInvalidInput
+	}
+	if channel == "EMAIL" && strings.TrimSpace(req.Subject) == "" {
+		return nil, domain.ErrInvalidInput
+	}
+
+	isScheduled := true
+	if req.ScheduledAt != nil {
 		status = entity.CampaignStatusScheduled
 	}
 
@@ -92,16 +99,13 @@ func (uc *CampaignUseCase) Create(ctx context.Context, companyID, userID string,
 
 		recipients := make([]*entity.CampaignRecipient, 0, len(recipientsDTO))
 		for _, recipient := range recipientsDTO {
-			if channel == "EMAIL" {
-				if strings.TrimSpace(recipient.Email) == "" {
-					continue
-				}
-			} else if channel == "WHATSAPP" || channel == "SMS" {
-				if strings.TrimSpace(recipient.Phone) == "" {
-					continue
-				}
+			email := strings.TrimSpace(recipient.Email)
+			phone := strings.TrimSpace(recipient.Phone)
+
+			if channel == "EMAIL" && email == "" {
+				continue
 			}
-			if strings.TrimSpace(recipient.Email) == "" && strings.TrimSpace(recipient.Phone) == "" {
+			if (channel == "WHATSAPP" || channel == "SMS") && phone == "" {
 				continue
 			}
 			custName := "Cliente"
@@ -113,8 +117,8 @@ func (uc *CampaignUseCase) Create(ctx context.Context, companyID, userID string,
 			recipients = append(recipients, &entity.CampaignRecipient{
 				CustomerID: recipient.CustomerID,
 				CompanyID:  companyID,
-				Email:      strings.TrimSpace(recipient.Email),
-				Phone:      strings.TrimSpace(recipient.Phone),
+				Email:      email,
+				Phone:      phone,
 				Subject:    req.Subject,
 				Body:       customBody,
 				Status:     "QUEUED",
