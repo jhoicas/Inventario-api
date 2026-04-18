@@ -1588,9 +1588,9 @@ func (r *CRMCampaignRepo) Create(ctx context.Context, c *entity.Campaign) error 
 	}
 	scheduledAt := toUTCTimePtr(c.ScheduledAt)
 	_, err := r.q.Exec(ctx, `
-		INSERT INTO crm_campaigns (id, company_id, name, description, subject, body, status, scheduled_at, created_by, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-		c.ID, c.CompanyID, c.Name, nullIfEmpty(c.Description), nullIfEmpty(c.Subject), nullIfEmpty(c.Body), c.Status, scheduledAt, nullIfEmpty(c.CreatedBy), c.CreatedAt, c.UpdatedAt,
+		INSERT INTO crm_campaigns (id, company_id, name, description, subject, body, status, channel, scheduled_at, created_by, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+		c.ID, c.CompanyID, c.Name, nullIfEmpty(c.Description), nullIfEmpty(c.Subject), nullIfEmpty(c.Body), c.Status, c.Channel, scheduledAt, nullIfEmpty(c.CreatedBy), c.CreatedAt, c.UpdatedAt,
 	)
 	if err != nil {
 		return err

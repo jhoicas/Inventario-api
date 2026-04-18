@@ -6,11 +6,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 )
 
 // MetaWhatsAppProvider implementa MessageProvider usando Meta Cloud API oficial.
 type MetaWhatsAppProvider struct {
-	accessToken string
+	accessToken   string
 	phoneNumberID string
 }
 
@@ -23,11 +24,16 @@ func NewMetaWhatsAppProvider(accessToken, phoneNumberID string) *MetaWhatsAppPro
 }
 
 func (p *MetaWhatsAppProvider) Send(ctx context.Context, to string, content string) error {
+	// Meta Cloud API requiere solo dígitos (sin +, espacios ni guiones).
+	cleanTo := strings.ReplaceAll(to, "+", "")
+	cleanTo = strings.ReplaceAll(cleanTo, " ", "")
+	cleanTo = strings.ReplaceAll(cleanTo, "-", "")
+
 	url := fmt.Sprintf("https://graph.facebook.com/v17.0/%s/messages", p.phoneNumberID)
 
 	payload := map[string]interface{}{
 		"messaging_product": "whatsapp",
-		"to":                to,
+		"to":                cleanTo,
 		"type":              "text",
 		"text": map[string]string{
 			"body": content,
