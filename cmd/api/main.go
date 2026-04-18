@@ -25,7 +25,9 @@ import (
 	infradian "github.com/jhoicas/Inventario-api/internal/infrastructure/dian"
 	"github.com/jhoicas/Inventario-api/internal/infrastructure/dian/signer"
 	inframail "github.com/jhoicas/Inventario-api/internal/infrastructure/mail"
+	"github.com/jhoicas/Inventario-api/internal/infrastructure/messaging"
 	infrapdf "github.com/jhoicas/Inventario-api/internal/infrastructure/pdf"
+	"github.com/jhoicas/Inventario-api/internal/domain/repository"
 	"github.com/jhoicas/Inventario-api/internal/infrastructure/postgres"
 	infrasecurity "github.com/jhoicas/Inventario-api/internal/infrastructure/security"
 	httpRouter "github.com/jhoicas/Inventario-api/internal/interfaces/http"
@@ -221,7 +223,19 @@ func main() {
 	if err != nil {
 		log.Error().Err(err).Msg("configurar SMTPSender para campañas CRM (usando net/smtp)")
 	}
-	campaignUC := crm.NewCampaignUseCase(crmCampaignRepo, customerRepo, crmProfileRepo, crmInteractionRepo, mailSender)
+	providers := make(map[string]repository.MessageProvider)
+
+	snsProvider, err := messaging.NewAWSSNSProvider(ctx)
+	if err != nil {
+		log.Error().Err(err).Msg("configurar AWSSNSProvider para SMS")
+	} else {
+		providers["SMS"] = snsProvider
+	}
+
+	metaProvider := messaging.NewMetaWhatsAppProvider(os.Getenv("META_WHATSAPP_TOKEN"), os.Getenv("META_WHATSAPP_PHONE_ID"))
+	providers["WHATSAPP"] = metaProvider
+
+	campaignUC := crm.NewCampaignUseCase(crmCampaignRepo, customerRepo, crmProfileRepo, crmInteractionRepo, providers, mailSender)
 	templateUC := crm.NewCampaignTemplateUseCase(crmTemplateRepo)
 	opportunityUC := crm.NewOpportunityUseCase(crmOpportunityRepo)
 	importUC := crm.NewImportUseCase(crmProfileRepo, customerRepo, crmCategoryRepo, crmTaskRepo, crmOpportunityRepo)

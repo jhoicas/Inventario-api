@@ -298,6 +298,7 @@ type CreateCampaignRequest struct {
 	Subject     string `json:"subject,omitempty"`
 	Body        string `json:"body,omitempty"`
 	CategoryID  string `json:"category_id,omitempty"`
+	Channel     string `json:"channel" validate:"required,oneof=EMAIL SMS WHATSAPP"`
 	// ScheduledAt debe venir en ISO 8601 (RFC3339), idealmente con offset (ej: 2026-04-20T10:00:00-05:00).
 	ScheduledAt *time.Time `json:"scheduled_at"`
 	Status      string     `json:"status,omitempty"`
@@ -307,6 +308,7 @@ type CreateCampaignRequest struct {
 type UpdateCampaignRequest struct {
 	Name        *string `json:"name,omitempty"`
 	Description *string `json:"description,omitempty"`
+	Channel     *string `json:"channel,omitempty"`
 	// ScheduledAt debe venir en ISO 8601 (RFC3339), idealmente con offset.
 	ScheduledAt *time.Time `json:"scheduled_at,omitempty"`
 	Status      *string    `json:"status,omitempty"`
@@ -319,6 +321,7 @@ type CampaignResponse struct {
 	Name        string     `json:"name"`
 	Description string     `json:"description"`
 	Status      string     `json:"status"`
+	Channel     string     `json:"channel"`
 	ScheduledAt *time.Time `json:"scheduled_at,omitempty"`
 	CreatedBy   string     `json:"created_by"`
 	CreatedAt   time.Time  `json:"created_at"`
@@ -484,16 +487,18 @@ type CRMAnalyticsMonthlyEvolutionItem struct {
 	Sales decimal.Decimal `json:"sales"`
 }
 
-// SendCampaignRequest body para enviar una campaña de email masiva.
+// SendCampaignRequest body para enviar una campaña masiva.
 type SendCampaignRequest struct {
-	Subject    string `json:"subject"`               // requerido
+	Channel    string `json:"channel" validate:"required"`
+	Subject    string `json:"subject,omitempty"`
 	Body       string `json:"body"`                  // requerido (texto generado por IA o HTML simple)
 	CategoryID string `json:"category_id,omitempty"` // opcional: filtrar por categoría CRM
 }
 
-// SendTestCampaignRequest body para enviar un correo de prueba (una sola dirección).
+// SendTestCampaignRequest body para enviar una prueba (una sola dirección o número).
 type SendTestCampaignRequest struct {
-	Subject    string `json:"subject"`
+	Channel    string `json:"channel" validate:"required"`
+	Subject    string `json:"subject,omitempty"`
 	Body       string `json:"body"`
 	Email      string `json:"email,omitempty"`
 	CustomerID string `json:"customer_id,omitempty"`

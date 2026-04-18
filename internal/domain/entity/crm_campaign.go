@@ -23,6 +23,7 @@ type CRMCampaign struct {
 	Name        string
 	Description string
 	Status      string
+	Channel     string
 	ScheduledAt *time.Time
 	CreatedBy   string
 	CreatedAt   time.Time

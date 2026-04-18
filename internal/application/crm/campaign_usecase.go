@@ -20,7 +20,8 @@ type CampaignUseCase struct {
 	customerRepo    repository.CustomerRepository
 	profileRepo     repository.CRMProfileRepository
 	interactionRepo repository.CRMInteractionRepository
-	mailSender      inframail.Sender
+	providers       map[string]repository.MessageProvider
+	mailSender      *inframail.SMTPSender
 }
 
 // NewCampaignUseCase construye el caso de uso.
@@ -29,13 +30,15 @@ func NewCampaignUseCase(
 	customerRepo repository.CustomerRepository,
 	profileRepo repository.CRMProfileRepository,
 	interactionRepo repository.CRMInteractionRepository,
-	mailSender inframail.Sender,
+	providers map[string]repository.MessageProvider,
+	mailSender *inframail.SMTPSender,
 ) *CampaignUseCase {
 	return &CampaignUseCase{
 		repo:            repo,
 		customerRepo:    customerRepo,
 		profileRepo:     profileRepo,
 		interactionRepo: interactionRepo,
+		providers:       providers,
 		mailSender:      mailSender,
 	}
 }
@@ -65,6 +68,7 @@ func (uc *CampaignUseCase) Create(ctx context.Context, companyID, userID string,
 		Name:        req.Name,
 		Description: req.Description,
 		Status:      status,
+		Channel:     req.Channel,
 		ScheduledAt: scheduledAt,
 		CreatedBy:   userID,
 		CreatedAt:   now,
@@ -142,11 +146,24 @@ func (uc *CampaignUseCase) GetMetrics(ctx context.Context, campaignID string) (*
 // SendCampaign envía una campaña de email a los clientes filtrados por categoría (opcional)
 // y registra una interacción de tipo "email" por cada envío exitoso.
 func (uc *CampaignUseCase) SendCampaign(ctx context.Context, companyID, userID string, req dto.SendCampaignRequest) error {
-	if strings.TrimSpace(req.Subject) == "" || strings.TrimSpace(req.Body) == "" {
+	if req.Channel == "EMAIL" && strings.TrimSpace(req.Subject) == "" {
 		return domain.ErrInvalidInput
 	}
-	if isNil(uc.mailSender) {
-		return domain.ErrConflict
+	if strings.TrimSpace(req.Body) == "" {
+		return domain.ErrInvalidInput
+	}
+	channel := strings.ToUpper(req.Channel)
+	var provider repository.MessageProvider
+	if channel != "EMAIL" {
+		p, exists := uc.providers[channel]
+		if !exists || isNil(p) {
+			return domain.ErrConflict
+		}
+		provider = p
+	} else {
+		if uc.mailSender == nil {
+			return domain.ErrConflict
+		}
 	}
 
 	// Resolver destinatarios
@@ -197,9 +214,15 @@ func (uc *CampaignUseCase) SendCampaign(ctx context.Context, companyID, userID s
 			continue
 		}
 
-		// Intentar enviar email; si falla uno, continuar con el siguiente.
-		if err := uc.mailSender.Send(email, req.Subject, req.Body); err != nil {
-			continue
+		// Intentar enviar mensaje
+		if channel == "EMAIL" {
+			if err := uc.mailSender.Send(email, req.Subject, req.Body); err != nil {
+				continue
+			}
+		} else {
+			if err := provider.Send(ctx, email, req.Body); err != nil {
+				continue
+			}
 		}
 
 		if uc.interactionRepo == nil {
@@ -224,11 +247,24 @@ func (uc *CampaignUseCase) SendCampaign(ctx context.Context, companyID, userID s
 
 // SendTest envía un correo de prueba a una dirección específica.
 func (uc *CampaignUseCase) SendTest(ctx context.Context, companyID, userID string, req dto.SendTestCampaignRequest) error {
-	if strings.TrimSpace(req.Subject) == "" || strings.TrimSpace(req.Body) == "" {
+	if req.Channel == "EMAIL" && strings.TrimSpace(req.Subject) == "" {
 		return domain.ErrInvalidInput
 	}
-	if isNil(uc.mailSender) {
-		return domain.ErrConflict
+	if strings.TrimSpace(req.Body) == "" {
+		return domain.ErrInvalidInput
+	}
+	channel := strings.ToUpper(req.Channel)
+	var provider repository.MessageProvider
+	if channel != "EMAIL" {
+		p, exists := uc.providers[channel]
+		if !exists || isNil(p) {
+			return domain.ErrConflict
+		}
+		provider = p
+	} else {
+		if uc.mailSender == nil {
+			return domain.ErrConflict
+		}
 	}
 
 	toEmail := strings.TrimSpace(req.Email)
@@ -258,7 +294,11 @@ func (uc *CampaignUseCase) SendTest(ctx context.Context, companyID, userID strin
 	if toEmail == "" {
 		return domain.ErrInvalidInput
 	}
-	return uc.mailSender.Send(toEmail, req.Subject, body)
+	
+	if channel == "EMAIL" {
+		return uc.mailSender.Send(toEmail, req.Subject, body)
+	}
+	return provider.Send(ctx, toEmail, body)
 }
 
 // isNil detecta interfaces con puntero interno nil (evita panics).
@@ -282,6 +322,7 @@ func toCampaignResponse(c *entity.Campaign) *dto.CampaignResponse {
 		Name:        c.Name,
 		Description: c.Description,
 		Status:      c.Status,
+		Channel:     c.Channel,
 		CreatedBy:   c.CreatedBy,
 		CreatedAt:   c.CreatedAt,
 		UpdatedAt:   c.UpdatedAt,
