@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jhoicas/Inventario-api/internal/application/dto"
 	"github.com/jhoicas/Inventario-api/internal/domain"
 	"github.com/jhoicas/Inventario-api/internal/domain/entity"
 	"github.com/jhoicas/Inventario-api/internal/domain/repository"
@@ -174,4 +175,161 @@ func (uc *AutomationUseCase) RunDailyAutomations(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// CreateAutomation crea una automatización CRM para una empresa.
+func (uc *AutomationUseCase) CreateAutomation(ctx context.Context, companyID string, req dto.CreateAutomationRequest) (*dto.AutomationResponse, error) {
+	if uc == nil || uc.automationRepo == nil || strings.TrimSpace(companyID) == "" {
+		return nil, domain.ErrInvalidInput
+	}
+	name := strings.TrimSpace(req.Name)
+	typ, err := parseAutomationType(req.Type)
+	if name == "" || err != nil {
+		return nil, domain.ErrInvalidInput
+	}
+	isActive := true
+	if req.IsActive != nil {
+		isActive = *req.IsActive
+	}
+	a := &entity.CRMAutomation{
+		ID:           uuid.New().String(),
+		CompanyID:    companyID,
+		Name:         name,
+		Type:         typ,
+		TemplateID:   trimPtr(req.TemplateID),
+		ScheduleCron: trimPtr(req.ScheduleCron),
+		Config:       normalizeConfig(req.Config),
+		IsActive:     isActive,
+	}
+	if err := uc.automationRepo.Create(ctx, a); err != nil {
+		return nil, err
+	}
+	return toAutomationResponse(a), nil
+}
+
+// ListAutomations lista automatizaciones CRM de la empresa autenticada.
+func (uc *AutomationUseCase) ListAutomations(ctx context.Context, companyID string) ([]dto.AutomationResponse, error) {
+	if uc == nil || uc.automationRepo == nil || strings.TrimSpace(companyID) == "" {
+		return nil, domain.ErrInvalidInput
+	}
+	list, err := uc.automationRepo.ListByCompany(ctx, companyID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]dto.AutomationResponse, 0, len(list))
+	for _, item := range list {
+		out = append(out, *toAutomationResponse(item))
+	}
+	return out, nil
+}
+
+// UpdateAutomation actualiza una automatización CRM existente.
+func (uc *AutomationUseCase) UpdateAutomation(ctx context.Context, companyID, id string, req dto.UpdateAutomationRequest) (*dto.AutomationResponse, error) {
+	if uc == nil || uc.automationRepo == nil || strings.TrimSpace(companyID) == "" || strings.TrimSpace(id) == "" {
+		return nil, domain.ErrInvalidInput
+	}
+	current, err := uc.automationRepo.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if current == nil {
+		return nil, domain.ErrNotFound
+	}
+	if current.CompanyID != companyID {
+		return nil, domain.ErrForbidden
+	}
+	if req.Name != nil {
+		name := strings.TrimSpace(*req.Name)
+		if name == "" {
+			return nil, domain.ErrInvalidInput
+		}
+		current.Name = name
+	}
+	if req.Type != nil {
+		typ, err := parseAutomationType(*req.Type)
+		if err != nil {
+			return nil, domain.ErrInvalidInput
+		}
+		current.Type = typ
+	}
+	if req.TemplateID != nil {
+		current.TemplateID = trimPtr(req.TemplateID)
+	}
+	if req.ScheduleCron != nil {
+		current.ScheduleCron = trimPtr(req.ScheduleCron)
+	}
+	if req.Config != nil {
+		current.Config = normalizeConfig(req.Config)
+	}
+	if req.IsActive != nil {
+		current.IsActive = *req.IsActive
+	}
+	if err := uc.automationRepo.Update(ctx, current); err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return nil, domain.ErrNotFound
+		}
+		return nil, err
+	}
+	return toAutomationResponse(current), nil
+}
+
+// DeleteAutomation elimina una automatización CRM de la empresa autenticada.
+func (uc *AutomationUseCase) DeleteAutomation(ctx context.Context, companyID, id string) error {
+	if uc == nil || uc.automationRepo == nil || strings.TrimSpace(companyID) == "" || strings.TrimSpace(id) == "" {
+		return domain.ErrInvalidInput
+	}
+	current, err := uc.automationRepo.GetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	if current == nil {
+		return domain.ErrNotFound
+	}
+	if current.CompanyID != companyID {
+		return domain.ErrForbidden
+	}
+	return uc.automationRepo.Delete(ctx, id, companyID)
+}
+
+func parseAutomationType(raw string) (entity.CRMAutomationType, error) {
+	s := entity.CRMAutomationType(strings.ToUpper(strings.TrimSpace(raw)))
+	if s != entity.CRMAutomationTypeBirthday && s != entity.CRMAutomationTypeRepurchase {
+		return "", domain.ErrInvalidInput
+	}
+	return s, nil
+}
+
+func trimPtr(v *string) *string {
+	if v == nil {
+		return nil
+	}
+	trimmed := strings.TrimSpace(*v)
+	if trimmed == "" {
+		return nil
+	}
+	return &trimmed
+}
+
+func normalizeConfig(raw []byte) []byte {
+	if len(raw) == 0 {
+		return []byte("{}")
+	}
+	return raw
+}
+
+func toAutomationResponse(a *entity.CRMAutomation) *dto.AutomationResponse {
+	if a == nil {
+		return nil
+	}
+	return &dto.AutomationResponse{
+		ID:           a.ID,
+		CompanyID:    a.CompanyID,
+		Name:         a.Name,
+		Type:         string(a.Type),
+		TemplateID:   a.TemplateID,
+		ScheduleCron: a.ScheduleCron,
+		Config:       append([]byte(nil), a.Config...),
+		IsActive:     a.IsActive,
+		LastRunAt:    a.LastRunAt,
+	}
 }

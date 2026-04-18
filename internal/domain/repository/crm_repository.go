@@ -149,6 +149,11 @@ type CRMCampaignRepository interface {
 
 // CRMAutomationRepository puerto de persistencia para automatizaciones CRM.
 type CRMAutomationRepository interface {
+	Create(ctx context.Context, automation *entity.CRMAutomation) error
+	ListByCompany(ctx context.Context, companyID string) ([]*entity.CRMAutomation, error)
+	GetByID(ctx context.Context, id string) (*entity.CRMAutomation, error)
+	Update(ctx context.Context, automation *entity.CRMAutomation) error
+	Delete(ctx context.Context, id, companyID string) error
 	GetActiveAutomations(ctx context.Context) ([]*entity.CRMAutomation, error)
 	GetCustomersForBirthday(ctx context.Context, companyID uuid.UUID) ([]*entity.Customer, error)
 	GetCustomersForRepurchase(ctx context.Context, companyID uuid.UUID, productID uuid.UUID, daysSincePurchase int) ([]*entity.Customer, error)

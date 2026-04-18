@@ -1,6 +1,7 @@
 package dto
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/jhoicas/Inventario-api/internal/domain/entity"
@@ -540,4 +541,38 @@ type CampaignListResponse struct {
 	Total  int64              `json:"total"`
 	Limit  int                `json:"limit"`
 	Offset int                `json:"offset"`
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// CRM Automations
+// ──────────────────────────────────────────────────────────────────────────────
+
+type CreateAutomationRequest struct {
+	Name         string          `json:"name"`
+	Type         string          `json:"type"` // BIRTHDAY|REPURCHASE
+	TemplateID   *string         `json:"template_id,omitempty"`
+	ScheduleCron *string         `json:"schedule_cron,omitempty"`
+	Config       json.RawMessage `json:"config,omitempty"`
+	IsActive     *bool           `json:"is_active,omitempty"`
+}
+
+type UpdateAutomationRequest struct {
+	Name         *string         `json:"name,omitempty"`
+	Type         *string         `json:"type,omitempty"` // BIRTHDAY|REPURCHASE
+	TemplateID   *string         `json:"template_id,omitempty"`
+	ScheduleCron *string         `json:"schedule_cron,omitempty"`
+	Config       json.RawMessage `json:"config,omitempty"`
+	IsActive     *bool           `json:"is_active,omitempty"`
+}
+
+type AutomationResponse struct {
+	ID           string          `json:"id"`
+	CompanyID    string          `json:"company_id"`
+	Name         string          `json:"name"`
+	Type         string          `json:"type"`
+	TemplateID   *string         `json:"template_id,omitempty"`
+	ScheduleCron *string         `json:"schedule_cron,omitempty"`
+	Config       json.RawMessage `json:"config,omitempty"`
+	IsActive     bool            `json:"is_active"`
+	LastRunAt    *time.Time      `json:"last_run_at,omitempty"`
 }

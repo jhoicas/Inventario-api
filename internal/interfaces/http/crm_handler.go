@@ -36,6 +36,7 @@ type customerListUseCaseWithFilters interface {
 type CRMHandler struct {
 	LoyaltyUC       *crm.LoyaltyUseCase
 	AnalyticsUC     *crm.AnalyticsUseCase
+	AutomationUC    *crm.AutomationUseCase
 	TaskUC          *crm.TaskUseCase
 	PQRUC           *crm.PQRUseCase
 	AICRMUC         *crm.AICRMUseCase
@@ -57,6 +58,7 @@ type CRMHandler struct {
 func NewCRMHandler(
 	loyaltyUC *crm.LoyaltyUseCase,
 	analyticsUC *crm.AnalyticsUseCase,
+	automationUC *crm.AutomationUseCase,
 	taskUC *crm.TaskUseCase,
 	pqrUC *crm.PQRUseCase,
 	aiCRMUC *crm.AICRMUseCase,
@@ -75,6 +77,7 @@ func NewCRMHandler(
 	return &CRMHandler{
 		LoyaltyUC:       loyaltyUC,
 		AnalyticsUC:     analyticsUC,
+		AutomationUC:    automationUC,
 		TaskUC:          taskUC,
 		PQRUC:           pqrUC,
 		AICRMUC:         aiCRMUC,
@@ -87,6 +90,153 @@ func NewCRMHandler(
 		ImportUC:        importUC,
 		InteractionRepo: interactionRepo,
 	}
+}
+
+// CreateAutomation crea una automatización CRM para la empresa autenticada.
+// @Summary      Crear automatización CRM
+// @Description  Crea una automatización de tipo BIRTHDAY o REPURCHASE
+// @Tags         crm
+// @Security     Bearer
+// @Accept       json
+// @Produce      json
+// @Param        body  body      dto.CreateAutomationRequest  true  "Automation"
+// @Success      201   {object}  dto.AutomationResponse
+// @Failure      400   {object}  dto.ErrorResponse
+// @Failure      401   {object}  dto.ErrorResponse
+// @Failure      503   {object}  dto.ErrorResponse
+// @Router       /api/crm/automations [post]
+func (h *CRMHandler) CreateAutomation(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	if companyID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if h.AutomationUC == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "automations no configurado"})
+	}
+	var in dto.CreateAutomationRequest
+	if err := c.BodyParser(&in); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
+	}
+	out, err := h.AutomationUC.CreateAutomation(c.Context(), companyID, in)
+	if err != nil {
+		if err == domain.ErrInvalidInput {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "datos de automatización inválidos"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.Status(fiber.StatusCreated).JSON(out)
+}
+
+// ListAutomations lista automatizaciones CRM de la empresa autenticada.
+// @Summary      Listar automatizaciones CRM
+// @Description  Devuelve automatizaciones configuradas para la empresa autenticada
+// @Tags         crm
+// @Security     Bearer
+// @Produce      json
+// @Success      200  {array}   dto.AutomationResponse
+// @Failure      401  {object}  dto.ErrorResponse
+// @Failure      503  {object}  dto.ErrorResponse
+// @Router       /api/crm/automations [get]
+func (h *CRMHandler) ListAutomations(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	if companyID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if h.AutomationUC == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "automations no configurado"})
+	}
+	out, err := h.AutomationUC.ListAutomations(c.Context(), companyID)
+	if err != nil {
+		if err == domain.ErrInvalidInput {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "parámetros inválidos"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.Status(fiber.StatusOK).JSON(out)
+}
+
+// UpdateAutomation actualiza una automatización CRM existente.
+// @Summary      Actualizar automatización CRM
+// @Description  Actualiza nombre, tipo, plantilla, cron, config o estado de una automatización
+// @Tags         crm
+// @Security     Bearer
+// @Accept       json
+// @Produce      json
+// @Param        id    path      string                       true  "Automation ID"
+// @Param        body  body      dto.UpdateAutomationRequest  true  "Automation"
+// @Success      200   {object}  dto.AutomationResponse
+// @Failure      400   {object}  dto.ErrorResponse
+// @Failure      401   {object}  dto.ErrorResponse
+// @Failure      403   {object}  dto.ErrorResponse
+// @Failure      404   {object}  dto.ErrorResponse
+// @Failure      503   {object}  dto.ErrorResponse
+// @Router       /api/crm/automations/{id} [put]
+func (h *CRMHandler) UpdateAutomation(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	id := c.Params("id")
+	if companyID == "" || id == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if h.AutomationUC == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "automations no configurado"})
+	}
+	var in dto.UpdateAutomationRequest
+	if err := c.BodyParser(&in); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
+	}
+	out, err := h.AutomationUC.UpdateAutomation(c.Context(), companyID, id, in)
+	if err != nil {
+		switch err {
+		case domain.ErrInvalidInput:
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "datos de automatización inválidos"})
+		case domain.ErrNotFound:
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "automatización no encontrada"})
+		case domain.ErrForbidden:
+			return c.Status(fiber.StatusForbidden).JSON(dto.ErrorResponse{Code: "FORBIDDEN", Message: "acceso denegado"})
+		default:
+			return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+		}
+	}
+	return c.Status(fiber.StatusOK).JSON(out)
+}
+
+// DeleteAutomation elimina una automatización CRM existente.
+// @Summary      Eliminar automatización CRM
+// @Description  Elimina una automatización de la empresa autenticada
+// @Tags         crm
+// @Security     Bearer
+// @Produce      json
+// @Param        id  path  string  true  "Automation ID"
+// @Success      204
+// @Failure      400  {object}  dto.ErrorResponse
+// @Failure      401  {object}  dto.ErrorResponse
+// @Failure      403  {object}  dto.ErrorResponse
+// @Failure      404  {object}  dto.ErrorResponse
+// @Failure      503  {object}  dto.ErrorResponse
+// @Router       /api/crm/automations/{id} [delete]
+func (h *CRMHandler) DeleteAutomation(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	id := c.Params("id")
+	if companyID == "" || id == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "id requerido"})
+	}
+	if h.AutomationUC == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "automations no configurado"})
+	}
+	err := h.AutomationUC.DeleteAutomation(c.Context(), companyID, id)
+	if err != nil {
+		switch err {
+		case domain.ErrInvalidInput:
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "id inválido"})
+		case domain.ErrNotFound:
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "automatización no encontrada"})
+		case domain.ErrForbidden:
+			return c.Status(fiber.StatusForbidden).JSON(dto.ErrorResponse{Code: "FORBIDDEN", Message: "acceso denegado"})
+		default:
+			return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+		}
+	}
+	return c.SendStatus(fiber.StatusNoContent)
 }
 
 // GetAnalytics retorna el dashboard CRM filtrado por la empresa autenticada.

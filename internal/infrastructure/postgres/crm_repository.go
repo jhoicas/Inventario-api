@@ -1856,6 +1856,128 @@ type CRMAutomationRepo struct{ q Querier }
 
 func NewCRMAutomationRepository(q Querier) *CRMAutomationRepo { return &CRMAutomationRepo{q: q} }
 
+func (r *CRMAutomationRepo) Create(ctx context.Context, automation *entity.CRMAutomation) error {
+	if automation == nil {
+		return fmt.Errorf("automation requerida")
+	}
+	if automation.ID == "" {
+		automation.ID = uuid.New().String()
+	}
+	config := []byte("{}")
+	if len(automation.Config) > 0 {
+		config = automation.Config
+	}
+	_, err := r.q.Exec(ctx, `
+		INSERT INTO crm_automations (id, company_id, name, type, template_id, schedule_cron, config, is_active, last_run_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9)`,
+		automation.ID,
+		automation.CompanyID,
+		automation.Name,
+		automation.Type,
+		nullIfEmpty(derefString(automation.TemplateID)),
+		nullIfEmpty(derefString(automation.ScheduleCron)),
+		config,
+		automation.IsActive,
+		automation.LastRunAt,
+	)
+	if err != nil {
+		return fmt.Errorf("create automation: %w", err)
+	}
+	return nil
+}
+
+func (r *CRMAutomationRepo) ListByCompany(ctx context.Context, companyID string) ([]*entity.CRMAutomation, error) {
+	rows, err := r.q.Query(ctx, `
+		SELECT id, company_id, name, type, template_id, schedule_cron, config, is_active, last_run_at
+		FROM crm_automations
+		WHERE company_id = $1
+		ORDER BY name ASC`, companyID)
+	if err != nil {
+		return nil, fmt.Errorf("list automations: %w", err)
+	}
+	defer rows.Close()
+
+	out := make([]*entity.CRMAutomation, 0)
+	for rows.Next() {
+		item, err := scanCRMAutomation(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, &item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate automations: %w", err)
+	}
+	return out, nil
+}
+
+func (r *CRMAutomationRepo) GetByID(ctx context.Context, id string) (*entity.CRMAutomation, error) {
+	rows, err := r.q.Query(ctx, `
+		SELECT id, company_id, name, type, template_id, schedule_cron, config, is_active, last_run_at
+		FROM crm_automations
+		WHERE id = $1`, id)
+	if err != nil {
+		return nil, fmt.Errorf("get automation: %w", err)
+	}
+	defer rows.Close()
+	if !rows.Next() {
+		return nil, nil
+	}
+	item, err := scanCRMAutomation(rows)
+	if err != nil {
+		return nil, err
+	}
+	return &item, nil
+}
+
+func (r *CRMAutomationRepo) Update(ctx context.Context, automation *entity.CRMAutomation) error {
+	if automation == nil {
+		return fmt.Errorf("automation requerida")
+	}
+	config := []byte("{}")
+	if len(automation.Config) > 0 {
+		config = automation.Config
+	}
+	cmd, err := r.q.Exec(ctx, `
+		UPDATE crm_automations
+		SET name = $3,
+			type = $4,
+			template_id = $5,
+			schedule_cron = $6,
+			config = $7::jsonb,
+			is_active = $8,
+			last_run_at = $9
+		WHERE id = $1 AND company_id = $2`,
+		automation.ID,
+		automation.CompanyID,
+		automation.Name,
+		automation.Type,
+		nullIfEmpty(derefString(automation.TemplateID)),
+		nullIfEmpty(derefString(automation.ScheduleCron)),
+		config,
+		automation.IsActive,
+		automation.LastRunAt,
+	)
+	if err != nil {
+		return fmt.Errorf("update automation: %w", err)
+	}
+	if cmd.RowsAffected() == 0 {
+		return domain.ErrNotFound
+	}
+	return nil
+}
+
+func (r *CRMAutomationRepo) Delete(ctx context.Context, id, companyID string) error {
+	cmd, err := r.q.Exec(ctx, `DELETE FROM crm_automations WHERE id = $1 AND company_id = $2`, id, companyID)
+	if err != nil {
+		return fmt.Errorf("delete automation: %w", err)
+	}
+	if cmd.RowsAffected() == 0 {
+		return domain.ErrNotFound
+	}
+	return nil
+}
+
 func (r *CRMAutomationRepo) GetActiveAutomations(ctx context.Context) ([]*entity.CRMAutomation, error) {
 	rows, err := r.q.Query(ctx, `
 		SELECT id, company_id, name, type, template_id, schedule_cron, config, is_active, last_run_at
@@ -1869,16 +1991,9 @@ func (r *CRMAutomationRepo) GetActiveAutomations(ctx context.Context) ([]*entity
 
 	out := make([]*entity.CRMAutomation, 0)
 	for rows.Next() {
-		var item entity.CRMAutomation
-		var templateID, scheduleCron *string
-		var configRaw []byte
-		if err := rows.Scan(&item.ID, &item.CompanyID, &item.Name, &item.Type, &templateID, &scheduleCron, &configRaw, &item.IsActive, &item.LastRunAt); err != nil {
-			return nil, fmt.Errorf("scan active automation: %w", err)
-		}
-		item.TemplateID = templateID
-		item.ScheduleCron = scheduleCron
-		if len(configRaw) > 0 {
-			item.Config = append(json.RawMessage(nil), configRaw...)
+		item, err := scanCRMAutomation(rows)
+		if err != nil {
+			return nil, err
 		}
 		out = append(out, &item)
 	}
@@ -1886,6 +2001,32 @@ func (r *CRMAutomationRepo) GetActiveAutomations(ctx context.Context) ([]*entity
 		return nil, fmt.Errorf("iterate active automations: %w", err)
 	}
 	return out, nil
+}
+
+type automationScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanCRMAutomation(row automationScanner) (entity.CRMAutomation, error) {
+	var item entity.CRMAutomation
+	var templateID, scheduleCron *string
+	var configRaw []byte
+	if err := row.Scan(&item.ID, &item.CompanyID, &item.Name, &item.Type, &templateID, &scheduleCron, &configRaw, &item.IsActive, &item.LastRunAt); err != nil {
+		return item, fmt.Errorf("scan automation: %w", err)
+	}
+	item.TemplateID = templateID
+	item.ScheduleCron = scheduleCron
+	if len(configRaw) > 0 {
+		item.Config = append(json.RawMessage(nil), configRaw...)
+	}
+	return item, nil
+}
+
+func derefString(v *string) string {
+	if v == nil {
+		return ""
+	}
+	return *v
 }
 
 func (r *CRMAutomationRepo) GetCustomersForBirthday(ctx context.Context, companyID uuid.UUID) ([]*entity.Customer, error) {
