@@ -15,7 +15,8 @@ import (
 )
 
 type loyaltyProfileRepoFake struct {
-	profile *entity.CRMCustomerProfile
+	profile            *entity.CRMCustomerProfile
+	campaignRecipients []dto.CampaignRecipientDTO
 }
 
 func (f *loyaltyProfileRepoFake) GetByCustomerID(customerID string) (*entity.CRMCustomerProfile, error) {
@@ -36,11 +37,11 @@ func (f *loyaltyProfileRepoFake) ListByCompany(companyID string, limit, offset i
 }
 
 func (f *loyaltyProfileRepoFake) ResolveCampaignRecipientsByCategory(ctx context.Context, companyID, categoryID string) ([]dto.CampaignRecipientDTO, error) {
-	return nil, nil
+	return f.campaignRecipients, nil
 }
 
 func (f *loyaltyProfileRepoFake) ResolveCampaignRecipients(ctx context.Context, companyID, categoryID string) ([]dto.CampaignRecipientDTO, error) {
-	return nil, nil
+	return f.campaignRecipients, nil
 }
 
 func (f *loyaltyProfileRepoFake) GetAnalytics(ctx context.Context, companyID string) (*dto.CRMAnalyticsResponse, error) {
@@ -231,4 +232,38 @@ func TestLoyaltyUseCase_GetBalanceByCompany_Forbidden(t *testing.T) {
 	require.Error(t, err)
 	assert.Nil(t, out)
 	assert.Equal(t, domain.ErrForbidden, err)
+}
+
+func TestLoyaltyUseCase_ResolveCampaignRecipients_IncludesPhone(t *testing.T) {
+	profileRepo := &loyaltyProfileRepoFake{
+		campaignRecipients: []dto.CampaignRecipientDTO{
+			{
+				CustomerID: "cust-1",
+				Name:       "Cliente Uno",
+				Email:      "cliente1@test.com",
+				Phone:      "+573001112233",
+			},
+		},
+	}
+	customerRepo := &loyaltyCustomerRepoFake{customer: &entity.Customer{ID: "cust-1", CompanyID: "comp-1"}}
+	interactionRepo := &loyaltyInteractionRepoFake{events: []*entity.CRMInteraction{}}
+
+	uc := NewLoyaltyUseCase(
+		profileRepo,
+		customerRepo,
+		&loyaltyCategoryRepoFake{},
+		&loyaltyBenefitRepoFake{},
+		interactionRepo,
+	)
+
+	out, err := uc.ResolveCampaignRecipients(context.Background(), "comp-1", dto.ResolveCampaignRecipientsRequest{
+		Strategies: []dto.CampaignRecipientStrategy{
+			{Type: "category", CategoryID: "cat-1"},
+		},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, out)
+	require.Len(t, out.Recipients, 1)
+	assert.Equal(t, "+573001112233", out.Recipients[0].Phone)
+	assert.Equal(t, "category", out.Recipients[0].Segment)
 }

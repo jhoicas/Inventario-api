@@ -375,6 +375,7 @@ type CampaignRecipientDTO struct {
 	CustomerID string `json:"customer_id"`
 	Name       string `json:"name"`
 	Email      string `json:"email"`
+	Phone      string `json:"phone"`
 	Segment    string `json:"segment"`
 }
 

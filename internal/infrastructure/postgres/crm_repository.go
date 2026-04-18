@@ -368,7 +368,7 @@ func (r *CRMProfileRepo) ResolveCampaignRecipients(ctx context.Context, companyI
 	)
 	if strings.TrimSpace(categoryID) == "" {
 		query = `
-			SELECT c.id, COALESCE(c.name, '') AS name, COALESCE(c.email, '') AS email
+			SELECT c.id, COALESCE(c.name, '') AS name, COALESCE(c.email, '') AS email, COALESCE(c.phone, '') AS phone
 			FROM customers c
 			WHERE c.company_id = $1
 			  AND c.is_active = true
@@ -377,7 +377,7 @@ func (r *CRMProfileRepo) ResolveCampaignRecipients(ctx context.Context, companyI
 		args = []any{companyID}
 	} else {
 		query = `
-			SELECT c.id, COALESCE(c.name, '') AS name, COALESCE(c.email, '') AS email
+			SELECT c.id, COALESCE(c.name, '') AS name, COALESCE(c.email, '') AS email, COALESCE(c.phone, '') AS phone
 			FROM customers c
 			WHERE c.company_id = $1
 			  AND c.is_active = true
@@ -402,7 +402,7 @@ func (r *CRMProfileRepo) ResolveCampaignRecipients(ctx context.Context, companyI
 	recipients := make([]dto.CampaignRecipientDTO, 0)
 	for rows.Next() {
 		var item dto.CampaignRecipientDTO
-		if err := rows.Scan(&item.CustomerID, &item.Name, &item.Email); err != nil {
+		if err := rows.Scan(&item.CustomerID, &item.Name, &item.Email, &item.Phone); err != nil {
 			return nil, fmt.Errorf("scan campaign recipient: %w", err)
 		}
 		recipients = append(recipients, item)
@@ -1812,7 +1812,7 @@ func (r *CRMCampaignRepo) ListByCompany(ctx context.Context, companyID string, l
 		WHERE company_id = $1
 		ORDER BY created_at DESC
 		LIMIT $2 OFFSET $3`
-	
+
 	rows, err := r.q.Query(ctx, query, companyID, limit, offset)
 	if err != nil {
 		return nil, 0, err
