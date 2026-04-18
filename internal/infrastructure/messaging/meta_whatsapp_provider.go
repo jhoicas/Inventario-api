@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 )
@@ -62,8 +63,9 @@ func (p *MetaWhatsAppProvider) Send(ctx context.Context, to string, content stri
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("respuesta de error de Meta API: %d", resp.StatusCode)
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("error de Meta API (Status %d): %s", resp.StatusCode, string(respBody))
 	}
 
 	return nil
