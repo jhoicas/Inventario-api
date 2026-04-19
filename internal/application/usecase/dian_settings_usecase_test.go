@@ -39,8 +39,11 @@ func (f *fakeCompanyRepoForDIANSettings) Update(company *entity.Company) error {
 	f.updated = &clone
 	return nil
 }
-func (f *fakeCompanyRepoForDIANSettings) List(limit, offset int) ([]*entity.Company, error) {
-	return nil, nil
+func (f *fakeCompanyRepoForDIANSettings) List(limit, offset int) ([]*entity.Company, int64, error) {
+	return nil, 0, nil
+}
+func (f *fakeCompanyRepoForDIANSettings) ListForAdmin(limit, offset int) ([]*entity.Company, int64, error) {
+	return nil, 0, nil
 }
 func (f *fakeCompanyRepoForDIANSettings) Delete(id string) error { return nil }
 func (f *fakeCompanyRepoForDIANSettings) ListModules(ctx context.Context, companyID string) ([]*entity.CompanyModule, error) {
@@ -57,6 +60,24 @@ func (f *fakeCompanyRepoForDIANSettings) DeleteModule(ctx context.Context, compa
 }
 func (f *fakeCompanyRepoForDIANSettings) HasActiveModule(ctx context.Context, companyID, moduleName string) (bool, error) {
 	return true, nil
+}
+func (f *fakeCompanyRepoForDIANSettings) HasActiveScreen(ctx context.Context, companyID, screenID string) (bool, error) {
+	return true, nil
+}
+func (f *fakeCompanyRepoForDIANSettings) ListScreens(ctx context.Context, companyID string) ([]*entity.CompanyScreen, error) {
+	return []*entity.CompanyScreen{}, nil
+}
+func (f *fakeCompanyRepoForDIANSettings) GetScreen(ctx context.Context, companyID, screenID string) (*entity.CompanyScreen, error) {
+	return nil, nil
+}
+func (f *fakeCompanyRepoForDIANSettings) UpsertScreen(ctx context.Context, screen *entity.CompanyScreen) error {
+	return nil
+}
+func (f *fakeCompanyRepoForDIANSettings) ReplaceScreens(ctx context.Context, companyID string, screenIDs []string) error {
+	return nil
+}
+func (f *fakeCompanyRepoForDIANSettings) DeleteScreen(ctx context.Context, companyID, screenID string) error {
+	return nil
 }
 
 type fakeDIANSettingsRepoForUseCase struct {

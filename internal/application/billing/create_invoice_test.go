@@ -103,7 +103,8 @@ type fakeCustomerRepo struct {
 	getByIDFunc              func(id string) (*entity.Customer, error)
 	createFunc               func(customer *entity.Customer) error
 	getByCompanyAndTaxIDFunc func(companyID, taxID string) (*entity.Customer, error)
-	listByCompanyFunc        func(companyID string, limit, offset int) ([]*entity.Customer, error)
+	getByCompanyAndEmailFunc func(companyID, email string) (*entity.Customer, error)
+	listByCompanyFunc        func(companyID string, limit, offset int) ([]*entity.Customer, int64, error)
 	updateFunc               func(customer *entity.Customer) error
 	deleteFunc               func(id string) error
 	setActiveFunc            func(companyID, id string, isActive bool) error
@@ -127,12 +128,18 @@ func (f *fakeCustomerRepo) GetByCompanyAndTaxID(companyID, taxID string) (*entit
 	}
 	return nil, nil
 }
-func (f *fakeCustomerRepo) ListByCompany(companyID string, search string, limit, offset int) ([]*entity.Customer, error) {
+func (f *fakeCustomerRepo) GetByCompanyAndEmail(companyID, email string) (*entity.Customer, error) {
+	if f.getByCompanyAndEmailFunc != nil {
+		return f.getByCompanyAndEmailFunc(companyID, email)
+	}
+	return nil, nil
+}
+func (f *fakeCustomerRepo) ListByCompany(companyID string, search string, limit, offset int) ([]*entity.Customer, int64, error) {
 	if f.listByCompanyFunc != nil {
 		// tests existentes no usan search; se ignora en el fake
 		return f.listByCompanyFunc(companyID, limit, offset)
 	}
-	return nil, nil
+	return nil, 0, nil
 }
 func (f *fakeCustomerRepo) Update(customer *entity.Customer) error {
 	if f.updateFunc != nil {
@@ -164,7 +171,8 @@ type fakeCompanyRepo struct {
 	createFunc          func(company *entity.Company) error
 	getByNITFunc        func(nit string) (*entity.Company, error)
 	updateFunc          func(company *entity.Company) error
-	listFunc            func(limit, offset int) ([]*entity.Company, error)
+	listFunc            func(limit, offset int) ([]*entity.Company, int64, error)
+	listForAdminFunc    func(limit, offset int) ([]*entity.Company, int64, error)
 	deleteFunc          func(id string) error
 }
 
@@ -198,16 +206,52 @@ func (f *fakeCompanyRepo) Update(company *entity.Company) error {
 	}
 	return nil
 }
-func (f *fakeCompanyRepo) List(limit, offset int) ([]*entity.Company, error) {
+func (f *fakeCompanyRepo) List(limit, offset int) ([]*entity.Company, int64, error) {
 	if f.listFunc != nil {
 		return f.listFunc(limit, offset)
 	}
-	return nil, nil
+	return nil, 0, nil
+}
+func (f *fakeCompanyRepo) ListForAdmin(limit, offset int) ([]*entity.Company, int64, error) {
+	if f.listForAdminFunc != nil {
+		return f.listForAdminFunc(limit, offset)
+	}
+	return nil, 0, nil
 }
 func (f *fakeCompanyRepo) Delete(id string) error {
 	if f.deleteFunc != nil {
 		return f.deleteFunc(id)
 	}
+	return nil
+}
+func (f *fakeCompanyRepo) ListModules(ctx context.Context, companyID string) ([]*entity.CompanyModule, error) {
+	return []*entity.CompanyModule{}, nil
+}
+func (f *fakeCompanyRepo) GetModule(ctx context.Context, companyID, moduleName string) (*entity.CompanyModule, error) {
+	return nil, nil
+}
+func (f *fakeCompanyRepo) UpsertModule(ctx context.Context, module *entity.CompanyModule) error {
+	return nil
+}
+func (f *fakeCompanyRepo) DeleteModule(ctx context.Context, companyID, moduleName string) error {
+	return nil
+}
+func (f *fakeCompanyRepo) HasActiveScreen(ctx context.Context, companyID, screenID string) (bool, error) {
+	return true, nil
+}
+func (f *fakeCompanyRepo) ListScreens(ctx context.Context, companyID string) ([]*entity.CompanyScreen, error) {
+	return []*entity.CompanyScreen{}, nil
+}
+func (f *fakeCompanyRepo) GetScreen(ctx context.Context, companyID, screenID string) (*entity.CompanyScreen, error) {
+	return nil, nil
+}
+func (f *fakeCompanyRepo) UpsertScreen(ctx context.Context, screen *entity.CompanyScreen) error {
+	return nil
+}
+func (f *fakeCompanyRepo) ReplaceScreens(ctx context.Context, companyID string, screenIDs []string) error {
+	return nil
+}
+func (f *fakeCompanyRepo) DeleteScreen(ctx context.Context, companyID, screenID string) error {
 	return nil
 }
 
@@ -276,7 +320,7 @@ type fakeWarehouseRepo struct {
 	getByIDFunc       func(id string) (*entity.Warehouse, error)
 	createFunc        func(warehouse *entity.Warehouse) error
 	updateFunc        func(warehouse *entity.Warehouse) error
-	listByCompanyFunc func(companyID string, limit, offset int) ([]*entity.Warehouse, error)
+	listByCompanyFunc func(companyID string, limit, offset int) ([]*entity.Warehouse, int64, error)
 	deleteFunc        func(id string) error
 }
 
@@ -298,11 +342,11 @@ func (f *fakeWarehouseRepo) Update(warehouse *entity.Warehouse) error {
 	}
 	return nil
 }
-func (f *fakeWarehouseRepo) ListByCompany(companyID string, limit, offset int) ([]*entity.Warehouse, error) {
+func (f *fakeWarehouseRepo) ListByCompany(companyID string, limit, offset int) ([]*entity.Warehouse, int64, error) {
 	if f.listByCompanyFunc != nil {
 		return f.listByCompanyFunc(companyID, limit, offset)
 	}
-	return nil, nil
+	return nil, 0, nil
 }
 func (f *fakeWarehouseRepo) Delete(id string) error {
 	if f.deleteFunc != nil {

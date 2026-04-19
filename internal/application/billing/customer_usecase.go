@@ -1,6 +1,7 @@
 package billing
 
 import (
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -29,6 +30,10 @@ func (uc *CustomerUseCase) Create(companyID string, in dto.CreateCustomerRequest
 	if in.Name == "" || in.TaxID == "" {
 		return nil, domain.ErrInvalidInput
 	}
+	birthDate, err := parseBirthDateInput(in.BirthDate)
+	if err != nil {
+		return nil, domain.ErrInvalidInput
+	}
 	existing, _ := uc.repo.GetByCompanyAndTaxID(companyID, in.TaxID)
 	if existing != nil {
 		return nil, domain.ErrDuplicate
@@ -41,6 +46,7 @@ func (uc *CustomerUseCase) Create(companyID string, in dto.CreateCustomerRequest
 		TaxID:     in.TaxID,
 		Email:     in.Email,
 		Phone:     in.Phone,
+		BirthDate: birthDate,
 		IsActive:  true,
 		CreatedAt: now,
 		UpdatedAt: now,
@@ -55,6 +61,7 @@ func (uc *CustomerUseCase) Create(companyID string, in dto.CreateCustomerRequest
 		TaxID:        customer.TaxID,
 		Email:        customer.Email,
 		Phone:        customer.Phone,
+		BirthDate:    formatBirthDateOutput(customer.BirthDate),
 		LTV:          customer.LTV,
 		CategoryName: customer.CategoryName,
 	}, nil
@@ -110,6 +117,7 @@ func (uc *CustomerUseCase) ListWithFilters(companyID string, filters dto.Custome
 			TaxID:        c.TaxID,
 			Email:        c.Email,
 			Phone:        c.Phone,
+			BirthDate:    formatBirthDateOutput(c.BirthDate),
 			LTV:          c.LTV,
 			CategoryName: c.CategoryName,
 		})
@@ -138,6 +146,10 @@ func (uc *CustomerUseCase) Update(companyID, customerID string, in dto.UpdateCus
 	if customerID == "" || in.Name == "" || in.TaxID == "" {
 		return nil, domain.ErrInvalidInput
 	}
+	birthDate, err := parseBirthDateInput(in.BirthDate)
+	if err != nil {
+		return nil, domain.ErrInvalidInput
+	}
 	current, err := uc.repo.GetByID(customerID)
 	if err != nil {
 		return nil, err
@@ -161,6 +173,7 @@ func (uc *CustomerUseCase) Update(companyID, customerID string, in dto.UpdateCus
 	current.TaxID = in.TaxID
 	current.Email = in.Email
 	current.Phone = in.Phone
+	current.BirthDate = birthDate
 	current.UpdatedAt = time.Now()
 	if err := uc.repo.Update(current); err != nil {
 		return nil, err
@@ -172,7 +185,32 @@ func (uc *CustomerUseCase) Update(companyID, customerID string, in dto.UpdateCus
 		TaxID:        current.TaxID,
 		Email:        current.Email,
 		Phone:        current.Phone,
+		BirthDate:    formatBirthDateOutput(current.BirthDate),
 		LTV:          current.LTV,
 		CategoryName: current.CategoryName,
 	}, nil
+}
+
+func parseBirthDateInput(input *string) (*time.Time, error) {
+	if input == nil {
+		return nil, nil
+	}
+	raw := strings.TrimSpace(*input)
+	if raw == "" {
+		return nil, nil
+	}
+	parsed, err := time.Parse("2006-01-02", raw)
+	if err != nil {
+		return nil, err
+	}
+	result := time.Date(parsed.Year(), parsed.Month(), parsed.Day(), 0, 0, 0, 0, time.UTC)
+	return &result, nil
+}
+
+func formatBirthDateOutput(value *time.Time) *string {
+	if value == nil {
+		return nil
+	}
+	formatted := value.UTC().Format("2006-01-02")
+	return &formatted
 }

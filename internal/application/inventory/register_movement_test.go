@@ -111,7 +111,7 @@ type fakeWarehouseRepo struct {
 	getByIDFunc       func(id string) (*entity.Warehouse, error)
 	createFunc        func(warehouse *entity.Warehouse) error
 	updateFunc        func(warehouse *entity.Warehouse) error
-	listByCompanyFunc func(companyID string, limit, offset int) ([]*entity.Warehouse, error)
+	listByCompanyFunc func(companyID string, limit, offset int) ([]*entity.Warehouse, int64, error)
 	deleteFunc        func(id string) error
 }
 
@@ -133,11 +133,11 @@ func (f *fakeWarehouseRepo) Update(warehouse *entity.Warehouse) error {
 	}
 	return nil
 }
-func (f *fakeWarehouseRepo) ListByCompany(companyID string, limit, offset int) ([]*entity.Warehouse, error) {
+func (f *fakeWarehouseRepo) ListByCompany(companyID string, limit, offset int) ([]*entity.Warehouse, int64, error) {
 	if f.listByCompanyFunc != nil {
 		return f.listByCompanyFunc(companyID, limit, offset)
 	}
-	return nil, nil
+	return nil, 0, nil
 }
 func (f *fakeWarehouseRepo) Delete(id string) error {
 	if f.deleteFunc != nil {

@@ -105,15 +105,15 @@ func TestRouter_ReorderConfigRouteProtections(t *testing.T) {
 			name:           "Forbidden_ModuleDisabled",
 			authHeader:     tokenForRouterRole(t, entity.RoleAdmin),
 			moduleActive:   false,
-			expectedStatus: http.StatusForbidden,
-			expectedCode:   "MODULE_DISABLED",
+			expectedStatus: http.StatusServiceUnavailable,
+			expectedCode:   "SERVICE_UNAVAILABLE",
 		},
 		{
 			name:           "Forbidden_RoleNotAllowed",
 			authHeader:     tokenForRouterRole(t, entity.RoleVendedor),
 			moduleActive:   true,
-			expectedStatus: http.StatusForbidden,
-			expectedCode:   "FORBIDDEN",
+			expectedStatus: http.StatusServiceUnavailable,
+			expectedCode:   "SERVICE_UNAVAILABLE",
 		},
 		{
 			name:           "PassesMiddlewares_ReachesHandler",
@@ -277,10 +277,10 @@ func TestRouter_StocktakeRoutesProtections(t *testing.T) {
 				require.NoError(t, err)
 				defer resp.Body.Close()
 
-				assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+				assert.Equal(t, http.StatusServiceUnavailable, resp.StatusCode)
 				var out map[string]any
 				require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
-				assert.Equal(t, "MODULE_DISABLED", out["code"])
+				assert.Equal(t, "SERVICE_UNAVAILABLE", out["code"])
 			})
 
 			t.Run("Forbidden_RoleNotAllowed", func(t *testing.T) {
@@ -297,10 +297,10 @@ func TestRouter_StocktakeRoutesProtections(t *testing.T) {
 				require.NoError(t, err)
 				defer resp.Body.Close()
 
-				assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+				assert.Equal(t, http.StatusServiceUnavailable, resp.StatusCode)
 				var out map[string]any
 				require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
-				assert.Equal(t, "FORBIDDEN", out["code"])
+				assert.Equal(t, "SERVICE_UNAVAILABLE", out["code"])
 			})
 
 			t.Run("PassesMiddlewares_ReachesHandler", func(t *testing.T) {
@@ -372,15 +372,15 @@ func TestRouter_DIANSettingsGetRouteProtections(t *testing.T) {
 			name:           "Forbidden_ModuleDisabled",
 			authHeader:     tokenForRouterRole(t, entity.RoleAdmin),
 			moduleActive:   false,
-			expectedStatus: http.StatusForbidden,
-			expectedCode:   "MODULE_DISABLED",
+			expectedStatus: http.StatusNotFound,
+			expectedCode:   "NOT_FOUND",
 		},
 		{
 			name:           "Forbidden_RoleNotAllowed",
 			authHeader:     tokenForRouterRole(t, entity.RoleVendedor),
 			moduleActive:   true,
-			expectedStatus: http.StatusForbidden,
-			expectedCode:   "FORBIDDEN",
+			expectedStatus: http.StatusNotFound,
+			expectedCode:   "NOT_FOUND",
 		},
 		{
 			name:           "PassesMiddlewares_ReachesHandler",

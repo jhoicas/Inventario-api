@@ -4,10 +4,11 @@ import "github.com/shopspring/decimal"
 
 // CreateCustomerRequest body para POST /api/customers.
 type CreateCustomerRequest struct {
-	Name  string `json:"name"`
-	TaxID string `json:"tax_id"`
-	Email string `json:"email,omitempty"`
-	Phone string `json:"phone,omitempty"`
+	Name      string  `json:"name"`
+	TaxID     string  `json:"tax_id"`
+	Email     string  `json:"email,omitempty"`
+	Phone     string  `json:"phone,omitempty"`
+	BirthDate *string `json:"birth_date,omitempty"`
 }
 
 // CustomerResponse cliente en respuestas.
@@ -18,6 +19,7 @@ type CustomerResponse struct {
 	TaxID        string          `json:"tax_id"`
 	Email        string          `json:"email,omitempty"`
 	Phone        string          `json:"phone,omitempty"`
+	BirthDate    *string         `json:"birth_date,omitempty"`
 	LTV          decimal.Decimal `json:"ltv"`
 	CategoryName string          `json:"category_name,omitempty"`
 }
@@ -42,10 +44,11 @@ type CustomerListFilters struct {
 
 // UpdateCustomerRequest body para actualizar un cliente.
 type UpdateCustomerRequest struct {
-	Name  string `json:"name"`
-	TaxID string `json:"tax_id"`
-	Email string `json:"email"`
-	Phone string `json:"phone"`
+	Name      string  `json:"name"`
+	TaxID     string  `json:"tax_id"`
+	Email     string  `json:"email"`
+	Phone     string  `json:"phone"`
+	BirthDate *string `json:"birth_date,omitempty"`
 }
 
 // CreateInvoiceRequest body para POST /api/invoices.
