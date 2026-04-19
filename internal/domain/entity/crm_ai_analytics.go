@@ -11,10 +11,11 @@ type ProductHub struct {
 	CompanyID   string
 	ProductCode string
 	ProductName string
-	Category    *string
-	UnitCost    *float64
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	// CategoryID referencia crm_categories.id (nullable).
+	CategoryID *string
+	UnitCost   *float64
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
 }
 
 // SaleHub represents a sales transaction aggregated for analytics with customer email linkage.

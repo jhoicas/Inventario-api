@@ -7,6 +7,18 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
+// nullableUUIDArg devuelve el UUID como string para pgx o nil si el puntero está vacío.
+func nullableUUIDArg(id *string) any {
+	if id == nil {
+		return nil
+	}
+	s := strings.TrimSpace(*id)
+	if s == "" {
+		return nil
+	}
+	return s
+}
+
 // isUniqueViolation verifica si un error es una violación de constraint único (23505).
 func isUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError

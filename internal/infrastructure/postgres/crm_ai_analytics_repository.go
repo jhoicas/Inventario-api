@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strings"
 	"time"
@@ -40,11 +41,11 @@ func (r *CRMProductHubRepository) CreateBatch(ctx context.Context, products []*e
 
 		for _, p := range chunk {
 			values = append(values, fmt.Sprintf("($%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d)", argPos, argPos+1, argPos+2, argPos+3, argPos+4, argPos+5, argPos+6, argPos+7))
-			args = append(args, p.ID, p.CompanyID, p.ProductCode, p.ProductName, p.Category, p.UnitCost, p.CreatedAt, p.UpdatedAt)
+			args = append(args, p.ID, p.CompanyID, p.ProductCode, p.ProductName, nullableUUIDArg(p.CategoryID), p.UnitCost, p.CreatedAt, p.UpdatedAt)
 			argPos += 8
 		}
 
-		query := `INSERT INTO crm_products_hub (id, company_id, product_code, product_name, category, unit_cost, created_at, updated_at)
+		query := `INSERT INTO crm_products_hub (id, company_id, product_code, product_name, category_id, unit_cost, created_at, updated_at)
 		 VALUES ` + strings.Join(values, ",") + `
 		 ON CONFLICT (company_id, product_code) DO NOTHING`
 
@@ -59,16 +60,20 @@ func (r *CRMProductHubRepository) CreateBatch(ctx context.Context, products []*e
 // GetByCompanyAndCode busca producto por codigo.
 func (r *CRMProductHubRepository) GetByCompanyAndCode(ctx context.Context, companyID, productCode string) (*entity.ProductHub, error) {
 	row := r.pool.QueryRow(ctx,
-		`SELECT id, company_id, product_code, product_name, category, unit_cost, created_at, updated_at
+		`SELECT id, company_id, product_code, product_name, category_id, unit_cost, created_at, updated_at
 		 FROM crm_products_hub
 		 WHERE company_id = $1 AND product_code = $2`,
 		companyID, productCode,
 	)
 
 	var p entity.ProductHub
-	err := row.Scan(&p.ID, &p.CompanyID, &p.ProductCode, &p.ProductName, &p.Category, &p.UnitCost, &p.CreatedAt, &p.UpdatedAt)
-	if err != nil {
+	var catID sql.NullString
+	if err := row.Scan(&p.ID, &p.CompanyID, &p.ProductCode, &p.ProductName, &catID, &p.UnitCost, &p.CreatedAt, &p.UpdatedAt); err != nil {
 		return nil, fmt.Errorf("buscar producto hub: %w", err)
+	}
+	if catID.Valid {
+		s := catID.String
+		p.CategoryID = &s
 	}
 	return &p, nil
 }
@@ -76,7 +81,7 @@ func (r *CRMProductHubRepository) GetByCompanyAndCode(ctx context.Context, compa
 // ListByCompany lista todos los productos de una empresa.
 func (r *CRMProductHubRepository) ListByCompany(ctx context.Context, companyID string) ([]*entity.ProductHub, error) {
 	rows, err := r.pool.Query(ctx,
-		`SELECT id, company_id, product_code, product_name, category, unit_cost, created_at, updated_at
+		`SELECT id, company_id, product_code, product_name, category_id, unit_cost, created_at, updated_at
 		 FROM crm_products_hub
 		 WHERE company_id = $1
 		 ORDER BY product_code`,
@@ -90,9 +95,13 @@ func (r *CRMProductHubRepository) ListByCompany(ctx context.Context, companyID s
 	var products []*entity.ProductHub
 	for rows.Next() {
 		var p entity.ProductHub
-		err := rows.Scan(&p.ID, &p.CompanyID, &p.ProductCode, &p.ProductName, &p.Category, &p.UnitCost, &p.CreatedAt, &p.UpdatedAt)
-		if err != nil {
+		var catID sql.NullString
+		if err := rows.Scan(&p.ID, &p.CompanyID, &p.ProductCode, &p.ProductName, &catID, &p.UnitCost, &p.CreatedAt, &p.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan producto hub: %w", err)
+		}
+		if catID.Valid {
+			s := catID.String
+			p.CategoryID = &s
 		}
 		products = append(products, &p)
 	}
@@ -102,11 +111,11 @@ func (r *CRMProductHubRepository) ListByCompany(ctx context.Context, companyID s
 // Upsert inserta o actualiza un producto.
 func (r *CRMProductHubRepository) Upsert(ctx context.Context, p *entity.ProductHub) error {
 	_, err := r.pool.Exec(ctx,
-		`INSERT INTO crm_products_hub (id, company_id, product_code, product_name, category, unit_cost, created_at, updated_at)
+		`INSERT INTO crm_products_hub (id, company_id, product_code, product_name, category_id, unit_cost, created_at, updated_at)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		 ON CONFLICT (company_id, product_code) 
-		 DO UPDATE SET product_name = $4, category = $5, unit_cost = $6, updated_at = $8`,
-		p.ID, p.CompanyID, p.ProductCode, p.ProductName, p.Category, p.UnitCost, p.CreatedAt, p.UpdatedAt,
+		 DO UPDATE SET product_name = $4, category_id = $5, unit_cost = $6, updated_at = $8`,
+		p.ID, p.CompanyID, p.ProductCode, p.ProductName, nullableUUIDArg(p.CategoryID), p.UnitCost, p.CreatedAt, p.UpdatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("upsert producto hub: %w", err)

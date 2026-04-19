@@ -1161,7 +1161,7 @@ func (uc *ImportUseCase) importSingleSalesOrder(
 			result.CreatedCategories++
 		}
 
-		productID, createdProduct, err := upsertProductHubTx(ctx, tx, companyID, item.ProductCode, item.ProductName, normCat)
+		productID, createdProduct, err := upsertProductHubTx(ctx, tx, companyID, item.ProductCode, item.ProductName, categoryID)
 		if err != nil {
 			return nil, err
 		}
@@ -1320,19 +1320,25 @@ func isPGUniqueViolation(err error) bool {
 	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
 
-func upsertProductHubTx(ctx context.Context, tx pgx.Tx, companyID, productCode, productName, categoryName string) (string, bool, error) {
+func upsertProductHubTx(ctx context.Context, tx pgx.Tx, companyID, productCode, productName, categoryID string) (string, bool, error) {
 	productCode = strings.TrimSpace(productCode)
 	productName = strings.TrimSpace(productName)
-	categoryName = strings.ToUpper(strings.TrimSpace(categoryName))
+	categoryID = strings.TrimSpace(categoryID)
 	if productCode == "" || productName == "" {
 		return "", false, domain.ErrInvalidInput
+	}
+	var categoryArg interface{}
+	if categoryID != "" {
+		categoryArg = categoryID
+	} else {
+		categoryArg = nil
 	}
 	var existingID string
 	if err := tx.QueryRow(ctx, `SELECT id FROM crm_products_hub WHERE company_id = $1 AND product_code = $2`, companyID, productCode).Scan(&existingID); err == nil && existingID != "" {
 		_, err := tx.Exec(ctx, `
 			UPDATE crm_products_hub
-			SET product_name = $2, category = NULLIF($3, ''), updated_at = now()
-			WHERE id = $1`, existingID, productName, categoryName)
+			SET product_name = $2, category_id = $3, updated_at = now()
+			WHERE id = $1`, existingID, productName, categoryArg)
 		if err != nil {
 			return "", false, fmt.Errorf("touch product hub: %w", err)
 		}
@@ -1340,13 +1346,13 @@ func upsertProductHubTx(ctx context.Context, tx pgx.Tx, companyID, productCode, 
 	}
 	var id string
 	err := tx.QueryRow(ctx, `
-		INSERT INTO crm_products_hub (id, company_id, product_code, product_name, category, created_at, updated_at)
-		VALUES (gen_random_uuid(), $1, $2, $3, NULLIF($4, ''), now(), now())
+		INSERT INTO crm_products_hub (id, company_id, product_code, product_name, category_id, created_at, updated_at)
+		VALUES (gen_random_uuid(), $1, $2, $3, $4, now(), now())
 		ON CONFLICT (company_id, product_code) DO UPDATE SET
 			product_name = EXCLUDED.product_name,
-			category = EXCLUDED.category,
+			category_id = EXCLUDED.category_id,
 			updated_at = EXCLUDED.updated_at
-		RETURNING id`, companyID, productCode, productName, categoryName).Scan(&id)
+		RETURNING id`, companyID, productCode, productName, categoryArg).Scan(&id)
 	if err != nil {
 		return "", false, fmt.Errorf("upsert product hub: %w", err)
 	}

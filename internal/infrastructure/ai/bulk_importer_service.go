@@ -194,7 +194,7 @@ func (s *BulkImporterService) processBatch(
 }
 
 // processProductsBatch importa productos y crea los que falten.
-// Columnas esperadas: product_code, product_name, category, unit_cost
+// Columnas esperadas: product_code, product_name, category (UUID de crm_categories), unit_cost
 func (s *BulkImporterService) processProductsBatch(
 	ctx context.Context,
 	companyID string,
@@ -222,7 +222,7 @@ func (s *BulkImporterService) processProductsBatch(
 			// Upsert si ya existe
 			cost, _ := parseFloat(record["unit_cost"])
 			existing.ProductName = name
-			existing.Category = stringPtr(record["category"])
+			existing.CategoryID = categoryUUIDPtr(record["category"])
 			existing.UnitCost = cost
 			existing.UpdatedAt = time.Now()
 			s.productRepo.Upsert(ctx, existing)
@@ -235,7 +235,7 @@ func (s *BulkImporterService) processProductsBatch(
 			CompanyID:   companyID,
 			ProductCode: code,
 			ProductName: name,
-			Category:    stringPtr(record["category"]),
+			CategoryID:  categoryUUIDPtr(record["category"]),
 			UnitCost:    cost,
 			CreatedAt:   time.Now(),
 			UpdatedAt:   time.Now(),
@@ -397,6 +397,18 @@ func (s *BulkImporterService) ValidateImportData(
 // Helper functions
 func stringPtr(s string) *string {
 	if s == "" {
+		return nil
+	}
+	return &s
+}
+
+// categoryUUIDPtr interpreta la columna category como UUID de crm_categories; otros valores se ignoran (nil).
+func categoryUUIDPtr(s string) *string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil
+	}
+	if _, err := uuid.Parse(s); err != nil {
 		return nil
 	}
 	return &s
