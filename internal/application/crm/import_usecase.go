@@ -20,6 +20,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jhoicas/Inventario-api/internal/application/dto"
 	"github.com/jhoicas/Inventario-api/internal/domain"
 	"github.com/jhoicas/Inventario-api/internal/domain/entity"
@@ -1292,12 +1293,31 @@ func upsertCategoryHubTx(ctx context.Context, tx pgx.Tx, companyID, categoryName
 	err = tx.QueryRow(ctx, `
 		INSERT INTO crm_categories (id, company_id, name, created_at, updated_at)
 		VALUES (gen_random_uuid(), $1, $2, now(), now())
-		ON CONFLICT (company_id, name) DO UPDATE SET updated_at = EXCLUDED.updated_at
 		RETURNING id`, companyID, categoryName).Scan(&id)
 	if err != nil {
+		if isPGUniqueViolation(err) {
+			// Carrera u otra sesión insertó la misma fila antes de que existiera el SELECT previo.
+			var conflictID string
+			err2 := tx.QueryRow(ctx, `
+				SELECT id FROM crm_categories
+				WHERE company_id = $1 AND TRIM(name) ILIKE $2
+				LIMIT 1`, companyID, categoryName).Scan(&conflictID)
+			if err2 == nil && conflictID != "" {
+				_, _ = tx.Exec(ctx, `UPDATE crm_categories SET updated_at = now() WHERE id = $1`, conflictID)
+				return conflictID, false, nil
+			}
+			if err2 != nil && !errors.Is(err2, pgx.ErrNoRows) {
+				return "", false, fmt.Errorf("upsert category hub after unique violation: %w", err2)
+			}
+		}
 		return "", false, fmt.Errorf("upsert category hub: %w", err)
 	}
 	return id, true, nil
+}
+
+func isPGUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
 
 func upsertProductHubTx(ctx context.Context, tx pgx.Tx, companyID, productCode, productName, categoryName string) (string, bool, error) {

@@ -275,6 +275,7 @@ func (uc *LoyaltyUseCase) GetProfile360(ctx context.Context, companyID, customer
 			TaxID:     p360.Customer.TaxID,
 			Email:     p360.Customer.Email,
 			Phone:     p360.Customer.Phone,
+			BirthDate: formatBirthDateYYYYMMDDPtr(p360.Customer.BirthDate),
 		},
 		ProfileID:  p360.ProfileID,
 		CategoryID: p360.CategoryID,
@@ -548,4 +549,12 @@ func (uc *LoyaltyUseCase) DeactivateBenefit(ctx context.Context, companyID, bene
 		return domain.ErrForbidden
 	}
 	return uc.benefitRepo.SetActive(companyID, benefitID, false)
+}
+
+func formatBirthDateYYYYMMDDPtr(t *time.Time) *string {
+	if t == nil {
+		return nil
+	}
+	s := t.UTC().Format("2006-01-02")
+	return &s
 }
