@@ -1,6 +1,10 @@
 package crm
 
 import (
+	"context"
+	"fmt"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -8,7 +12,62 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/jhoicas/Inventario-api/internal/application/dto"
+	"github.com/jhoicas/Inventario-api/internal/domain/entity"
+	"github.com/jhoicas/Inventario-api/internal/domain/repository"
 )
+
+// countingCategoryRepo cuenta llamadas a GetOrCreateCategoryByName (tests de concurrencia).
+type countingCategoryRepo struct {
+	getOrCreateCalls atomic.Int32
+}
+
+func (c *countingCategoryRepo) Create(_ *entity.CRMCategory) error { return nil }
+
+func (c *countingCategoryRepo) GetByID(_ string) (*entity.CRMCategory, error) { return nil, nil }
+
+func (c *countingCategoryRepo) GetOrCreateCategoryByName(_, _ string) (string, error) {
+	c.getOrCreateCalls.Add(1)
+	return "00000000-0000-0000-0000-0000000000aa", nil
+}
+
+func (c *countingCategoryRepo) ListByCompany(_ string, _, _ int) ([]*entity.CRMCategory, int64, error) {
+	return nil, 0, nil
+}
+
+func (c *countingCategoryRepo) Update(_ *entity.CRMCategory) error { return nil }
+
+func (c *countingCategoryRepo) Delete(_ string) error { return nil }
+
+func (c *countingCategoryRepo) SetActive(_, _ string, _ bool, _ time.Time) error { return nil }
+
+var _ repository.CRMCategoryRepository = (*countingCategoryRepo)(nil)
+
+// importConcurrentCustomerRepo devuelve siempre "sin cliente" para forzar creación con email único por test.
+type importConcurrentCustomerRepo struct{}
+
+func (importConcurrentCustomerRepo) GetByCompanyAndEmail(_, _ string) (*entity.Customer, error) {
+	return nil, nil
+}
+
+func (importConcurrentCustomerRepo) Create(_ *entity.Customer) error { return nil }
+
+func (importConcurrentCustomerRepo) GetByID(_ string) (*entity.Customer, error) { return nil, nil }
+
+func (importConcurrentCustomerRepo) GetByCompanyAndTaxID(_, _ string) (*entity.Customer, error) {
+	return nil, nil
+}
+
+func (importConcurrentCustomerRepo) ListByCompany(_ string, _ string, _, _ int) ([]*entity.Customer, int64, error) {
+	return nil, 0, nil
+}
+
+func (importConcurrentCustomerRepo) Update(_ *entity.Customer) error { return nil }
+
+func (importConcurrentCustomerRepo) Delete(_ string) error { return nil }
+
+func (importConcurrentCustomerRepo) SetActive(_, _ string, _ bool) error { return nil }
+
+var _ repository.CustomerRepository = (*importConcurrentCustomerRepo)(nil)
 
 func TestNormalizeImportEmail(t *testing.T) {
 	assert.Equal(t, "cliente@acme.com", normalizeImportEmail("  Cliente @ Acme.COM  "))
@@ -192,4 +251,42 @@ func TestImportJobProgress_TracksInsertedUpdatedSkippedAndFailed(t *testing.T) {
 	assert.Contains(t, progress.Rows[0].Errors, "create error")
 	assert.Equal(t, "skipped", progress.Rows[1].Action)
 	assert.Equal(t, "skipped", progress.Rows[2].Action)
+}
+
+func TestUpsertProfile_CategoryCacheConcurrent_CallsGetOrCreateOnce(t *testing.T) {
+	catRepo := &countingCategoryRepo{}
+	uc := NewImportUseCase(
+		nil,
+		&loyaltyProfileRepoFake{},
+		importConcurrentCustomerRepo{},
+		catRepo,
+		nil,
+		nil,
+	)
+
+	cache := make(map[string]string)
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	cats := []string{"vip", "VIP", " Vip "}
+	ctx := context.Background()
+
+	const n = 100
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			prof := dto.ImportCRMProfileRequest{
+				Name:         fmt.Sprintf("Usuario %d", i),
+				Email:        fmt.Sprintf("conc-%d@example.com", i),
+				Phone:        "+573001234567",
+				TaxID:        fmt.Sprintf("DOC%06d", i),
+				CategoryName: cats[i%3],
+			}
+			_, err := uc.upsertProfile(ctx, "company-1", "user-1", prof, cache, &mu)
+			require.NoError(t, err)
+		}(i)
+	}
+	wg.Wait()
+
+	assert.Equal(t, int32(1), catRepo.getOrCreateCalls.Load(), "GetOrCreateCategoryByName debe ejecutarse una sola vez con caché+mutex")
 }

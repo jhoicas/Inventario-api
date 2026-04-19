@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -956,9 +957,12 @@ func (uc *ImportUseCase) ImportSalesFromFile(ctx context.Context, companyID, use
 		return nil, err
 	}
 
+	categoryCache := make(map[string]string)
+	var categoryCacheMu sync.Mutex
+
 	resp := &dto.ImportSalesResponse{TotalOrders: len(orders)}
 	for _, order := range orders {
-		res, err := uc.importSingleSalesOrder(ctx, companyID, userID, order)
+		res, err := uc.importSingleSalesOrder(ctx, companyID, userID, order, categoryCache, &categoryCacheMu)
 		if err != nil {
 			resp.FailedOrders++
 			resp.Errors = append(resp.Errors, dto.ImportSalesError{OrderNumber: order.OrderNumber, Message: err.Error()})
@@ -1106,7 +1110,13 @@ func (uc *ImportUseCase) groupSalesImportRows(rows [][]string) ([]salesImportOrd
 	return orders, nil
 }
 
-func (uc *ImportUseCase) importSingleSalesOrder(ctx context.Context, companyID, userID string, order salesImportOrder) (*salesImportTxResult, error) {
+func (uc *ImportUseCase) importSingleSalesOrder(
+	ctx context.Context,
+	companyID, userID string,
+	order salesImportOrder,
+	categoryCache map[string]string,
+	categoryMu *sync.Mutex,
+) (*salesImportTxResult, error) {
 	tx, err := uc.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("begin sales import tx: %w", err)
@@ -1123,15 +1133,34 @@ func (uc *ImportUseCase) importSingleSalesOrder(ctx context.Context, companyID, 
 
 	snapshotItems := make([]salesSnapshotItem, 0, len(order.Items))
 	for _, item := range order.Items {
-		categoryID, createdCategory, err := upsertCategoryHubTx(ctx, tx, companyID, item.CategoryName)
-		if err != nil {
-			return nil, err
+		normCat := strings.ToUpper(strings.TrimSpace(item.CategoryName))
+		var categoryID string
+		var createdCategory bool
+		if normCat == "" {
+			categoryID = ""
+			createdCategory = false
+		} else {
+			categoryMu.Lock()
+			if cachedID, ok := categoryCache[normCat]; ok {
+				categoryID = cachedID
+				categoryMu.Unlock()
+				createdCategory = false
+			} else {
+				var err error
+				categoryID, createdCategory, err = upsertCategoryHubTx(ctx, tx, companyID, normCat)
+				if err != nil {
+					categoryMu.Unlock()
+					return nil, err
+				}
+				categoryCache[normCat] = categoryID
+				categoryMu.Unlock()
+			}
 		}
 		if createdCategory {
 			result.CreatedCategories++
 		}
 
-		productID, createdProduct, err := upsertProductHubTx(ctx, tx, companyID, item.ProductCode, item.ProductName, item.CategoryName)
+		productID, createdProduct, err := upsertProductHubTx(ctx, tx, companyID, item.ProductCode, item.ProductName, normCat)
 		if err != nil {
 			return nil, err
 		}
@@ -1143,7 +1172,7 @@ func (uc *ImportUseCase) importSingleSalesOrder(ctx context.Context, companyID, 
 			OrderNumber:  order.OrderNumber,
 			ProductCode:  item.ProductCode,
 			ProductName:  item.ProductName,
-			CategoryName: item.CategoryName,
+			CategoryName: normCat,
 			CategoryID:   categoryID,
 			ProductID:    productID,
 			Quantity:     item.Quantity,
@@ -1240,20 +1269,27 @@ func upsertCustomerFromImportTx(ctx context.Context, tx pgx.Tx, companyID, email
 }
 
 func upsertCategoryHubTx(ctx context.Context, tx pgx.Tx, companyID, categoryName string) (string, bool, error) {
-	categoryName = strings.TrimSpace(categoryName)
+	categoryName = strings.ToUpper(strings.TrimSpace(categoryName))
 	if categoryName == "" {
 		return "", false, nil
 	}
 	var existingID string
-	if err := tx.QueryRow(ctx, `SELECT id FROM crm_categories WHERE company_id = $1 AND name = $2`, companyID, categoryName).Scan(&existingID); err == nil && existingID != "" {
+	err := tx.QueryRow(ctx, `
+		SELECT id FROM crm_categories
+		WHERE company_id = $1 AND TRIM(name) ILIKE $2
+		LIMIT 1`, companyID, categoryName).Scan(&existingID)
+	if err == nil && existingID != "" {
 		_, err := tx.Exec(ctx, `UPDATE crm_categories SET updated_at = now() WHERE id = $1`, existingID)
 		if err != nil {
 			return "", false, fmt.Errorf("touch category hub: %w", err)
 		}
 		return existingID, false, nil
 	}
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return "", false, err
+	}
 	var id string
-	err := tx.QueryRow(ctx, `
+	err = tx.QueryRow(ctx, `
 		INSERT INTO crm_categories (id, company_id, name, created_at, updated_at)
 		VALUES (gen_random_uuid(), $1, $2, now(), now())
 		ON CONFLICT (company_id, name) DO UPDATE SET updated_at = EXCLUDED.updated_at
@@ -1267,6 +1303,7 @@ func upsertCategoryHubTx(ctx context.Context, tx pgx.Tx, companyID, categoryName
 func upsertProductHubTx(ctx context.Context, tx pgx.Tx, companyID, productCode, productName, categoryName string) (string, bool, error) {
 	productCode = strings.TrimSpace(productCode)
 	productName = strings.TrimSpace(productName)
+	categoryName = strings.ToUpper(strings.TrimSpace(categoryName))
 	if productCode == "" || productName == "" {
 		return "", false, domain.ErrInvalidInput
 	}
@@ -1275,7 +1312,7 @@ func upsertProductHubTx(ctx context.Context, tx pgx.Tx, companyID, productCode, 
 		_, err := tx.Exec(ctx, `
 			UPDATE crm_products_hub
 			SET product_name = $2, category = NULLIF($3, ''), updated_at = now()
-			WHERE id = $1`, existingID, productName, strings.TrimSpace(categoryName))
+			WHERE id = $1`, existingID, productName, categoryName)
 		if err != nil {
 			return "", false, fmt.Errorf("touch product hub: %w", err)
 		}
@@ -1289,7 +1326,7 @@ func upsertProductHubTx(ctx context.Context, tx pgx.Tx, companyID, productCode, 
 			product_name = EXCLUDED.product_name,
 			category = EXCLUDED.category,
 			updated_at = EXCLUDED.updated_at
-		RETURNING id`, companyID, productCode, productName, strings.TrimSpace(categoryName)).Scan(&id)
+		RETURNING id`, companyID, productCode, productName, categoryName).Scan(&id)
 	if err != nil {
 		return "", false, fmt.Errorf("upsert product hub: %w", err)
 	}

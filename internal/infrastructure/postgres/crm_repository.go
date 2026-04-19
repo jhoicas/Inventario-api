@@ -77,7 +77,7 @@ func (r *CRMCategoryRepo) GetOrCreateCategoryByName(companyID, name string) (str
 	err := r.q.QueryRow(context.Background(), `
 		SELECT id
 		FROM crm_categories
-		WHERE company_id = $1 AND name ILIKE $2
+		WHERE company_id = $1 AND TRIM(name) ILIKE $2
 		LIMIT 1`, companyID, name).Scan(&id)
 	if err == nil {
 		return id, nil
