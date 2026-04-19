@@ -138,12 +138,13 @@ func TestParseImportPhone_RejectsInvalidNumbers(t *testing.T) {
 
 func TestParseRowReadsCategoryAndNormalizesPhone(t *testing.T) {
 	uc := &ImportUseCase{}
-	headers := []string{"Nombre", "Email", "Telefono", "Categoria"}
+	headers := []string{"Nombre", "Email", "Telefono", "Documento", "Fecha_Nacimiento", "Categoria"}
 	headersMap := uc.mapHeaders(headers)
-	profile, errs := uc.parseRow(headersMap, []string{"Ana", "ana@example.com", "300 123 4567", "VIP"})
+	profile, errs := uc.parseRow(headersMap, []string{"Ana", "ana@example.com", "300 123 4567", "900123123", "01-01-1990", "VIP"})
 
 	require.Empty(t, errs)
-	assert.Equal(t, "+573001234567", profile.Telefono)
+	assert.Equal(t, "+573001234567", profile.Phone)
+	assert.Equal(t, "900123123", profile.TaxID)
 	assert.Equal(t, "VIP", profile.CategoryName)
 }
 

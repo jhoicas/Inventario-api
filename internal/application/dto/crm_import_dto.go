@@ -4,10 +4,10 @@ import "time"
 
 // ImportCRMProfileRequest es la fila de datos parseada del archivo de importación.
 type ImportCRMProfileRequest struct {
-	IDCliente             string     `json:"idCliente"`
-	Nombre                string     `json:"nombre"`
+	Name                  string     `json:"nombre"`
 	Email                 string     `json:"email"`
-	Telefono              string     `json:"telefono"`
+	Phone                 string     `json:"telefono"`
+	TaxID                 string     `json:"documento"`
 	FechaNacimiento       string     `json:"fecha_nacimiento,omitempty"`
 	BirthDate             *time.Time `json:"-"`
 	CategoryName          string     `json:"category_name"`

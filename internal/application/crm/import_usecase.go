@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"mime/multipart"
 	"regexp"
 	"strconv"
@@ -27,6 +28,7 @@ import (
 )
 
 var importBirthDatePattern = regexp.MustCompile(`^\d{2}-\d{2}-\d{4}$`)
+var requiredCRMImportHeaders = []string{"nombre", "email", "telefono", "documento", "fecha_nacimiento", "categoria"}
 
 var importJobs = sync.Map{}
 
@@ -106,6 +108,9 @@ func (uc *ImportUseCase) ImportProfilesFromFile(
 	if err != nil {
 		return "", err
 	}
+	if err := validateCRMImportHeaders(rows); err != nil {
+		return "", err
+	}
 	validatedRows, preview := uc.validateImportRows(rows)
 
 	jobID := uuid.NewString()
@@ -122,6 +127,9 @@ func (uc *ImportUseCase) ImportProfilesFromFile(
 func (uc *ImportUseCase) PreviewProfilesFromFile(file *multipart.FileHeader) (*dto.CRMImportPreviewResponse, error) {
 	rows, err := uc.readImportRows(file)
 	if err != nil {
+		return nil, err
+	}
+	if err := validateCRMImportHeaders(rows); err != nil {
 		return nil, err
 	}
 	_, preview := uc.validateImportRows(rows)
@@ -421,7 +429,7 @@ func findRowIndex(rows []dto.ImportJobRowStatus, rowNumber int) (int, bool) {
 func (uc *ImportUseCase) mapHeaders(headers []string) map[string]int {
 	headerMap := make(map[string]int)
 	for i, h := range headers {
-		headerMap[strings.ToLower(strings.TrimSpace(h))] = i
+		headerMap[normalizeHeaderKey(h)] = i
 	}
 	return headerMap
 }
@@ -431,25 +439,25 @@ func (uc *ImportUseCase) parseRow(headerMap map[string]int, row []string) (dto.I
 	profile := dto.ImportCRMProfileRequest{}
 	var rowErrors []string
 
-	// Busca y asigna campos por nombre de columna (admite espacios, underscore y acentos).
+	// Mapeo canónico para importación básica de clientes.
 	if idx, ok := findHeaderIndex(headerMap, "nombre"); ok && idx < len(row) {
-		profile.Nombre = strings.TrimSpace(row[idx])
-	}
-	if idx, ok := findHeaderIndex(headerMap, "idcliente", "id cliente", "id_cliente"); ok && idx < len(row) {
-		profile.IDCliente = strings.TrimSpace(row[idx])
+		profile.Name = strings.TrimSpace(row[idx])
 	}
 	if idx, ok := findHeaderIndex(headerMap, "email"); ok && idx < len(row) {
 		profile.Email = normalizeImportEmail(row[idx])
 	}
-	if idx, ok := findHeaderIndex(headerMap, "telefono", "teléfono", "phone", "celular"); ok && idx < len(row) {
+	if idx, ok := findHeaderIndex(headerMap, "telefono"); ok && idx < len(row) {
 		normalizedPhone, err := parseImportPhone(row[idx])
 		if err != nil {
 			rowErrors = append(rowErrors, err.Error())
 		} else {
-			profile.Telefono = normalizedPhone
+			profile.Phone = normalizedPhone
 		}
 	}
-	if idx, ok := findHeaderIndex(headerMap, "fecha_nacimiento", "fecha nacimiento", "fechanacimiento", "birth_date", "birth date"); ok && idx < len(row) {
+	if idx, ok := findHeaderIndex(headerMap, "documento"); ok && idx < len(row) {
+		profile.TaxID = strings.TrimSpace(row[idx])
+	}
+	if idx, ok := findHeaderIndex(headerMap, "fecha_nacimiento"); ok && idx < len(row) {
 		raw := strings.TrimSpace(row[idx])
 		if raw != "" {
 			profile.FechaNacimiento = raw
@@ -465,7 +473,7 @@ func (uc *ImportUseCase) parseRow(headerMap map[string]int, row []string) (dto.I
 	if idx, ok := findHeaderIndex(headerMap, "segmento"); ok && idx < len(row) {
 		profile.Segmento = strings.TrimSpace(row[idx])
 	}
-	if idx, ok := findHeaderIndex(headerMap, "categoria", "categoría", "category", "category_name"); ok && idx < len(row) {
+	if idx, ok := findHeaderIndex(headerMap, "categoria"); ok && idx < len(row) {
 		profile.CategoryName = strings.TrimSpace(row[idx])
 	}
 	if idx, ok := findHeaderIndex(headerMap, "ventas totales", "ventas_totales", "ventastotales"); ok && idx < len(row) {
@@ -539,7 +547,7 @@ func (uc *ImportUseCase) validateImportRows(rows [][]string) ([]importValidatedR
 			Email:           profile.Email,
 			NormalizedEmail: profile.Email,
 			FechaNacimiento: profile.FechaNacimiento,
-			IDCliente:       strings.TrimSpace(profile.IDCliente),
+			IDCliente:       strings.TrimSpace(profile.TaxID),
 			LastPurchase:    strings.TrimSpace(profile.UltimaCompra),
 			Valid:           true,
 		}
@@ -553,6 +561,14 @@ func (uc *ImportUseCase) validateImportRows(rows [][]string) ([]importValidatedR
 		if previewRow.NormalizedEmail == "" {
 			previewRow.Valid = false
 			previewRow.Errors = append(previewRow.Errors, "email es obligatorio")
+		}
+		if strings.TrimSpace(profile.Name) == "" {
+			previewRow.Valid = false
+			previewRow.Errors = append(previewRow.Errors, "nombre es obligatorio")
+		}
+		if strings.TrimSpace(profile.TaxID) == "" {
+			previewRow.Valid = false
+			previewRow.Errors = append(previewRow.Errors, "documento es obligatorio")
 		}
 		if strings.TrimSpace(profile.UltimaCompra) == "" {
 			previewRow.Warnings = append(previewRow.Warnings, "última compra vacía")
@@ -683,11 +699,39 @@ func birthDatesEqual(a, b *time.Time) bool {
 
 func findHeaderIndex(headerMap map[string]int, keys ...string) (int, bool) {
 	for _, key := range keys {
-		if idx, ok := headerMap[strings.ToLower(strings.TrimSpace(key))]; ok {
+		if idx, ok := headerMap[normalizeHeaderKey(key)]; ok {
 			return idx, true
 		}
 	}
 	return 0, false
+}
+
+func normalizeHeaderKey(value string) string {
+	value = strings.TrimSpace(strings.TrimPrefix(value, "\ufeff"))
+	return strings.ToLower(value)
+}
+
+func validateCRMImportHeaders(rows [][]string) error {
+	if len(rows) == 0 || len(rows[0]) == 0 {
+		return domain.ErrInvalidInput
+	}
+
+	headerMap := make(map[string]struct{}, len(rows[0]))
+	for _, header := range rows[0] {
+		headerMap[normalizeHeaderKey(header)] = struct{}{}
+	}
+
+	for _, required := range requiredCRMImportHeaders {
+		if _, ok := headerMap[required]; !ok {
+			return fmt.Errorf("cabecera requerida faltante: %s", required)
+		}
+	}
+
+	if len(headerMap) != len(requiredCRMImportHeaders) {
+		return fmt.Errorf("cabeceras inválidas: se esperaban exactamente %s", strings.Join(requiredCRMImportHeaders, ", "))
+	}
+
+	return nil
 }
 
 // isEmptyRow verifica si una fila está completamente vacía.
@@ -708,7 +752,7 @@ func (uc *ImportUseCase) upsertProfile(
 	userID string,
 	profile dto.ImportCRMProfileRequest,
 ) (bool, error) {
-	// Busca cliente únicamente por email. IDCliente se conserva como dato, pero no como clave de coincidencia.
+	// Busca cliente únicamente por email.
 	var (
 		customer *entity.Customer
 		err      error
@@ -721,13 +765,10 @@ func (uc *ImportUseCase) upsertProfile(
 	if customer == nil {
 		created = true
 		now := time.Now()
-		name := strings.TrimSpace(profile.Nombre)
-		if name == "" {
-			name = strings.Split(profile.Email, "@")[0]
-		}
-		taxID := strings.TrimSpace(profile.IDCliente)
-		if taxID == "" {
-			taxID = uc.buildTempTaxID()
+		name := strings.TrimSpace(profile.Name)
+		taxID := strings.TrimSpace(profile.TaxID)
+		if name == "" || taxID == "" {
+			return false, fmt.Errorf("nombre y documento son obligatorios para crear cliente")
 		}
 
 		customer = &entity.Customer{
@@ -736,7 +777,7 @@ func (uc *ImportUseCase) upsertProfile(
 			Name:      name,
 			TaxID:     taxID,
 			Email:     profile.Email,
-			Phone:     profile.Telefono,
+			Phone:     profile.Phone,
 			BirthDate: profile.BirthDate,
 			IsActive:  true,
 			CreatedAt: now,
@@ -746,9 +787,19 @@ func (uc *ImportUseCase) upsertProfile(
 			return false, fmt.Errorf("crear cliente automático: %w", err)
 		}
 	} else {
-		incomingPhone := profile.Telefono
+		incomingPhone := profile.Phone
 		incomingBirthDate := profile.BirthDate
+		incomingName := strings.TrimSpace(profile.Name)
+		incomingTaxID := strings.TrimSpace(profile.TaxID)
 		needsUpdate := false
+		if incomingName != "" && strings.TrimSpace(customer.Name) != incomingName {
+			customer.Name = incomingName
+			needsUpdate = true
+		}
+		if incomingTaxID != "" && strings.TrimSpace(customer.TaxID) != incomingTaxID {
+			customer.TaxID = incomingTaxID
+			needsUpdate = true
+		}
 		if incomingPhone != "" && strings.TrimSpace(customer.Phone) != incomingPhone {
 			customer.Phone = incomingPhone
 			needsUpdate = true
@@ -780,8 +831,12 @@ func (uc *ImportUseCase) upsertProfile(
 		ltv = decimal.NewFromFloat(profile.VentasTotales)
 	}
 
-	categoryID, err := uc.resolveCategoryID(companyID, profile.CategoryName, profile.Segmento)
+	if uc.categoryRepo == nil {
+		return false, fmt.Errorf("repositorio de categorías no configurado")
+	}
+	categoryID, err := uc.categoryRepo.GetOrCreateCategoryByName(companyID, profile.CategoryName)
 	if err != nil {
+		log.Printf("crm import: error resolviendo categoría company_id=%s customer_id=%s category=%q: %v", companyID, customer.ID, profile.CategoryName, err)
 		return false, fmt.Errorf("resolver categoría: %w", err)
 	}
 
@@ -810,6 +865,7 @@ func (uc *ImportUseCase) upsertProfile(
 	}
 
 	if err := uc.profileRepo.Upsert(upsertProfile); err != nil {
+		log.Printf("crm import: error upsert crm_customer_profiles company_id=%s customer_id=%s category_id=%s: %v", companyID, customer.ID, categoryID, err)
 		return false, fmt.Errorf("upsert perfil: %w", err)
 	}
 
@@ -818,17 +874,6 @@ func (uc *ImportUseCase) upsertProfile(
 	}
 
 	return created, nil
-}
-
-func (uc *ImportUseCase) resolveCategoryID(companyID, categoryName, fallbackSegment string) (string, error) {
-	categoryName = strings.TrimSpace(categoryName)
-	if categoryName == "" {
-		categoryName = strings.TrimSpace(fallbackSegment)
-	}
-	if categoryName == "" || uc.categoryRepo == nil {
-		return "", nil
-	}
-	return uc.categoryRepo.GetOrCreateCategoryByName(companyID, categoryName)
 }
 
 func (uc *ImportUseCase) createAutomationArtifacts(ctx context.Context, companyID, userID, customerID string, profile dto.ImportCRMProfileRequest) error {
@@ -905,11 +950,6 @@ func normalizeMonthYear(value string) string {
 		}
 	}
 	return value
-}
-
-func (uc *ImportUseCase) buildTempTaxID() string {
-	// Prefijo CF (Cliente Fiscal) + sufijo UUID corto para minimizar colisiones.
-	return "CF-" + strings.ToUpper(strings.ReplaceAll(uuid.NewString(), "-", ""))[:12]
 }
 
 // ImportSalesFromFile procesa un archivo Excel/CSV y persiste ventas con snapshot JSONB por orden.
