@@ -260,6 +260,12 @@ func (uc *CampaignUseCase) UpdateCampaign(ctx context.Context, companyID, userID
 	return toCampaignResponse(c), nil
 }
 
+// Update actualiza una campaña usando companyID + id y cambios parciales del request.
+// Mantiene compatibilidad con callers que no envían userID explícito.
+func (uc *CampaignUseCase) Update(ctx context.Context, companyID, id string, req dto.UpdateCampaignRequest) (*dto.CampaignResponse, error) {
+	return uc.UpdateCampaign(ctx, companyID, "", id, req)
+}
+
 // DeleteCampaign elimina una campaña.
 func (uc *CampaignUseCase) DeleteCampaign(ctx context.Context, companyID, userID, campaignID string) error {
 	if strings.TrimSpace(companyID) == "" || strings.TrimSpace(campaignID) == "" {

@@ -1838,9 +1838,8 @@ func (h *CRMHandler) CreateCampaign(c *fiber.Ctx) error {
 // @Router       /api/crm/campaigns/{id} [put]
 func (h *CRMHandler) UpdateCampaign(c *fiber.Ctx) error {
 	companyID := GetCompanyID(c)
-	userID := GetUserID(c)
 	id := c.Params("id")
-	if companyID == "" || userID == "" || id == "" {
+	if companyID == "" || id == "" {
 		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
 	}
 	if h.CampaignUC == nil {
@@ -1850,7 +1849,7 @@ func (h *CRMHandler) UpdateCampaign(c *fiber.Ctx) error {
 	if err := c.BodyParser(&in); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
 	}
-	out, err := h.CampaignUC.UpdateCampaign(c.Context(), companyID, userID, id, in)
+	out, err := h.CampaignUC.Update(c.Context(), companyID, id, in)
 	if err != nil {
 		switch err {
 		case domain.ErrInvalidInput:
