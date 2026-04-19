@@ -233,6 +233,8 @@ func (uc *ImportUseCase) processRowsAsync(ctx context.Context, companyID string,
 	jobs := make(chan importValidatedRow, len(rows))
 	var processedCount atomic.Int32
 	var emailLocks sync.Map
+	categoryCache := make(map[string]string)
+	var categoryCacheMu sync.Mutex
 
 	workerCount := 20
 	for w := 0; w < workerCount; w++ {
@@ -258,7 +260,7 @@ func (uc *ImportUseCase) processRowsAsync(ctx context.Context, companyID string,
 					mu.Lock()
 					defer mu.Unlock()
 
-					inserted, err := uc.upsertProfile(ctx, companyID, userID, item.Profile)
+					inserted, err := uc.upsertProfile(ctx, companyID, userID, item.Profile, categoryCache, &categoryCacheMu)
 					if err != nil {
 						uc.markJobRowFailed(jobID, item.RowNumber, err.Error())
 						uc.incrementJobCounter(jobID, func(p *JobProgress) { p.FailedRows++ })
@@ -277,6 +279,8 @@ func (uc *ImportUseCase) processRowsAsync(ctx context.Context, companyID string,
 	}
 
 	for _, row := range rows {
+		normalizedCategory := strings.ToUpper(strings.TrimSpace(row.Profile.CategoryName))
+		row.Profile.CategoryName = normalizedCategory
 		jobs <- row
 	}
 	close(jobs)
@@ -751,6 +755,8 @@ func (uc *ImportUseCase) upsertProfile(
 	companyID string,
 	userID string,
 	profile dto.ImportCRMProfileRequest,
+	categoryCache map[string]string,
+	categoryCacheMu *sync.Mutex,
 ) (bool, error) {
 	// Busca cliente únicamente por email.
 	var (
@@ -819,13 +825,31 @@ func (uc *ImportUseCase) upsertProfile(
 	if uc.categoryRepo == nil {
 		return false, fmt.Errorf("repositorio de categorías no configurado")
 	}
-	categoryID, err := uc.categoryRepo.GetOrCreateCategoryByName(companyID, profile.CategoryName)
-	if err != nil {
-		log.Printf("crm import: error resolviendo categoría company_id=%s customer_id=%s category=%q: %v", companyID, customer.ID, profile.CategoryName, err)
-		return false, fmt.Errorf("resolver categoría: %w", err)
+	normalizedCategory := strings.ToUpper(strings.TrimSpace(profile.CategoryName))
+	profile.CategoryName = normalizedCategory
+	if normalizedCategory == "" {
+		log.Printf("crm import: categoría vacía company_id=%s customer_id=%s", companyID, customer.ID)
+		return false, fmt.Errorf("categoría vacía para customer_id=%s", customer.ID)
+	}
+
+	var categoryID string
+	categoryCacheMu.Lock()
+	if cachedID, exists := categoryCache[normalizedCategory]; exists {
+		categoryID = cachedID
+		categoryCacheMu.Unlock()
+	} else {
+		var resolveErr error
+		categoryID, resolveErr = uc.categoryRepo.GetOrCreateCategoryByName(companyID, normalizedCategory)
+		if resolveErr != nil {
+			categoryCacheMu.Unlock()
+			log.Printf("crm import: error resolviendo categoría company_id=%s customer_id=%s category=%q: %v", companyID, customer.ID, normalizedCategory, resolveErr)
+			return false, fmt.Errorf("resolver categoría: %w", resolveErr)
+		}
+		categoryCache[normalizedCategory] = categoryID
+		categoryCacheMu.Unlock()
 	}
 	if strings.TrimSpace(categoryID) == "" {
-		log.Printf("crm import: category_id vacío company_id=%s customer_id=%s category=%q", companyID, customer.ID, profile.CategoryName)
+		log.Printf("crm import: category_id vacío company_id=%s customer_id=%s category=%q", companyID, customer.ID, normalizedCategory)
 		return false, fmt.Errorf("category_id vacío para customer_id=%s", customer.ID)
 	}
 	if err := uc.profileRepo.UpsertCustomerProfile(ctx, customer.ID, companyID, categoryID); err != nil {

@@ -68,7 +68,7 @@ func (r *CRMCategoryRepo) GetByID(id string) (*entity.CRMCategory, error) {
 
 func (r *CRMCategoryRepo) GetOrCreateCategoryByName(companyID, name string) (string, error) {
 	companyID = strings.TrimSpace(companyID)
-	name = strings.TrimSpace(name)
+	name = strings.ToUpper(strings.TrimSpace(name))
 	if companyID == "" || name == "" {
 		return "", nil
 	}
@@ -77,7 +77,8 @@ func (r *CRMCategoryRepo) GetOrCreateCategoryByName(companyID, name string) (str
 	err := r.q.QueryRow(context.Background(), `
 		SELECT id
 		FROM crm_categories
-		WHERE company_id = $1 AND name = $2`, companyID, name).Scan(&id)
+		WHERE company_id = $1 AND name ILIKE $2
+		LIMIT 1`, companyID, name).Scan(&id)
 	if err == nil {
 		return id, nil
 	}
