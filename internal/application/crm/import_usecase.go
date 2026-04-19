@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -15,6 +16,7 @@ import (
 	"unicode"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jhoicas/Inventario-api/internal/application/dto"
 	"github.com/jhoicas/Inventario-api/internal/domain"
 	"github.com/jhoicas/Inventario-api/internal/domain/entity"
@@ -58,6 +60,7 @@ type importValidatedRow struct {
 
 // ImportUseCase gestiona la importación masiva de perfiles CRM.
 type ImportUseCase struct {
+	db              txStarter
 	profileRepo     repository.CRMProfileRepository
 	customerRepo    repository.CustomerRepository
 	categoryRepo    repository.CRMCategoryRepository
@@ -65,8 +68,13 @@ type ImportUseCase struct {
 	opportunityRepo repository.CRMOpportunityRepository
 }
 
+type txStarter interface {
+	BeginTx(context.Context, pgx.TxOptions) (pgx.Tx, error)
+}
+
 // NewImportUseCase construye el caso de uso de importación.
 func NewImportUseCase(
+	db txStarter,
 	profileRepo repository.CRMProfileRepository,
 	customerRepo repository.CustomerRepository,
 	categoryRepo repository.CRMCategoryRepository,
@@ -74,6 +82,7 @@ func NewImportUseCase(
 	opportunityRepo repository.CRMOpportunityRepository,
 ) *ImportUseCase {
 	return &ImportUseCase{
+		db:              db,
 		profileRepo:     profileRepo,
 		customerRepo:    customerRepo,
 		categoryRepo:    categoryRepo,
@@ -804,4 +813,468 @@ func normalizeMonthYear(value string) string {
 func (uc *ImportUseCase) buildTempTaxID() string {
 	// Prefijo CF (Cliente Fiscal) + sufijo UUID corto para minimizar colisiones.
 	return "CF-" + strings.ToUpper(strings.ReplaceAll(uuid.NewString(), "-", ""))[:12]
+}
+
+// ImportSalesFromFile procesa un archivo Excel/CSV y persiste ventas con snapshot JSONB por orden.
+func (uc *ImportUseCase) ImportSalesFromFile(ctx context.Context, companyID, userID string, file *multipart.FileHeader) (*dto.ImportSalesResponse, error) {
+	if uc == nil || uc.db == nil || strings.TrimSpace(companyID) == "" || file == nil {
+		return nil, domain.ErrInvalidInput
+	}
+
+	rows, err := uc.readImportRows(file)
+	if err != nil {
+		return nil, err
+	}
+
+	orders, err := uc.groupSalesImportRows(rows)
+	if err != nil {
+		return nil, err
+	}
+
+	resp := &dto.ImportSalesResponse{TotalOrders: len(orders)}
+	for _, order := range orders {
+		res, err := uc.importSingleSalesOrder(ctx, companyID, userID, order)
+		if err != nil {
+			resp.FailedOrders++
+			resp.Errors = append(resp.Errors, dto.ImportSalesError{OrderNumber: order.OrderNumber, Message: err.Error()})
+			continue
+		}
+		resp.SuccessfulOrders++
+		resp.TotalItems += res.TotalItems
+		resp.CreatedCustomers += boolToInt(res.CreatedCustomer)
+		resp.CreatedCategories += res.CreatedCategories
+		resp.CreatedProducts += res.CreatedProducts
+	}
+
+	return resp, nil
+}
+
+type salesImportItem struct {
+	ProductCode   string
+	ProductName   string
+	CategoryName  string
+	Quantity      int
+	UnitPrice     float64
+	LineTotal     float64
+	RawRowNumber  int
+	CustomerEmail string
+	CustomerPhone string
+	CustomerName  string
+	OrderNumber   string
+	SaleDate      time.Time
+	ProductID     string
+	CategoryID    string
+	CustomerID    string
+	ItemsSnapshot map[string]any
+}
+
+type salesImportOrder struct {
+	OrderNumber   string
+	SaleDate      time.Time
+	CustomerEmail string
+	CustomerPhone string
+	CustomerName  string
+	Items         []salesImportItem
+	Errors        []string
+	TotalAmount   float64
+	CreatedAt     time.Time
+}
+
+type salesImportTxResult struct {
+	CreatedCustomer   bool
+	CreatedCategories int
+	CreatedProducts   int
+	TotalItems        int
+}
+
+func (uc *ImportUseCase) groupSalesImportRows(rows [][]string) ([]salesImportOrder, error) {
+	if len(rows) == 0 {
+		return nil, domain.ErrInvalidInput
+	}
+
+	headers := rows[0]
+	headerMap := uc.mapHeaders(headers)
+	dataRows := rows[1:]
+	ordersByNumber := make(map[string]*salesImportOrder)
+	orderedKeys := make([]string, 0)
+
+	for idx, row := range dataRows {
+		rowNumber := idx + 2
+		if len(row) == 0 || uc.isEmptyRow(row) {
+			continue
+		}
+
+		orderNumber := trimCell(salesCell(headerMap, row, "numero_orden", "numero orden", "numeroorden", "orden", "order_number", "ordernumber"))
+		saleDateRaw := trimCell(salesCell(headerMap, row, "fecha_venta", "fecha venta", "fechaventa", "sale_date", "saledate"))
+		email := normalizeImportEmail(salesCell(headerMap, row, "email_cliente", "email cliente", "email", "customer_email", "customeremail"))
+		phone := normalizeImportPhone(salesCell(headerMap, row, "telefono", "teléfono", "phone", "customer_phone"))
+		customerName := trimCell(salesCell(headerMap, row, "nombre_cliente", "nombre cliente", "nombrecliente", "customer_name"))
+		productCode := trimCell(salesCell(headerMap, row, "codigo_producto", "código_producto", "codigo producto", "product_code", "productcode"))
+		productName := trimCell(salesCell(headerMap, row, "nombre_producto", "nombre producto", "nombreproducto", "product_name", "productname"))
+		categoryName := trimCell(salesCell(headerMap, row, "categoria_producto", "categoría_producto", "categoria producto", "category", "product_category"))
+		qtyRaw := trimCell(salesCell(headerMap, row, "cantidad", "quantity", "qty"))
+		unitPriceRaw := trimCell(salesCell(headerMap, row, "precio_unitario", "precio unitario", "unit_price", "price"))
+
+		if orderNumber == "" || saleDateRaw == "" || email == "" || productCode == "" || productName == "" || qtyRaw == "" || unitPriceRaw == "" {
+			continue
+		}
+
+		saleDate, err := parseSalesDate(saleDateRaw)
+		if err != nil {
+			continue
+		}
+		qty, err := strconv.Atoi(qtyRaw)
+		if err != nil || qty <= 0 {
+			continue
+		}
+		unitPrice, err := strconv.ParseFloat(strings.ReplaceAll(unitPriceRaw, ",", ""), 64)
+		if err != nil {
+			continue
+		}
+		lineTotal := float64(qty) * unitPrice
+
+		order, ok := ordersByNumber[orderNumber]
+		if !ok {
+			order = &salesImportOrder{OrderNumber: orderNumber, SaleDate: saleDate, CustomerEmail: email, CustomerPhone: phone, CustomerName: customerName, CreatedAt: time.Now()}
+			ordersByNumber[orderNumber] = order
+			orderedKeys = append(orderedKeys, orderNumber)
+		}
+		if order.CustomerEmail == "" {
+			order.CustomerEmail = email
+		}
+		if order.CustomerPhone == "" {
+			order.CustomerPhone = phone
+		}
+		if order.CustomerName == "" {
+			order.CustomerName = customerName
+		}
+		if order.SaleDate.IsZero() {
+			order.SaleDate = saleDate
+		}
+		order.Items = append(order.Items, salesImportItem{
+			ProductCode:   productCode,
+			ProductName:   productName,
+			CategoryName:  categoryName,
+			Quantity:      qty,
+			UnitPrice:     unitPrice,
+			LineTotal:     lineTotal,
+			RawRowNumber:  rowNumber,
+			CustomerEmail: email,
+			CustomerPhone: phone,
+			CustomerName:  customerName,
+			OrderNumber:   orderNumber,
+			SaleDate:      saleDate,
+		})
+		order.TotalAmount += lineTotal
+	}
+
+	orders := make([]salesImportOrder, 0, len(orderedKeys))
+	for _, key := range orderedKeys {
+		if order := ordersByNumber[key]; order != nil && len(order.Items) > 0 {
+			orders = append(orders, *order)
+		}
+	}
+
+	if len(orders) == 0 {
+		return nil, domain.ErrInvalidInput
+	}
+	return orders, nil
+}
+
+func (uc *ImportUseCase) importSingleSalesOrder(ctx context.Context, companyID, userID string, order salesImportOrder) (*salesImportTxResult, error) {
+	tx, err := uc.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("begin sales import tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	result := &salesImportTxResult{}
+
+	customerID, createdCustomer, err := upsertCustomerFromImportTx(ctx, tx, companyID, order.CustomerEmail, order.CustomerName, order.CustomerPhone)
+	if err != nil {
+		return nil, err
+	}
+	result.CreatedCustomer = createdCustomer
+
+	snapshotItems := make([]salesSnapshotItem, 0, len(order.Items))
+	for _, item := range order.Items {
+		categoryID, createdCategory, err := upsertCategoryHubTx(ctx, tx, companyID, item.CategoryName)
+		if err != nil {
+			return nil, err
+		}
+		if createdCategory {
+			result.CreatedCategories++
+		}
+
+		productID, createdProduct, err := upsertProductHubTx(ctx, tx, companyID, item.ProductCode, item.ProductName, item.CategoryName)
+		if err != nil {
+			return nil, err
+		}
+		if createdProduct {
+			result.CreatedProducts++
+		}
+
+		snapshotItems = append(snapshotItems, salesSnapshotItem{
+			OrderNumber:  order.OrderNumber,
+			ProductCode:  item.ProductCode,
+			ProductName:  item.ProductName,
+			CategoryName: item.CategoryName,
+			CategoryID:   categoryID,
+			ProductID:    productID,
+			Quantity:     item.Quantity,
+			UnitPrice:    item.UnitPrice,
+			LineTotal:    item.LineTotal,
+		})
+		result.TotalItems++
+	}
+
+	snapshotJSON, err := json.Marshal(snapshotItems)
+	if err != nil {
+		return nil, fmt.Errorf("marshal sale snapshot: %w", err)
+	}
+
+	saleID, err := insertSaleHubTx(ctx, tx, saleHubInput{
+		CompanyID:     companyID,
+		CustomerID:    customerID,
+		CustomerEmail: order.CustomerEmail,
+		CustomerName:  emptyStringPtr(order.CustomerName),
+		SaleDate:      order.SaleDate,
+		TotalAmount:   order.TotalAmount,
+		ItemsSnapshot: snapshotJSON,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if err := recalculateCustomerProfileTx(ctx, tx, companyID, customerID, order.SaleDate, order.TotalAmount); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit sales import tx: %w", err)
+	}
+
+	_ = saleID
+	_ = userID
+	return result, nil
+}
+
+type salesSnapshotItem struct {
+	OrderNumber  string  `json:"order_number"`
+	ProductCode  string  `json:"product_code"`
+	ProductName  string  `json:"product_name"`
+	CategoryName string  `json:"category_name"`
+	CategoryID   string  `json:"category_id,omitempty"`
+	ProductID    string  `json:"product_id,omitempty"`
+	Quantity     int     `json:"quantity"`
+	UnitPrice    float64 `json:"unit_price"`
+	LineTotal    float64 `json:"line_total"`
+}
+
+type saleHubInput struct {
+	CompanyID     string
+	CustomerID    string
+	CustomerEmail string
+	CustomerName  *string
+	SaleDate      time.Time
+	TotalAmount   float64
+	ItemsSnapshot []byte
+}
+
+func upsertCustomerFromImportTx(ctx context.Context, tx pgx.Tx, companyID, email, name, phone string) (string, bool, error) {
+	email = normalizeImportEmail(email)
+	if email == "" {
+		return "", false, domain.ErrInvalidInput
+	}
+	cleanPhone := normalizeImportPhone(phone)
+	cleanName := strings.TrimSpace(name)
+	if cleanName == "" {
+		cleanName = strings.Split(email, "@")[0]
+	}
+	customerID := uuid.NewString()
+	var existingID string
+	if err := tx.QueryRow(ctx, `
+		SELECT id FROM customers WHERE company_id = $1 AND LOWER(email) = LOWER($2)`, companyID, email).Scan(&existingID); err == nil && existingID != "" {
+		_, err := tx.Exec(ctx, `
+			UPDATE customers
+			SET name = $2, phone = $3, updated_at = now()
+			WHERE id = $1`, existingID, cleanName, cleanPhone)
+		if err != nil {
+			return "", false, fmt.Errorf("update imported customer: %w", err)
+		}
+		return existingID, false, nil
+	}
+
+	_, err := tx.Exec(ctx, `
+		INSERT INTO customers (id, company_id, name, tax_id, email, phone, is_active, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, true, now(), now())`, customerID, companyID, cleanName, customerID, email, cleanPhone)
+	if err != nil {
+		return "", false, fmt.Errorf("insert imported customer: %w", err)
+	}
+	return customerID, true, nil
+}
+
+func upsertCategoryHubTx(ctx context.Context, tx pgx.Tx, companyID, categoryName string) (string, bool, error) {
+	categoryName = strings.TrimSpace(categoryName)
+	if categoryName == "" {
+		return "", false, nil
+	}
+	var existingID string
+	if err := tx.QueryRow(ctx, `SELECT id FROM crm_categories WHERE company_id = $1 AND name = $2`, companyID, categoryName).Scan(&existingID); err == nil && existingID != "" {
+		_, err := tx.Exec(ctx, `UPDATE crm_categories SET updated_at = now() WHERE id = $1`, existingID)
+		if err != nil {
+			return "", false, fmt.Errorf("touch category hub: %w", err)
+		}
+		return existingID, false, nil
+	}
+	var id string
+	err := tx.QueryRow(ctx, `
+		INSERT INTO crm_categories (id, company_id, name, created_at, updated_at)
+		VALUES (gen_random_uuid(), $1, $2, now(), now())
+		ON CONFLICT (company_id, name) DO UPDATE SET updated_at = EXCLUDED.updated_at
+		RETURNING id`, companyID, categoryName).Scan(&id)
+	if err != nil {
+		return "", false, fmt.Errorf("upsert category hub: %w", err)
+	}
+	return id, true, nil
+}
+
+func upsertProductHubTx(ctx context.Context, tx pgx.Tx, companyID, productCode, productName, categoryName string) (string, bool, error) {
+	productCode = strings.TrimSpace(productCode)
+	productName = strings.TrimSpace(productName)
+	if productCode == "" || productName == "" {
+		return "", false, domain.ErrInvalidInput
+	}
+	var existingID string
+	if err := tx.QueryRow(ctx, `SELECT id FROM crm_products_hub WHERE company_id = $1 AND product_code = $2`, companyID, productCode).Scan(&existingID); err == nil && existingID != "" {
+		_, err := tx.Exec(ctx, `
+			UPDATE crm_products_hub
+			SET product_name = $2, category = NULLIF($3, ''), updated_at = now()
+			WHERE id = $1`, existingID, productName, strings.TrimSpace(categoryName))
+		if err != nil {
+			return "", false, fmt.Errorf("touch product hub: %w", err)
+		}
+		return existingID, false, nil
+	}
+	var id string
+	err := tx.QueryRow(ctx, `
+		INSERT INTO crm_products_hub (id, company_id, product_code, product_name, category, created_at, updated_at)
+		VALUES (gen_random_uuid(), $1, $2, $3, NULLIF($4, ''), now(), now())
+		ON CONFLICT (company_id, product_code) DO UPDATE SET
+			product_name = EXCLUDED.product_name,
+			category = EXCLUDED.category,
+			updated_at = EXCLUDED.updated_at
+		RETURNING id`, companyID, productCode, productName, strings.TrimSpace(categoryName)).Scan(&id)
+	if err != nil {
+		return "", false, fmt.Errorf("upsert product hub: %w", err)
+	}
+	return id, true, nil
+}
+
+func insertSaleHubTx(ctx context.Context, tx pgx.Tx, in saleHubInput) (string, error) {
+	saleID := uuid.NewString()
+	_, err := tx.Exec(ctx, `
+		INSERT INTO crm_sales_hub (
+			id, company_id, customer_id, customer_email, customer_name, sale_date, total_amount, cost_total, profit, items_snapshot, created_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, NULL, NULL, $8::jsonb, now())`,
+		saleID, in.CompanyID, in.CustomerID, in.CustomerEmail, in.CustomerName, in.SaleDate, in.TotalAmount, in.ItemsSnapshot)
+	if err != nil {
+		return "", fmt.Errorf("insert sale hub: %w", err)
+	}
+	return saleID, nil
+}
+
+func recalculateCustomerProfileTx(ctx context.Context, tx pgx.Tx, companyID, customerID string, saleDate time.Time, totalAmount float64) error {
+	metadata := map[string]any{
+		"ordersCount":      1,
+		"distinctProducts": 0,
+		"lastPurchaseDate": saleDate.Format("01/2006"),
+		"mainCategory":     "",
+		"productsList":     "",
+		"followUpStrategy": "",
+	}
+	metadataJSON, err := json.Marshal(metadata)
+	if err != nil {
+		return fmt.Errorf("marshal profile metadata: %w", err)
+	}
+
+	_, err = tx.Exec(ctx, `
+		INSERT INTO crm_customer_profiles (id, customer_id, company_id, ltv, metadata, created_at, updated_at)
+		VALUES (gen_random_uuid(), $1, $2, $3, $4::jsonb, now(), now())
+		ON CONFLICT (customer_id) DO UPDATE SET
+			ltv = crm_customer_profiles.ltv + EXCLUDED.ltv,
+			metadata = jsonb_set(
+				jsonb_set(COALESCE(crm_customer_profiles.metadata, '{}'::jsonb), '{ordersCount}', to_jsonb(COALESCE((crm_customer_profiles.metadata->>'ordersCount')::int, 0) + 1), true),
+				'{lastPurchaseDate}', to_jsonb($5::text), true
+			),
+			updated_at = now()`, customerID, companyID, totalAmount, metadataJSON, saleDate.Format("01/2006"))
+	if err != nil {
+		return fmt.Errorf("recalculate customer profile: %w", err)
+	}
+	return nil
+}
+
+func salesCell(headerMap map[string]int, row []string, keys ...string) string {
+	idx, ok := findHeaderIndex(headerMap, keys...)
+	if !ok || idx >= len(row) {
+		return ""
+	}
+	return row[idx]
+}
+
+func trimCell(value string) string {
+	return strings.TrimSpace(strings.TrimPrefix(value, "\ufeff"))
+}
+
+func parseSalesDate(value string) (time.Time, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return time.Time{}, fmt.Errorf("fecha vacía")
+	}
+	formats := []string{"2006-01-02", "02/01/2006", "02-01-2006", time.RFC3339, "2006-01-02 15:04:05"}
+	for _, layout := range formats {
+		if t, err := time.Parse(layout, value); err == nil {
+			return t.UTC(), nil
+		}
+	}
+	return time.Time{}, fmt.Errorf("formato de fecha no reconocido: %s", value)
+}
+
+func normalizeImportPhone(value string) string {
+	value = strings.TrimSpace(value)
+	value = strings.ReplaceAll(value, " ", "")
+	if value == "" {
+		return ""
+	}
+	if strings.HasPrefix(value, "+") {
+		return value
+	}
+	digits := make([]rune, 0, len(value))
+	for _, r := range value {
+		if r >= '0' && r <= '9' {
+			digits = append(digits, r)
+		}
+	}
+	if len(digits) == 10 {
+		return "+57" + string(digits)
+	}
+	if len(digits) > 0 {
+		return string(digits)
+	}
+	return value
+}
+
+func emptyStringPtr(value string) *string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+	return &value
+}
+
+func boolToInt(v bool) int {
+	if v {
+		return 1
+	}
+	return 0
 }

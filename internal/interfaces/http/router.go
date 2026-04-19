@@ -332,6 +332,7 @@ func Router(app *fiber.App, deps RouterDeps) {
 			crmGroup.Post("/ai/ask", deps.CRMAIHandler.AskAI)
 			crmGroup.Post("/sales/import", RequireRole(entity.RoleAdmin, "gerente"), deps.CRMAIHandler.ImportSalesFile)
 		}
+		crmGroup.Post("/import/sales", RequireRole(entity.RoleAdmin, "gerente"), h.ImportSalesFromFile)
 		crmGroup.Get("/analytics", h.GetAnalytics)
 		crmGroup.Get("/remarketing", h.GetRemarketing)
 		crmGroup.Get("/remarketing/audience", h.GetRemarketingAudience)

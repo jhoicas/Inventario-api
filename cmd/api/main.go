@@ -242,7 +242,7 @@ func main() {
 	automationUC := crm.NewAutomationUseCase(crmAutomationRepo, crmCampaignRepo, crmTemplateRepo, nil, log, auditLogUC)
 	templateUC := crm.NewCampaignTemplateUseCase(crmTemplateRepo, auditLogUC)
 	opportunityUC := crm.NewOpportunityUseCase(crmOpportunityRepo)
-	importUC := crm.NewImportUseCase(crmProfileRepo, customerRepo, crmCategoryRepo, crmTaskRepo, crmOpportunityRepo)
+	importUC := crm.NewImportUseCase(pool, crmProfileRepo, customerRepo, crmCategoryRepo, crmTaskRepo, crmOpportunityRepo)
 	crmHandler := httpRouter.NewCRMHandler(loyaltyUC, crmAnalyticsUC, automationUC, auditLogUC, taskUC, pqrUC, aiCRMUC, customerUC, crmInteractionRepo, opportunityUC, invoiceRepo, campaignUC, templateUC, importUC)
 	crmAIHandler := httpRouter.NewCRMAIHandler(aiAnalystSvc, bulkImporterSvc, log)
 	emailHandler := httpRouter.NewEmailHandler(emailUC)

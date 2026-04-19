@@ -1,6 +1,9 @@
 package entity
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 // ProductHub represents a product in the analytics hub for fair comparison across sales.
 type ProductHub struct {
@@ -25,6 +28,7 @@ type SaleHub struct {
 	TotalAmount   float64
 	CostTotal     *float64
 	Profit        *float64
+	ItemsSnapshot json.RawMessage
 	CreatedAt     time.Time
 }
 

@@ -25,6 +25,8 @@ type AutomationUseCase struct {
 	auditUC        *AuditLogUseCase
 }
 
+const defaultAutomationScheduleCron = "0 0 * * *"
+
 // NewAutomationUseCase construye el caso de uso de automatizaciones.
 func NewAutomationUseCase(
 	automationRepo repository.CRMAutomationRepository,
@@ -200,7 +202,7 @@ func (uc *AutomationUseCase) CreateAutomation(ctx context.Context, companyID str
 		Name:         name,
 		Type:         typ,
 		TemplateID:   trimPtr(req.TemplateID),
-		ScheduleCron: trimPtr(req.ScheduleCron),
+		ScheduleCron: ensureScheduleCron(trimPtr(req.ScheduleCron)),
 		Config:       normalizeConfig(req.Config),
 		IsActive:     isActive,
 	}
@@ -264,7 +266,10 @@ func (uc *AutomationUseCase) UpdateAutomationByUser(ctx context.Context, company
 		current.TemplateID = trimPtr(req.TemplateID)
 	}
 	if req.ScheduleCron != nil {
-		current.ScheduleCron = trimPtr(req.ScheduleCron)
+		current.ScheduleCron = ensureScheduleCron(trimPtr(req.ScheduleCron))
+	}
+	if current.ScheduleCron == nil {
+		current.ScheduleCron = ensureScheduleCron(nil)
 	}
 	if req.Config != nil {
 		current.Config = normalizeConfig(req.Config)
@@ -332,6 +337,17 @@ func normalizeConfig(raw []byte) []byte {
 		return []byte("{}")
 	}
 	return raw
+}
+
+func ensureScheduleCron(v *string) *string {
+	if v != nil {
+		trimmed := strings.TrimSpace(*v)
+		if trimmed != "" {
+			return &trimmed
+		}
+	}
+	cron := defaultAutomationScheduleCron
+	return &cron
 }
 
 func toAutomationResponse(a *entity.CRMAutomation) *dto.AutomationResponse {

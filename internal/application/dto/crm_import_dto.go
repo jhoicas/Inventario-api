@@ -76,3 +76,21 @@ type CRMImportPreviewResponse struct {
 	Summary ImportPreviewSummary `json:"summary"`
 	Rows    []ImportPreviewRow   `json:"rows"`
 }
+
+// ImportSalesError representa un error encontrado al procesar una orden.
+type ImportSalesError struct {
+	OrderNumber string `json:"order_number"`
+	Message     string `json:"message"`
+}
+
+// ImportSalesResponse resume el resultado de la importación masiva de ventas.
+type ImportSalesResponse struct {
+	TotalOrders       int               `json:"total_orders"`
+	SuccessfulOrders  int               `json:"successful_orders"`
+	FailedOrders      int               `json:"failed_orders"`
+	TotalItems        int               `json:"total_items"`
+	CreatedCustomers  int               `json:"created_customers"`
+	CreatedCategories int               `json:"created_categories"`
+	CreatedProducts   int               `json:"created_products"`
+	Errors            []ImportSalesError `json:"errors,omitempty"`
+}
