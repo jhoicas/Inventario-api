@@ -10,6 +10,7 @@ type ImportCRMProfileRequest struct {
 	Telefono              string     `json:"telefono"`
 	FechaNacimiento       string     `json:"fecha_nacimiento,omitempty"`
 	BirthDate             *time.Time `json:"-"`
+	CategoryName          string     `json:"category_name"`
 	Segmento              string     `json:"segmento"`
 	VentasTotales         float64    `json:"ventasTotales"`
 	Pedidos               int        `json:"pedidos"`

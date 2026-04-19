@@ -115,6 +115,38 @@ func TestParseImportBirthDate_ReturnsNormalizedISODate(t *testing.T) {
 	assert.Empty(t, iso)
 }
 
+func TestParseImportPhone_NormalizesLocalAndInternationalNumbers(t *testing.T) {
+	phone, err := parseImportPhone("300 123 4567")
+	require.NoError(t, err)
+	assert.Equal(t, "+573001234567", phone)
+
+	phone, err = parseImportPhone("+57 300-123-4567")
+	require.NoError(t, err)
+	assert.Equal(t, "+573001234567", phone)
+
+	phone, err = parseImportPhone("")
+	require.NoError(t, err)
+	assert.Empty(t, phone)
+}
+
+func TestParseImportPhone_RejectsInvalidNumbers(t *testing.T) {
+	phone, err := parseImportPhone("ABC-123")
+	require.Error(t, err)
+	assert.Empty(t, phone)
+	assert.Contains(t, err.Error(), "telefono: formato inválido")
+}
+
+func TestParseRowReadsCategoryAndNormalizesPhone(t *testing.T) {
+	uc := &ImportUseCase{}
+	headers := []string{"Nombre", "Email", "Telefono", "Categoria"}
+	headersMap := uc.mapHeaders(headers)
+	profile, errs := uc.parseRow(headersMap, []string{"Ana", "ana@example.com", "300 123 4567", "VIP"})
+
+	require.Empty(t, errs)
+	assert.Equal(t, "+573001234567", profile.Telefono)
+	assert.Equal(t, "VIP", profile.CategoryName)
+}
+
 func TestImportJobProgress_TracksInsertedUpdatedSkippedAndFailed(t *testing.T) {
 	jobID := "job-1"
 	defer importJobs.Delete(jobID)

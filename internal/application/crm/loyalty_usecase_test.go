@@ -109,6 +109,10 @@ func (f *loyaltyCategoryRepoFake) Create(category *entity.CRMCategory) error { r
 
 func (f *loyaltyCategoryRepoFake) GetByID(id string) (*entity.CRMCategory, error) { return nil, nil }
 
+func (f *loyaltyCategoryRepoFake) GetOrCreateCategoryByName(companyID, name string) (string, error) {
+	return "", nil
+}
+
 func (f *loyaltyCategoryRepoFake) ListByCompany(companyID string, limit, offset int) ([]*entity.CRMCategory, int64, error) {
 	return []*entity.CRMCategory{}, 0, nil
 }

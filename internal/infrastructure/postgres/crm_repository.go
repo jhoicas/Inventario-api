@@ -66,6 +66,38 @@ func (r *CRMCategoryRepo) GetByID(id string) (*entity.CRMCategory, error) {
 	return &c, nil
 }
 
+func (r *CRMCategoryRepo) GetOrCreateCategoryByName(companyID, name string) (string, error) {
+	companyID = strings.TrimSpace(companyID)
+	name = strings.TrimSpace(name)
+	if companyID == "" || name == "" {
+		return "", nil
+	}
+
+	var existingID string
+	err := r.q.QueryRow(context.Background(), `
+		SELECT id
+		FROM crm_categories
+		WHERE company_id = $1 AND name = $2
+		LIMIT 1`, companyID, name).Scan(&existingID)
+	if err == nil && existingID != "" {
+		return existingID, nil
+	}
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return "", err
+	}
+
+	id := uuid.New().String()
+	err = r.q.QueryRow(context.Background(), `
+		INSERT INTO crm_categories (id, company_id, name, min_ltv, is_active, created_at, updated_at)
+		VALUES ($1, $2, $3, 0, true, now(), now())
+		ON CONFLICT (company_id, name) DO UPDATE SET updated_at = EXCLUDED.updated_at
+		RETURNING id`, id, companyID, name).Scan(&id)
+	if err != nil {
+		return "", err
+	}
+	return id, nil
+}
+
 func (r *CRMCategoryRepo) ListByCompany(companyID string, limit, offset int) ([]*entity.CRMCategory, int64, error) {
 	where, args := r.buildFilters(companyID)
 	items, err := r.list(where, args, limit, offset)

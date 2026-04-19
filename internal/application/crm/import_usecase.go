@@ -442,7 +442,12 @@ func (uc *ImportUseCase) parseRow(headerMap map[string]int, row []string) (dto.I
 		profile.Email = normalizeImportEmail(row[idx])
 	}
 	if idx, ok := findHeaderIndex(headerMap, "telefono", "teléfono", "phone", "celular"); ok && idx < len(row) {
-		profile.Telefono = strings.TrimSpace(row[idx])
+		normalizedPhone, err := parseImportPhone(row[idx])
+		if err != nil {
+			rowErrors = append(rowErrors, err.Error())
+		} else {
+			profile.Telefono = normalizedPhone
+		}
 	}
 	if idx, ok := findHeaderIndex(headerMap, "fecha_nacimiento", "fecha nacimiento", "fechanacimiento", "birth_date", "birth date"); ok && idx < len(row) {
 		raw := strings.TrimSpace(row[idx])
@@ -459,6 +464,9 @@ func (uc *ImportUseCase) parseRow(headerMap map[string]int, row []string) (dto.I
 	}
 	if idx, ok := findHeaderIndex(headerMap, "segmento"); ok && idx < len(row) {
 		profile.Segmento = strings.TrimSpace(row[idx])
+	}
+	if idx, ok := findHeaderIndex(headerMap, "categoria", "categoría", "category", "category_name"); ok && idx < len(row) {
+		profile.CategoryName = strings.TrimSpace(row[idx])
 	}
 	if idx, ok := findHeaderIndex(headerMap, "ventas totales", "ventas_totales", "ventastotales"); ok && idx < len(row) {
 		if val := strings.TrimSpace(row[idx]); val != "" {
@@ -631,6 +639,39 @@ func parseImportBirthDate(raw string) (*time.Time, string, error) {
 	return &parsed, iso, nil
 }
 
+func parseImportPhone(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", nil
+	}
+
+	var builder strings.Builder
+	for i, r := range raw {
+		if r >= '0' && r <= '9' {
+			builder.WriteRune(r)
+			continue
+		}
+		if i == 0 && r == '+' {
+			continue
+		}
+	}
+
+	digits := builder.String()
+	if digits == "" {
+		return "", fmt.Errorf("telefono: formato inválido")
+	}
+	if strings.HasPrefix(raw, "+57") && len(digits) == 12 && strings.HasPrefix(digits, "57") {
+		return "+57" + digits[2:], nil
+	}
+	if len(digits) == 10 {
+		return "+57" + digits, nil
+	}
+	if len(digits) == 12 && strings.HasPrefix(digits, "57") {
+		return "+57" + digits[2:], nil
+	}
+	return "", fmt.Errorf("telefono: formato inválido, use 10 dígitos locales o +57XXXXXXXXXX")
+}
+
 func birthDatesEqual(a, b *time.Time) bool {
 	if a == nil || b == nil {
 		return a == nil && b == nil
@@ -695,7 +736,7 @@ func (uc *ImportUseCase) upsertProfile(
 			Name:      name,
 			TaxID:     taxID,
 			Email:     profile.Email,
-			Phone:     strings.TrimSpace(profile.Telefono),
+			Phone:     profile.Telefono,
 			BirthDate: profile.BirthDate,
 			IsActive:  true,
 			CreatedAt: now,
@@ -705,7 +746,7 @@ func (uc *ImportUseCase) upsertProfile(
 			return false, fmt.Errorf("crear cliente automático: %w", err)
 		}
 	} else {
-		incomingPhone := strings.TrimSpace(profile.Telefono)
+		incomingPhone := profile.Telefono
 		incomingBirthDate := profile.BirthDate
 		needsUpdate := false
 		if incomingPhone != "" && strings.TrimSpace(customer.Phone) != incomingPhone {
@@ -739,9 +780,9 @@ func (uc *ImportUseCase) upsertProfile(
 		ltv = decimal.NewFromFloat(profile.VentasTotales)
 	}
 
-	categoryID, err := uc.resolveCategoryID(companyID, profile.Segmento)
+	categoryID, err := uc.resolveCategoryID(companyID, profile.CategoryName, profile.Segmento)
 	if err != nil {
-		return false, fmt.Errorf("resolver categoría por segmento: %w", err)
+		return false, fmt.Errorf("resolver categoría: %w", err)
 	}
 
 	metadata := entity.ProfileMetadata{
@@ -779,21 +820,15 @@ func (uc *ImportUseCase) upsertProfile(
 	return created, nil
 }
 
-func (uc *ImportUseCase) resolveCategoryID(companyID, segment string) (string, error) {
-	segment = strings.TrimSpace(segment)
-	if segment == "" || uc.categoryRepo == nil {
+func (uc *ImportUseCase) resolveCategoryID(companyID, categoryName, fallbackSegment string) (string, error) {
+	categoryName = strings.TrimSpace(categoryName)
+	if categoryName == "" {
+		categoryName = strings.TrimSpace(fallbackSegment)
+	}
+	if categoryName == "" || uc.categoryRepo == nil {
 		return "", nil
 	}
-	categories, _, err := uc.categoryRepo.ListByCompany(companyID, 200, 0)
-	if err != nil {
-		return "", err
-	}
-	for _, cat := range categories {
-		if strings.EqualFold(strings.TrimSpace(cat.Name), segment) {
-			return cat.ID, nil
-		}
-	}
-	return "", nil
+	return uc.categoryRepo.GetOrCreateCategoryByName(companyID, categoryName)
 }
 
 func (uc *ImportUseCase) createAutomationArtifacts(ctx context.Context, companyID, userID, customerID string, profile dto.ImportCRMProfileRequest) error {

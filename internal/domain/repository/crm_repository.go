@@ -15,6 +15,7 @@ import (
 type CRMCategoryRepository interface {
 	Create(category *entity.CRMCategory) error
 	GetByID(id string) (*entity.CRMCategory, error)
+	GetOrCreateCategoryByName(companyID, name string) (string, error)
 	ListByCompany(companyID string, limit, offset int) ([]*entity.CRMCategory, int64, error)
 	Update(category *entity.CRMCategory) error
 	Delete(id string) error
