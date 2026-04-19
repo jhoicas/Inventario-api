@@ -31,6 +31,9 @@ func (f *loyaltyProfileRepoFake) GetProfile360(ctx context.Context, companyID, c
 }
 
 func (f *loyaltyProfileRepoFake) Upsert(profile *entity.CRMCustomerProfile) error { return nil }
+func (f *loyaltyProfileRepoFake) UpsertCustomerProfile(ctx context.Context, customerID, companyID, categoryID string) error {
+	return nil
+}
 
 func (f *loyaltyProfileRepoFake) ListByCompany(companyID string, limit, offset int) ([]*entity.CRMCustomerProfile, error) {
 	return nil, nil

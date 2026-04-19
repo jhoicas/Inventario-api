@@ -18,11 +18,11 @@ func TestNormalizeImportEmail(t *testing.T) {
 func TestValidateImportRows_FlagsDuplicatesMissingEmailAndLastPurchaseWarnings(t *testing.T) {
 	uc := &ImportUseCase{}
 	rows := [][]string{
-		{"Nombre", "Email", "IDCliente", "Última Compra"},
-		{"Ana", "Ana@Example.com", "ID-1", ""},
-		{"Ana 2", " ana@example.com ", "ID-2", "01/2025"},
-		{"Sin Email", "", "ID-3", "02/2025"},
-		{"Con Espacios", "  cliente @ demo.com ", "ID-4", ""},
+		{"nombre", "email", "telefono", "documento", "fecha_nacimiento", "categoria", "ultima compra"},
+		{"Ana", "Ana@Example.com", "3001234567", "ID-1", "", "VIP", ""},
+		{"Ana 2", " ana@example.com ", "3001234568", "ID-2", "", "VIP", "01/2025"},
+		{"Sin Email", "", "3001234569", "ID-3", "", "VIP", "02/2025"},
+		{"Con Espacios", "  cliente @ demo.com ", "3001234570", "ID-4", "", "VIP", ""},
 	}
 
 	validRows, preview := uc.validateImportRows(rows)
@@ -57,9 +57,9 @@ func TestValidateImportRows_FlagsDuplicatesMissingEmailAndLastPurchaseWarnings(t
 func TestValidateImportRows_ParsesBirthDateAndKeepsItOptional(t *testing.T) {
 	uc := &ImportUseCase{}
 	rows := [][]string{
-		{"Nombre", "Email", "IDCliente", "Última Compra", "Fecha Nacimiento"},
-		{"Ana", "ana@example.com", "ID-1", "01/2025", "31-12-1990"},
-		{"Sin Fecha", "sinfecha@example.com", "ID-2", "02/2025", ""},
+		{"nombre", "email", "telefono", "documento", "fecha_nacimiento", "categoria", "ultima compra"},
+		{"Ana", "ana@example.com", "3001234567", "ID-1", "31-12-1990", "VIP", "01/2025"},
+		{"Sin Fecha", "sinfecha@example.com", "3001234568", "ID-2", "", "VIP", "02/2025"},
 	}
 
 	validRows, preview := uc.validateImportRows(rows)
@@ -85,9 +85,9 @@ func TestValidateImportRows_ParsesBirthDateAndKeepsItOptional(t *testing.T) {
 func TestValidateImportRows_RejectsInvalidBirthDateFormatAndImpossibleDate(t *testing.T) {
 	uc := &ImportUseCase{}
 	rows := [][]string{
-		{"Nombre", "Email", "Fecha Nacimiento"},
-		{"Formato Malo", "bad-format@example.com", "1990-12-31"},
-		{"Fecha Inexistente", "bad-date@example.com", "31-02-2024"},
+		{"nombre", "email", "telefono", "documento", "fecha_nacimiento", "categoria"},
+		{"Formato Malo", "bad-format@example.com", "3001234567", "ID-1", "1990-12-31", "VIP"},
+		{"Fecha Inexistente", "bad-date@example.com", "3001234568", "ID-2", "31-02-2024", "VIP"},
 	}
 
 	_, preview := uc.validateImportRows(rows)

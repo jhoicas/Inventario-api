@@ -816,21 +816,6 @@ func (uc *ImportUseCase) upsertProfile(
 		}
 	}
 
-	existingProfile, err := uc.profileRepo.GetByCustomerID(customer.ID)
-	if err != nil {
-		return false, fmt.Errorf("buscar perfil por customer_id: %w", err)
-	}
-
-	now := time.Now()
-	ltv := decimal.Zero
-	if existingProfile != nil {
-		ltv = existingProfile.LTV
-	}
-	// VentasTotales del Excel se persiste como LTV del perfil CRM.
-	if profile.VentasTotales > 0 {
-		ltv = decimal.NewFromFloat(profile.VentasTotales)
-	}
-
 	if uc.categoryRepo == nil {
 		return false, fmt.Errorf("repositorio de categorías no configurado")
 	}
@@ -839,34 +824,13 @@ func (uc *ImportUseCase) upsertProfile(
 		log.Printf("crm import: error resolviendo categoría company_id=%s customer_id=%s category=%q: %v", companyID, customer.ID, profile.CategoryName, err)
 		return false, fmt.Errorf("resolver categoría: %w", err)
 	}
-
-	metadata := entity.ProfileMetadata{
-		OrdersCount:      profile.Pedidos,
-		DistinctProducts: profile.Productos,
-		LastPurchaseDate: profile.UltimaCompra,
-		// CategoriaProducto del Excel se persiste en metadata.mainCategory.
-		MainCategory:     profile.CategoriaProducto,
-		ProductsList:     profile.DescripcionProductos,
-		FollowUpStrategy: profile.EstrategiaSeguimiento,
+	if strings.TrimSpace(categoryID) == "" {
+		log.Printf("crm import: category_id vacío company_id=%s customer_id=%s category=%q", companyID, customer.ID, profile.CategoryName)
+		return false, fmt.Errorf("category_id vacío para customer_id=%s", customer.ID)
 	}
-
-	upsertProfile := &entity.CRMCustomerProfile{
-		CustomerID: customer.ID,
-		CompanyID:  companyID,
-		CategoryID: categoryID,
-		LTV:        ltv,
-		Metadata:   metadata,
-		CreatedAt:  now,
-		UpdatedAt:  now,
-	}
-	if existingProfile != nil {
-		upsertProfile.ID = existingProfile.ID
-		upsertProfile.CreatedAt = existingProfile.CreatedAt
-	}
-
-	if err := uc.profileRepo.Upsert(upsertProfile); err != nil {
+	if err := uc.profileRepo.UpsertCustomerProfile(ctx, customer.ID, companyID, categoryID); err != nil {
 		log.Printf("crm import: error upsert crm_customer_profiles company_id=%s customer_id=%s category_id=%s: %v", companyID, customer.ID, categoryID, err)
-		return false, fmt.Errorf("upsert perfil: %w", err)
+		return false, fmt.Errorf("upsert customer profile: %w", err)
 	}
 
 	if err := uc.createAutomationArtifacts(ctx, companyID, userID, customer.ID, profile); err != nil {

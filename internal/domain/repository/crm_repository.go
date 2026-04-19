@@ -36,6 +36,7 @@ type CRMProfileRepository interface {
 	GetByCustomerID(customerID string) (*entity.CRMCustomerProfile, error)
 	GetProfile360(ctx context.Context, companyID, customerID string) (*entity.Profile360, error)
 	Upsert(profile *entity.CRMCustomerProfile) error
+	UpsertCustomerProfile(ctx context.Context, customerID, companyID, categoryID string) error
 	ListByCompany(companyID string, limit, offset int) ([]*entity.CRMCustomerProfile, error)
 	ResolveCampaignRecipientsByCategory(ctx context.Context, companyID, categoryID string) ([]dto.CampaignRecipientDTO, error)
 	ResolveCampaignRecipients(ctx context.Context, companyID, categoryID string) ([]dto.CampaignRecipientDTO, error)

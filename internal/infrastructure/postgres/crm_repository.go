@@ -73,25 +73,22 @@ func (r *CRMCategoryRepo) GetOrCreateCategoryByName(companyID, name string) (str
 		return "", nil
 	}
 
-	var existingID string
+	var id string
 	err := r.q.QueryRow(context.Background(), `
 		SELECT id
 		FROM crm_categories
-		WHERE company_id = $1 AND name = $2
-		LIMIT 1`, companyID, name).Scan(&existingID)
-	if err == nil && existingID != "" {
-		return existingID, nil
+		WHERE company_id = $1 AND name = $2`, companyID, name).Scan(&id)
+	if err == nil {
+		return id, nil
 	}
-	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+	if !errors.Is(err, pgx.ErrNoRows) {
 		return "", err
 	}
 
-	id := uuid.New().String()
 	err = r.q.QueryRow(context.Background(), `
-		INSERT INTO crm_categories (id, company_id, name, min_ltv, is_active, created_at, updated_at)
-		VALUES ($1, $2, $3, 0, true, now(), now())
-		ON CONFLICT (company_id, name) DO UPDATE SET updated_at = EXCLUDED.updated_at
-		RETURNING id`, id, companyID, name).Scan(&id)
+		INSERT INTO crm_categories (company_id, name, min_ltv)
+		VALUES ($1, $2, 0)
+		RETURNING id`, companyID, name).Scan(&id)
 	if err != nil {
 		return "", err
 	}
@@ -355,6 +352,27 @@ func (r *CRMProfileRepo) Upsert(p *entity.CRMCustomerProfile) error {
 		p.ID, p.CustomerID, p.CompanyID, nullIfEmpty(p.CategoryID), p.LTV, metadataJSON, p.CreatedAt, p.UpdatedAt,
 	)
 	return err
+}
+
+func (r *CRMProfileRepo) UpsertCustomerProfile(ctx context.Context, customerID, companyID, categoryID string) error {
+	customerID = strings.TrimSpace(customerID)
+	companyID = strings.TrimSpace(companyID)
+	categoryID = strings.TrimSpace(categoryID)
+	if customerID == "" || companyID == "" || categoryID == "" {
+		return domain.ErrInvalidInput
+	}
+
+	_, err := r.q.Exec(ctx, `
+		INSERT INTO crm_customer_profiles (customer_id, company_id, category_id, ltv)
+		VALUES ($1, $2, $3, 0)
+		ON CONFLICT (customer_id) DO UPDATE SET
+			category_id = EXCLUDED.category_id`,
+		customerID, companyID, categoryID,
+	)
+	if err != nil {
+		return fmt.Errorf("upsert customer profile: %w", err)
+	}
+	return nil
 }
 
 func (r *CRMProfileRepo) ListByCompany(companyID string, limit, offset int) ([]*entity.CRMCustomerProfile, error) {
