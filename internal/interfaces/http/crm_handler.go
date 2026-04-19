@@ -37,6 +37,7 @@ type CRMHandler struct {
 	LoyaltyUC       *crm.LoyaltyUseCase
 	AnalyticsUC     *crm.AnalyticsUseCase
 	AutomationUC    *crm.AutomationUseCase
+	AuditLogUC      *crm.AuditLogUseCase
 	TaskUC          *crm.TaskUseCase
 	PQRUC           *crm.PQRUseCase
 	AICRMUC         *crm.AICRMUseCase
@@ -59,6 +60,7 @@ func NewCRMHandler(
 	loyaltyUC *crm.LoyaltyUseCase,
 	analyticsUC *crm.AnalyticsUseCase,
 	automationUC *crm.AutomationUseCase,
+	auditLogUC *crm.AuditLogUseCase,
 	taskUC *crm.TaskUseCase,
 	pqrUC *crm.PQRUseCase,
 	aiCRMUC *crm.AICRMUseCase,
@@ -78,6 +80,7 @@ func NewCRMHandler(
 		LoyaltyUC:       loyaltyUC,
 		AnalyticsUC:     analyticsUC,
 		AutomationUC:    automationUC,
+		AuditLogUC:      auditLogUC,
 		TaskUC:          taskUC,
 		PQRUC:           pqrUC,
 		AICRMUC:         aiCRMUC,
@@ -184,7 +187,7 @@ func (h *CRMHandler) UpdateAutomation(c *fiber.Ctx) error {
 	if err := c.BodyParser(&in); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
 	}
-	out, err := h.AutomationUC.UpdateAutomation(c.Context(), companyID, id, in)
+	out, err := h.AutomationUC.UpdateAutomationByUser(c.Context(), companyID, GetUserID(c), id, in)
 	if err != nil {
 		switch err {
 		case domain.ErrInvalidInput:
@@ -223,7 +226,7 @@ func (h *CRMHandler) DeleteAutomation(c *fiber.Ctx) error {
 	if h.AutomationUC == nil {
 		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "automations no configurado"})
 	}
-	err := h.AutomationUC.DeleteAutomation(c.Context(), companyID, id)
+	err := h.AutomationUC.DeleteAutomationByUser(c.Context(), companyID, GetUserID(c), id)
 	if err != nil {
 		switch err {
 		case domain.ErrInvalidInput:
@@ -1818,6 +1821,85 @@ func (h *CRMHandler) CreateCampaign(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(out)
 }
 
+// UpdateCampaign actualiza una campaña CRM.
+// @Summary      Actualizar campaña
+// @Description  Actualiza atributos editables de una campaña CRM
+// @Tags         crm
+// @Security     Bearer
+// @Accept       json
+// @Produce      json
+// @Param        id    path      string                     true  "Campaign ID"
+// @Param        body  body      dto.UpdateCampaignRequest  true  "Campaign"
+// @Success      200   {object}  dto.CampaignResponse
+// @Failure      400   {object}  dto.ErrorResponse
+// @Failure      401   {object}  dto.ErrorResponse
+// @Failure      404   {object}  dto.ErrorResponse
+// @Failure      500   {object}  dto.ErrorResponse
+// @Router       /api/crm/campaigns/{id} [put]
+func (h *CRMHandler) UpdateCampaign(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	userID := GetUserID(c)
+	id := c.Params("id")
+	if companyID == "" || userID == "" || id == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if h.CampaignUC == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "campaigns no configurado"})
+	}
+	var in dto.UpdateCampaignRequest
+	if err := c.BodyParser(&in); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
+	}
+	out, err := h.CampaignUC.UpdateCampaign(c.Context(), companyID, userID, id, in)
+	if err != nil {
+		switch err {
+		case domain.ErrInvalidInput:
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "datos de campaña inválidos"})
+		case domain.ErrNotFound:
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "campaña no encontrada"})
+		default:
+			return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+		}
+	}
+	return c.JSON(out)
+}
+
+// DeleteCampaign elimina una campaña CRM.
+// @Summary      Eliminar campaña
+// @Description  Elimina una campaña CRM de la empresa autenticada
+// @Tags         crm
+// @Security     Bearer
+// @Produce      json
+// @Param        id  path      string  true  "Campaign ID"
+// @Success      204
+// @Failure      400  {object}  dto.ErrorResponse
+// @Failure      401  {object}  dto.ErrorResponse
+// @Failure      404  {object}  dto.ErrorResponse
+// @Failure      500  {object}  dto.ErrorResponse
+// @Router       /api/crm/campaigns/{id} [delete]
+func (h *CRMHandler) DeleteCampaign(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	userID := GetUserID(c)
+	id := c.Params("id")
+	if companyID == "" || userID == "" || id == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "id requerido"})
+	}
+	if h.CampaignUC == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "campaigns no configurado"})
+	}
+	if err := h.CampaignUC.DeleteCampaign(c.Context(), companyID, userID, id); err != nil {
+		switch err {
+		case domain.ErrInvalidInput:
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "id inválido"})
+		case domain.ErrNotFound:
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "campaña no encontrada"})
+		default:
+			return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+		}
+	}
+	return c.SendStatus(fiber.StatusNoContent)
+}
+
 // GetCampaignMetrics retorna las métricas de una campaña.
 // @Summary      Métricas de campaña
 // @Description  Devuelve contadores de envío, apertura, clics, conversión e ingresos de una campaña
@@ -1920,6 +2002,7 @@ func (h *CRMHandler) ListCampaignTemplates(c *fiber.Ctx) error {
 // @Router       /api/crm/campaign-templates/{id} [delete]
 func (h *CRMHandler) DeleteCampaignTemplate(c *fiber.Ctx) error {
 	companyID := GetCompanyID(c)
+	userID := GetUserID(c)
 	id := c.Params("id")
 	if companyID == "" || id == "" {
 		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
@@ -1927,13 +2010,127 @@ func (h *CRMHandler) DeleteCampaignTemplate(c *fiber.Ctx) error {
 	if h.TemplateUC == nil {
 		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "templates no configurado"})
 	}
-	if err := h.TemplateUC.DeleteTemplate(c.Context(), companyID, id); err != nil {
+	if err := h.TemplateUC.DeleteTemplateByUser(c.Context(), companyID, userID, id); err != nil {
 		if err == domain.ErrInvalidInput {
 			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "parámetros inválidos"})
+		}
+		if err == domain.ErrNotFound {
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "plantilla no encontrada"})
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}
 	return c.SendStatus(fiber.StatusNoContent)
+}
+
+// UpdateCampaignTemplate godoc
+// @Summary      Actualizar plantilla de campaña
+// @Tags         crm
+// @Security     Bearer
+// @Accept       json
+// @Produce      json
+// @Param        id    path  string                            true  "Template ID"
+// @Param        body  body  dto.UpdateCampaignTemplateRequest true  "Datos de actualización"
+// @Success      200   {object} dto.CampaignTemplateResponse
+// @Failure      400   {object} dto.ErrorResponse
+// @Failure      401   {object} dto.ErrorResponse
+// @Failure      404   {object} dto.ErrorResponse
+// @Failure      503   {object} dto.ErrorResponse
+// @Router       /api/crm/campaign-templates/{id} [put]
+func (h *CRMHandler) UpdateCampaignTemplate(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	userID := GetUserID(c)
+	id := c.Params("id")
+	if companyID == "" || id == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if h.TemplateUC == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "templates no configurado"})
+	}
+	var in dto.UpdateCampaignTemplateRequest
+	if err := c.BodyParser(&in); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
+	}
+	out, err := h.TemplateUC.UpdateTemplate(c.Context(), companyID, userID, id, in)
+	if err != nil {
+		switch err {
+		case domain.ErrInvalidInput:
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "datos de plantilla inválidos"})
+		case domain.ErrNotFound:
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "plantilla no encontrada"})
+		default:
+			return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+		}
+	}
+	return c.JSON(out)
+}
+
+// ListAuditLogs devuelve bitácoras de cambios con filtros y métricas por entidad.
+// @Summary      Listar bitácoras (audit logs)
+// @Tags         crm
+// @Security     Bearer
+// @Produce      json
+// @Param        user_id     query  string  false  "Filtrar por user_id"
+// @Param        entity      query  string  false  "Filtrar por entidad"
+// @Param        start_date  query  string  false  "Fecha inicial RFC3339"
+// @Param        end_date    query  string  false  "Fecha final RFC3339"
+// @Param        limit       query  int     false  "Límite"
+// @Param        offset      query  int     false  "Offset"
+// @Success      200  {object} dto.AuditLogListResponse
+// @Failure      400  {object} dto.ErrorResponse
+// @Failure      401  {object} dto.ErrorResponse
+// @Failure      503  {object} dto.ErrorResponse
+// @Router       /api/crm/audit-logs [get]
+func (h *CRMHandler) ListAuditLogs(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	if companyID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if h.AuditLogUC == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "audit logs no configurado"})
+	}
+	limit := c.QueryInt("limit", 50)
+	offset := c.QueryInt("offset", 0)
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	var startDate time.Time
+	if raw := strings.TrimSpace(c.Query("start_date")); raw != "" {
+		parsed, err := time.Parse(time.RFC3339, raw)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "start_date inválida (RFC3339)"})
+		}
+		startDate = parsed
+	}
+	var endDate time.Time
+	if raw := strings.TrimSpace(c.Query("end_date")); raw != "" {
+		parsed, err := time.Parse(time.RFC3339, raw)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "end_date inválida (RFC3339)"})
+		}
+		endDate = parsed
+	}
+	out, err := h.AuditLogUC.List(c.Context(), repository.AuditLogFilters{
+		CompanyID:  companyID,
+		UserID:     strings.TrimSpace(c.Query("user_id")),
+		EntityName: strings.TrimSpace(c.Query("entity")),
+		StartDate:  startDate,
+		EndDate:    endDate,
+		Limit:      limit,
+		Offset:     offset,
+	})
+	if err != nil {
+		if err == domain.ErrInvalidInput {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "filtros inválidos"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.JSON(out)
 }
 
 // ResolveCampaignRecipients resuelve destinatarios potenciales para una campaña

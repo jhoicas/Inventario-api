@@ -22,6 +22,7 @@ type AutomationUseCase struct {
 	templateRepo   repository.CRMCampaignTemplateRepository
 	factory        *AutomationStrategyFactory
 	log            *logger.Logger
+	auditUC        *AuditLogUseCase
 }
 
 // NewAutomationUseCase construye el caso de uso de automatizaciones.
@@ -31,6 +32,7 @@ func NewAutomationUseCase(
 	templateRepo repository.CRMCampaignTemplateRepository,
 	factory *AutomationStrategyFactory,
 	log *logger.Logger,
+	auditUC *AuditLogUseCase,
 ) *AutomationUseCase {
 	if factory == nil && automationRepo != nil {
 		factory = NewAutomationStrategyFactory(automationRepo)
@@ -41,6 +43,7 @@ func NewAutomationUseCase(
 		templateRepo:   templateRepo,
 		factory:        factory,
 		log:            log,
+		auditUC:        auditUC,
 	}
 }
 
@@ -225,6 +228,10 @@ func (uc *AutomationUseCase) ListAutomations(ctx context.Context, companyID stri
 
 // UpdateAutomation actualiza una automatización CRM existente.
 func (uc *AutomationUseCase) UpdateAutomation(ctx context.Context, companyID, id string, req dto.UpdateAutomationRequest) (*dto.AutomationResponse, error) {
+	return uc.UpdateAutomationByUser(ctx, companyID, "", id, req)
+}
+
+func (uc *AutomationUseCase) UpdateAutomationByUser(ctx context.Context, companyID, userID, id string, req dto.UpdateAutomationRequest) (*dto.AutomationResponse, error) {
 	if uc == nil || uc.automationRepo == nil || strings.TrimSpace(companyID) == "" || strings.TrimSpace(id) == "" {
 		return nil, domain.ErrInvalidInput
 	}
@@ -238,6 +245,7 @@ func (uc *AutomationUseCase) UpdateAutomation(ctx context.Context, companyID, id
 	if current.CompanyID != companyID {
 		return nil, domain.ErrForbidden
 	}
+	before := *current
 	if req.Name != nil {
 		name := strings.TrimSpace(*req.Name)
 		if name == "" {
@@ -270,11 +278,16 @@ func (uc *AutomationUseCase) UpdateAutomation(ctx context.Context, companyID, id
 		}
 		return nil, err
 	}
+	_ = uc.auditUC.RegisterChange(ctx, companyID, userID, "UPDATE", "AUTOMATION", current.ID, before, current)
 	return toAutomationResponse(current), nil
 }
 
 // DeleteAutomation elimina una automatización CRM de la empresa autenticada.
 func (uc *AutomationUseCase) DeleteAutomation(ctx context.Context, companyID, id string) error {
+	return uc.DeleteAutomationByUser(ctx, companyID, "", id)
+}
+
+func (uc *AutomationUseCase) DeleteAutomationByUser(ctx context.Context, companyID, userID, id string) error {
 	if uc == nil || uc.automationRepo == nil || strings.TrimSpace(companyID) == "" || strings.TrimSpace(id) == "" {
 		return domain.ErrInvalidInput
 	}
@@ -288,7 +301,11 @@ func (uc *AutomationUseCase) DeleteAutomation(ctx context.Context, companyID, id
 	if current.CompanyID != companyID {
 		return domain.ErrForbidden
 	}
-	return uc.automationRepo.Delete(ctx, id, companyID)
+	if err := uc.automationRepo.Delete(ctx, id, companyID); err != nil {
+		return err
+	}
+	_ = uc.auditUC.RegisterChange(ctx, companyID, userID, "DELETE", "AUTOMATION", id, current, nil)
+	return nil
 }
 
 func parseAutomationType(raw string) (entity.CRMAutomationType, error) {

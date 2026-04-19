@@ -22,6 +22,7 @@ type CampaignUseCase struct {
 	interactionRepo repository.CRMInteractionRepository
 	providers       map[string]repository.MessageProvider
 	mailSender      *inframail.SMTPSender
+	auditUC         *AuditLogUseCase
 }
 
 // NewCampaignUseCase construye el caso de uso.
@@ -32,6 +33,7 @@ func NewCampaignUseCase(
 	interactionRepo repository.CRMInteractionRepository,
 	providers map[string]repository.MessageProvider,
 	mailSender *inframail.SMTPSender,
+	auditUC *AuditLogUseCase,
 ) *CampaignUseCase {
 	return &CampaignUseCase{
 		repo:            repo,
@@ -40,6 +42,7 @@ func NewCampaignUseCase(
 		interactionRepo: interactionRepo,
 		providers:       providers,
 		mailSender:      mailSender,
+		auditUC:         auditUC,
 	}
 }
 
@@ -215,6 +218,65 @@ func (uc *CampaignUseCase) ExecuteCampaign(ctx context.Context, companyID, userI
 	c.Status = entity.CampaignStatusCompleted
 	c.UpdatedAt = time.Now()
 	return uc.repo.Update(ctx, c)
+}
+
+// UpdateCampaign actualiza la configuración de una campaña.
+func (uc *CampaignUseCase) UpdateCampaign(ctx context.Context, companyID, userID, campaignID string, req dto.UpdateCampaignRequest) (*dto.CampaignResponse, error) {
+	if strings.TrimSpace(companyID) == "" || strings.TrimSpace(campaignID) == "" {
+		return nil, domain.ErrInvalidInput
+	}
+	c, err := uc.repo.GetByID(ctx, campaignID)
+	if err != nil {
+		return nil, err
+	}
+	if c == nil || c.CompanyID != companyID {
+		return nil, domain.ErrNotFound
+	}
+	before := *c
+	if req.Name != nil {
+		name := strings.TrimSpace(*req.Name)
+		if name == "" {
+			return nil, domain.ErrInvalidInput
+		}
+		c.Name = name
+	}
+	if req.Description != nil {
+		c.Description = strings.TrimSpace(*req.Description)
+	}
+	if req.Channel != nil {
+		c.Channel = strings.ToUpper(strings.TrimSpace(*req.Channel))
+	}
+	if req.Status != nil {
+		c.Status = strings.TrimSpace(*req.Status)
+	}
+	if req.ScheduledAt != nil {
+		c.ScheduledAt = normalizeTimePtrToUTC(req.ScheduledAt)
+	}
+	c.UpdatedAt = time.Now()
+	if err := uc.repo.Update(ctx, c); err != nil {
+		return nil, err
+	}
+	_ = uc.auditUC.RegisterChange(ctx, companyID, userID, "UPDATE", "CAMPAIGN", c.ID, before, c)
+	return toCampaignResponse(c), nil
+}
+
+// DeleteCampaign elimina una campaña.
+func (uc *CampaignUseCase) DeleteCampaign(ctx context.Context, companyID, userID, campaignID string) error {
+	if strings.TrimSpace(companyID) == "" || strings.TrimSpace(campaignID) == "" {
+		return domain.ErrInvalidInput
+	}
+	c, err := uc.repo.GetByID(ctx, campaignID)
+	if err != nil {
+		return err
+	}
+	if c == nil || c.CompanyID != companyID {
+		return domain.ErrNotFound
+	}
+	if err := uc.repo.Delete(ctx, campaignID, companyID); err != nil {
+		return err
+	}
+	_ = uc.auditUC.RegisterChange(ctx, companyID, userID, "DELETE", "CAMPAIGN", campaignID, c, nil)
+	return nil
 }
 
 // SendTestMessage envía un mensaje directo a un destino sin guardarlo en la base de datos.

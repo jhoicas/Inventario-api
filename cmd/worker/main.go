@@ -36,7 +36,7 @@ func main() {
 	aiAnalyticsRepo := postgres.NewAIAnalyticsRepository(pool)
 	anthropicSvc := infraai.NewAnthropicService(cfg.AI.AnthropicAPIKey, cfg.AI.AnthropicModel)
 	salesAssistant := crm.NewAISalesAssistant(anthropicSvc, logg)
-	automationUC := crm.NewAutomationUseCase(automationRepo, campaignRepo, templateRepo, nil, logg)
+	automationUC := crm.NewAutomationUseCase(automationRepo, campaignRepo, templateRepo, nil, logg, nil)
 
 	automationWorker, err := crm.NewAutomationCronWorker(automationUC, logg)
 	if err != nil {

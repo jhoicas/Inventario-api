@@ -349,6 +349,12 @@ type CreateCampaignTemplateRequest struct {
 	Body    string `json:"body" validate:"required"`
 }
 
+type UpdateCampaignTemplateRequest struct {
+	Name    *string `json:"name,omitempty"`
+	Subject *string `json:"subject,omitempty"`
+	Body    *string `json:"body,omitempty"`
+}
+
 type CampaignTemplateResponse struct {
 	ID        string    `json:"id"`
 	CompanyID string    `json:"company_id"`
@@ -575,4 +581,28 @@ type AutomationResponse struct {
 	Config       json.RawMessage `json:"config,omitempty"`
 	IsActive     bool            `json:"is_active"`
 	LastRunAt    *time.Time      `json:"last_run_at,omitempty"`
+}
+
+type AuditLogResponse struct {
+	ID         string          `json:"id"`
+	CompanyID  string          `json:"company_id"`
+	UserID     string          `json:"user_id"`
+	Action     string          `json:"action"`
+	EntityName string          `json:"entity_name"`
+	EntityID   string          `json:"entity_id"`
+	Changes    json.RawMessage `json:"changes"`
+	CreatedAt  time.Time       `json:"created_at"`
+}
+
+type AuditLogMetricByEntity struct {
+	EntityName string `json:"entity_name"`
+	Count      int64  `json:"count"`
+}
+
+type AuditLogListResponse struct {
+	Items   []AuditLogResponse       `json:"items"`
+	Total   int64                    `json:"total"`
+	Limit   int                      `json:"limit"`
+	Offset  int                      `json:"offset"`
+	Metrics []AuditLogMetricByEntity `json:"metrics"`
 }

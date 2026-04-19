@@ -1288,6 +1288,16 @@ func (r *CRMCampaignTemplateRepo) GetByID(ctx context.Context, id string) (*enti
 	return &t, nil
 }
 
+func (r *CRMCampaignTemplateRepo) Update(ctx context.Context, t *entity.CampaignTemplate) error {
+	_, err := r.q.Exec(ctx, `
+		UPDATE crm_campaign_templates
+		SET name = $3, subject = $4, body = $5, updated_at = $6
+		WHERE id = $1 AND company_id = $2`,
+		t.ID, t.CompanyID, t.Name, t.Subject, t.Body, t.UpdatedAt,
+	)
+	return err
+}
+
 func (r *CRMCampaignTemplateRepo) FindAllByCompany(ctx context.Context, companyID string) ([]*entity.CampaignTemplate, error) {
 	rows, err := r.q.Query(ctx, `
 		SELECT id, company_id, name, subject, body, created_at, updated_at
@@ -1729,12 +1739,20 @@ func (r *CRMCampaignRepo) Update(ctx context.Context, c *entity.Campaign) error 
 		UPDATE crm_campaigns
 		SET name = $2,
 			description = $3,
-			status = $4,
-			scheduled_at = $5,
-			updated_at = $6
+			subject = $4,
+			body = $5,
+			status = $6,
+			channel = $7,
+			scheduled_at = $8,
+			updated_at = $9
 		WHERE id = $1`,
-		c.ID, c.Name, nullIfEmpty(c.Description), c.Status, scheduledAt, c.UpdatedAt,
+		c.ID, c.Name, nullIfEmpty(c.Description), nullIfEmpty(c.Subject), nullIfEmpty(c.Body), c.Status, c.Channel, scheduledAt, c.UpdatedAt,
 	)
+	return err
+}
+
+func (r *CRMCampaignRepo) Delete(ctx context.Context, id, companyID string) error {
+	_, err := r.q.Exec(ctx, `DELETE FROM crm_campaigns WHERE id = $1 AND company_id = $2`, id, companyID)
 	return err
 }
 
@@ -1742,9 +1760,9 @@ func (r *CRMCampaignRepo) GetByID(ctx context.Context, id string) (*entity.Campa
 	var c entity.Campaign
 	var description, createdBy *string
 	err := r.q.QueryRow(ctx, `
-		SELECT id, company_id, name, description, status, scheduled_at, created_by, created_at, updated_at
+		SELECT id, company_id, name, description, subject, body, status, channel, scheduled_at, created_by, created_at, updated_at
 		FROM crm_campaigns WHERE id = $1`, id,
-	).Scan(&c.ID, &c.CompanyID, &c.Name, &description, &c.Status, &c.ScheduledAt, &createdBy, &c.CreatedAt, &c.UpdatedAt)
+	).Scan(&c.ID, &c.CompanyID, &c.Name, &description, &c.Subject, &c.Body, &c.Status, &c.Channel, &c.ScheduledAt, &createdBy, &c.CreatedAt, &c.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
@@ -1759,6 +1777,145 @@ func (r *CRMCampaignRepo) GetByID(ctx context.Context, id string) (*entity.Campa
 	}
 	c.ScheduledAt = toUTCTimePtr(c.ScheduledAt)
 	return &c, nil
+}
+
+// CRMAuditLogRepo implementación de AuditLogRepository.
+type CRMAuditLogRepo struct{ q Querier }
+
+func NewCRMAuditLogRepository(q Querier) *CRMAuditLogRepo { return &CRMAuditLogRepo{q: q} }
+
+func (r *CRMAuditLogRepo) Create(ctx context.Context, log *entity.AuditLog) error {
+	if log.ID == "" {
+		log.ID = uuid.New().String()
+	}
+	if log.CreatedAt.IsZero() {
+		log.CreatedAt = time.Now().UTC()
+	}
+	changes := []byte("{}")
+	if len(log.Changes) > 0 {
+		changes = log.Changes
+	}
+	_, err := r.q.Exec(ctx, `
+		INSERT INTO audit_logs (id, company_id, user_id, action, entity_name, entity_id, changes, created_at)
+		VALUES ($1, $2, NULLIF($3,''), $4, $5, $6, $7::jsonb, $8)`,
+		log.ID, log.CompanyID, log.UserID, log.Action, log.EntityName, log.EntityID, changes, log.CreatedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("create audit log: %w", err)
+	}
+	return nil
+}
+
+func (r *CRMAuditLogRepo) List(ctx context.Context, filters repository.AuditLogFilters) ([]*entity.AuditLog, int64, error) {
+	where := " WHERE company_id = $1"
+	args := []any{filters.CompanyID}
+	idx := 2
+	if strings.TrimSpace(filters.UserID) != "" {
+		where += fmt.Sprintf(" AND user_id::text = $%d", idx)
+		args = append(args, filters.UserID)
+		idx++
+	}
+	if strings.TrimSpace(filters.EntityName) != "" {
+		where += fmt.Sprintf(" AND entity_name = $%d", idx)
+		args = append(args, strings.ToUpper(strings.TrimSpace(filters.EntityName)))
+		idx++
+	}
+	if !filters.StartDate.IsZero() {
+		where += fmt.Sprintf(" AND created_at >= $%d", idx)
+		args = append(args, filters.StartDate)
+		idx++
+	}
+	if !filters.EndDate.IsZero() {
+		where += fmt.Sprintf(" AND created_at <= $%d", idx)
+		args = append(args, filters.EndDate)
+		idx++
+	}
+
+	limit := filters.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+	offset := filters.Offset
+	if offset < 0 {
+		offset = 0
+	}
+
+	query := `
+		SELECT id, company_id, COALESCE(user_id::text, ''), action, entity_name, entity_id, changes, created_at
+		FROM audit_logs` + where + fmt.Sprintf(" ORDER BY created_at DESC LIMIT $%d OFFSET $%d", idx, idx+1)
+	rows, err := r.q.Query(ctx, query, append(args, limit, offset)...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list audit logs: %w", err)
+	}
+	defer rows.Close()
+
+	items := make([]*entity.AuditLog, 0)
+	for rows.Next() {
+		var item entity.AuditLog
+		if err := rows.Scan(&item.ID, &item.CompanyID, &item.UserID, &item.Action, &item.EntityName, &item.EntityID, &item.Changes, &item.CreatedAt); err != nil {
+			return nil, 0, fmt.Errorf("scan audit log: %w", err)
+		}
+		items = append(items, &item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("iterate audit logs: %w", err)
+	}
+
+	var total int64
+	countQuery := `SELECT COUNT(*) FROM audit_logs` + where
+	if err := r.q.QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("count audit logs: %w", err)
+	}
+
+	return items, total, nil
+}
+
+func (r *CRMAuditLogRepo) CountByEntity(ctx context.Context, filters repository.AuditLogFilters) ([]*repository.AuditLogEntityCount, error) {
+	where := " WHERE company_id = $1"
+	args := []any{filters.CompanyID}
+	idx := 2
+	if strings.TrimSpace(filters.UserID) != "" {
+		where += fmt.Sprintf(" AND user_id::text = $%d", idx)
+		args = append(args, filters.UserID)
+		idx++
+	}
+	if strings.TrimSpace(filters.EntityName) != "" {
+		where += fmt.Sprintf(" AND entity_name = $%d", idx)
+		args = append(args, strings.ToUpper(strings.TrimSpace(filters.EntityName)))
+		idx++
+	}
+	if !filters.StartDate.IsZero() {
+		where += fmt.Sprintf(" AND created_at >= $%d", idx)
+		args = append(args, filters.StartDate)
+		idx++
+	}
+	if !filters.EndDate.IsZero() {
+		where += fmt.Sprintf(" AND created_at <= $%d", idx)
+		args = append(args, filters.EndDate)
+	}
+
+	rows, err := r.q.Query(ctx, `
+		SELECT entity_name, COUNT(*)
+		FROM audit_logs`+where+`
+		GROUP BY entity_name
+		ORDER BY entity_name ASC`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("count audit logs by entity: %w", err)
+	}
+	defer rows.Close()
+
+	out := make([]*repository.AuditLogEntityCount, 0)
+	for rows.Next() {
+		item := &repository.AuditLogEntityCount{}
+		if err := rows.Scan(&item.EntityName, &item.Count); err != nil {
+			return nil, fmt.Errorf("scan audit log metric: %w", err)
+		}
+		out = append(out, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate audit log metrics: %w", err)
+	}
+	return out, nil
 }
 
 func toUTCTimePtr(t *time.Time) *time.Time {

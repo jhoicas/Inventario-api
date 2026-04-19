@@ -189,6 +189,7 @@ func main() {
 	crmCampaignRepo := postgres.NewCRMCampaignRepository(pool)
 	crmAutomationRepo := postgres.NewCRMAutomationRepository(pool)
 	crmTemplateRepo := postgres.NewCRMCampaignTemplateRepository(pool)
+	auditLogRepo := postgres.NewCRMAuditLogRepository(pool)
 	crmOpportunityRepo := postgres.NewCRMOpportunityRepository(pool)
 	slaConfigRepo := postgres.NewSLAConfigRepository(pool)
 	_ = slaConfigRepo // disponible para futuros endpoints
@@ -236,12 +237,13 @@ func main() {
 	metaProvider := messaging.NewMetaWhatsAppProvider(os.Getenv("META_WHATSAPP_TOKEN"), os.Getenv("META_WHATSAPP_PHONE_ID"))
 	providers["WHATSAPP"] = metaProvider
 
-	campaignUC := crm.NewCampaignUseCase(crmCampaignRepo, customerRepo, crmProfileRepo, crmInteractionRepo, providers, mailSender)
-	automationUC := crm.NewAutomationUseCase(crmAutomationRepo, crmCampaignRepo, crmTemplateRepo, nil, log)
-	templateUC := crm.NewCampaignTemplateUseCase(crmTemplateRepo)
+	auditLogUC := crm.NewAuditLogUseCase(auditLogRepo)
+	campaignUC := crm.NewCampaignUseCase(crmCampaignRepo, customerRepo, crmProfileRepo, crmInteractionRepo, providers, mailSender, auditLogUC)
+	automationUC := crm.NewAutomationUseCase(crmAutomationRepo, crmCampaignRepo, crmTemplateRepo, nil, log, auditLogUC)
+	templateUC := crm.NewCampaignTemplateUseCase(crmTemplateRepo, auditLogUC)
 	opportunityUC := crm.NewOpportunityUseCase(crmOpportunityRepo)
 	importUC := crm.NewImportUseCase(crmProfileRepo, customerRepo, crmCategoryRepo, crmTaskRepo, crmOpportunityRepo)
-	crmHandler := httpRouter.NewCRMHandler(loyaltyUC, crmAnalyticsUC, automationUC, taskUC, pqrUC, aiCRMUC, customerUC, crmInteractionRepo, opportunityUC, invoiceRepo, campaignUC, templateUC, importUC)
+	crmHandler := httpRouter.NewCRMHandler(loyaltyUC, crmAnalyticsUC, automationUC, auditLogUC, taskUC, pqrUC, aiCRMUC, customerUC, crmInteractionRepo, opportunityUC, invoiceRepo, campaignUC, templateUC, importUC)
 	crmAIHandler := httpRouter.NewCRMAIHandler(aiAnalystSvc, bulkImporterSvc, log)
 	emailHandler := httpRouter.NewEmailHandler(emailUC)
 

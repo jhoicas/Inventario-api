@@ -140,6 +140,7 @@ type CRMCampaignRepository interface {
 	Create(ctx context.Context, c *entity.Campaign) error
 	CreateWithRecipients(ctx context.Context, c *entity.Campaign, recipients []*entity.CampaignRecipient) error
 	Update(ctx context.Context, c *entity.Campaign) error
+	Delete(ctx context.Context, id, companyID string) error
 	GetByID(ctx context.Context, id string) (*entity.Campaign, error)
 	GetMetrics(ctx context.Context, campaignID string) (*entity.CampaignMetrics, error)
 	QueueRecipients(ctx context.Context, campaignID string, recipients []*entity.CampaignRecipient) (int, error)
@@ -163,8 +164,30 @@ type CRMAutomationRepository interface {
 type CRMCampaignTemplateRepository interface {
 	Create(ctx context.Context, t *entity.CampaignTemplate) error
 	GetByID(ctx context.Context, id string) (*entity.CampaignTemplate, error)
+	Update(ctx context.Context, t *entity.CampaignTemplate) error
 	FindAllByCompany(ctx context.Context, companyID string) ([]*entity.CampaignTemplate, error)
 	Delete(ctx context.Context, id, companyID string) error
+}
+
+type AuditLogFilters struct {
+	CompanyID  string
+	UserID     string
+	EntityName string
+	StartDate  time.Time
+	EndDate    time.Time
+	Limit      int
+	Offset     int
+}
+
+type AuditLogEntityCount struct {
+	EntityName string
+	Count      int64
+}
+
+type AuditLogRepository interface {
+	Create(ctx context.Context, log *entity.AuditLog) error
+	List(ctx context.Context, filters AuditLogFilters) ([]*entity.AuditLog, int64, error)
+	CountByEntity(ctx context.Context, filters AuditLogFilters) ([]*AuditLogEntityCount, error)
 }
 
 // CRMProductHubRepository puerto de persistencia para productos en el hub de analytics.
