@@ -2454,8 +2454,9 @@ func (h *CRMHandler) EscalateTicket(c *fiber.Ctx) error {
 }
 
 // Import procesa la importación masiva de perfiles CRM desde un archivo Excel/CSV.
+// Soporta la columna opcional fecha_nacimiento en formato DD-MM-YYYY.
 // @Summary      Importar perfiles CRM
-// @Description  Carga perfiles de clientes en background y retorna un jobID para consultar progreso
+// @Description  Carga perfiles de clientes en background, valida fecha_nacimiento en DD-MM-YYYY y retorna un jobID para consultar progreso
 // @Tags         crm
 // @Security     Bearer
 // @Accept       mpfd

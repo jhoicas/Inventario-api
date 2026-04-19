@@ -2,6 +2,7 @@ package crm
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -29,12 +30,12 @@ func TestValidateImportRows_FlagsDuplicatesMissingEmailAndLastPurchaseWarnings(t
 
 	assert.Len(t, preview.Rows, 4)
 	assert.Equal(t, 4, preview.Summary.TotalRows)
-	assert.Equal(t, 2, preview.Summary.ValidRows)
-	assert.Equal(t, 2, preview.Summary.InvalidRows)
+	assert.Equal(t, 1, preview.Summary.ValidRows)
+	assert.Equal(t, 3, preview.Summary.InvalidRows)
 	assert.Equal(t, 2, preview.Summary.DuplicateRows)
 	assert.Equal(t, 1, preview.Summary.MissingEmailRows)
-	assert.Equal(t, 2, preview.Summary.WarningRows)
-	assert.Len(t, validRows, 2)
+	assert.Equal(t, 4, preview.Summary.WarningRows)
+	assert.Len(t, validRows, 1)
 
 	first := preview.Rows[0]
 	assert.Equal(t, 2, first.Row)
@@ -51,6 +52,67 @@ func TestValidateImportRows_FlagsDuplicatesMissingEmailAndLastPurchaseWarnings(t
 	fourth := preview.Rows[3]
 	assert.Equal(t, "cliente@demo.com", fourth.NormalizedEmail)
 	assert.True(t, fourth.Valid)
+}
+
+func TestValidateImportRows_ParsesBirthDateAndKeepsItOptional(t *testing.T) {
+	uc := &ImportUseCase{}
+	rows := [][]string{
+		{"Nombre", "Email", "IDCliente", "Última Compra", "Fecha Nacimiento"},
+		{"Ana", "ana@example.com", "ID-1", "01/2025", "31-12-1990"},
+		{"Sin Fecha", "sinfecha@example.com", "ID-2", "02/2025", ""},
+	}
+
+	validRows, preview := uc.validateImportRows(rows)
+	require.NotNil(t, preview)
+
+	assert.Len(t, validRows, 2)
+	assert.Equal(t, 2, preview.Summary.TotalRows)
+	assert.Equal(t, 2, preview.Summary.ValidRows)
+	assert.Equal(t, 0, preview.Summary.InvalidRows)
+
+	first := preview.Rows[0]
+	assert.True(t, first.Valid)
+	assert.Equal(t, "1990-12-31", first.FechaNacimiento)
+	assert.Empty(t, first.Errors)
+	assert.Empty(t, first.Warnings)
+
+	second := preview.Rows[1]
+	assert.True(t, second.Valid)
+	assert.Empty(t, second.FechaNacimiento)
+	assert.Contains(t, second.Warnings, "fecha_nacimiento vacía")
+}
+
+func TestValidateImportRows_RejectsInvalidBirthDateFormatAndImpossibleDate(t *testing.T) {
+	uc := &ImportUseCase{}
+	rows := [][]string{
+		{"Nombre", "Email", "Fecha Nacimiento"},
+		{"Formato Malo", "bad-format@example.com", "1990-12-31"},
+		{"Fecha Inexistente", "bad-date@example.com", "31-02-2024"},
+	}
+
+	_, preview := uc.validateImportRows(rows)
+	require.NotNil(t, preview)
+
+	assert.Len(t, preview.Rows, 2)
+	assert.False(t, preview.Rows[0].Valid)
+	assert.Contains(t, preview.Rows[0].Errors, "fecha_nacimiento: formato inválido, use DD-MM-YYYY")
+	assert.False(t, preview.Rows[1].Valid)
+	assert.Contains(t, preview.Rows[1].Errors, "fecha_nacimiento: fecha inválida o inexistente")
+	assert.Equal(t, 2, preview.Summary.InvalidRows)
+	assert.Equal(t, 0, preview.Summary.ValidRows)
+}
+
+func TestParseImportBirthDate_ReturnsNormalizedISODate(t *testing.T) {
+	parsed, iso, err := parseImportBirthDate("07-03-2001")
+	require.NoError(t, err)
+	require.NotNil(t, parsed)
+	assert.Equal(t, "2001-03-07", iso)
+	assert.Equal(t, time.Date(2001, 3, 7, 0, 0, 0, 0, time.UTC), parsed.UTC())
+
+	parsed, iso, err = parseImportBirthDate("")
+	require.NoError(t, err)
+	assert.Nil(t, parsed)
+	assert.Empty(t, iso)
 }
 
 func TestImportJobProgress_TracksInsertedUpdatedSkippedAndFailed(t *testing.T) {

@@ -4,18 +4,20 @@ import "time"
 
 // ImportCRMProfileRequest es la fila de datos parseada del archivo de importación.
 type ImportCRMProfileRequest struct {
-	IDCliente             string  `json:"idCliente"`
-	Nombre                string  `json:"nombre"`
-	Email                 string  `json:"email"`
-	Telefono              string  `json:"telefono"`
-	Segmento              string  `json:"segmento"`
-	VentasTotales         float64 `json:"ventasTotales"`
-	Pedidos               int     `json:"pedidos"`
-	Productos             int     `json:"productos"`
-	UltimaCompra          string  `json:"ultimaCompra"`
-	CategoriaProducto     string  `json:"categoriaProducto"`
-	DescripcionProductos  string  `json:"descripcionProductos"`
-	EstrategiaSeguimiento string  `json:"estrategiaSeguimiento"`
+	IDCliente             string     `json:"idCliente"`
+	Nombre                string     `json:"nombre"`
+	Email                 string     `json:"email"`
+	Telefono              string     `json:"telefono"`
+	FechaNacimiento       string     `json:"fecha_nacimiento,omitempty"`
+	BirthDate             *time.Time `json:"-"`
+	Segmento              string     `json:"segmento"`
+	VentasTotales         float64    `json:"ventasTotales"`
+	Pedidos               int        `json:"pedidos"`
+	Productos             int        `json:"productos"`
+	UltimaCompra          string     `json:"ultimaCompra"`
+	CategoriaProducto     string     `json:"categoriaProducto"`
+	DescripcionProductos  string     `json:"descripcionProductos"`
+	EstrategiaSeguimiento string     `json:"estrategiaSeguimiento"`
 }
 
 // CRMImportResponse resume el resultado de la importación masiva.
@@ -41,6 +43,7 @@ type ImportPreviewRow struct {
 	Row             int      `json:"row"`
 	Email           string   `json:"email,omitempty"`
 	NormalizedEmail string   `json:"normalized_email,omitempty"`
+	FechaNacimiento string   `json:"fecha_nacimiento,omitempty"`
 	Valid           bool     `json:"valid"`
 	Errors          []string `json:"errors,omitempty"`
 	Warnings        []string `json:"warnings,omitempty"`
@@ -53,6 +56,7 @@ type ImportJobRowStatus struct {
 	Row             int      `json:"row"`
 	Email           string   `json:"email,omitempty"`
 	NormalizedEmail string   `json:"normalized_email,omitempty"`
+	FechaNacimiento string   `json:"fecha_nacimiento,omitempty"`
 	Valid           bool     `json:"valid"`
 	Action          string   `json:"action"` // skipped|pending|inserted|updated|failed
 	Errors          []string `json:"errors,omitempty"`
@@ -85,12 +89,12 @@ type ImportSalesError struct {
 
 // ImportSalesResponse resume el resultado de la importación masiva de ventas.
 type ImportSalesResponse struct {
-	TotalOrders       int               `json:"total_orders"`
-	SuccessfulOrders  int               `json:"successful_orders"`
-	FailedOrders      int               `json:"failed_orders"`
-	TotalItems        int               `json:"total_items"`
-	CreatedCustomers  int               `json:"created_customers"`
-	CreatedCategories int               `json:"created_categories"`
-	CreatedProducts   int               `json:"created_products"`
+	TotalOrders       int                `json:"total_orders"`
+	SuccessfulOrders  int                `json:"successful_orders"`
+	FailedOrders      int                `json:"failed_orders"`
+	TotalItems        int                `json:"total_items"`
+	CreatedCustomers  int                `json:"created_customers"`
+	CreatedCategories int                `json:"created_categories"`
+	CreatedProducts   int                `json:"created_products"`
 	Errors            []ImportSalesError `json:"errors,omitempty"`
 }

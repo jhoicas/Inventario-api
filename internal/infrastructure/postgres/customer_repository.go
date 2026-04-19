@@ -29,10 +29,10 @@ func NewCustomerRepository(q Querier) *CustomerRepo {
 // Create persiste un nuevo cliente.
 func (r *CustomerRepo) Create(customer *entity.Customer) error {
 	query := `
-		INSERT INTO customers (id, company_id, name, tax_id, email, phone, is_active, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`
+		INSERT INTO customers (id, company_id, name, tax_id, email, phone, birth_date, is_active, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`
 	_, err := r.q.Exec(context.Background(), query,
-		customer.ID, customer.CompanyID, customer.Name, customer.TaxID, customer.Email, customer.Phone,
+		customer.ID, customer.CompanyID, customer.Name, customer.TaxID, customer.Email, customer.Phone, customer.BirthDate,
 		customer.IsActive,
 		customer.CreatedAt, customer.UpdatedAt,
 	)
@@ -48,11 +48,11 @@ func (r *CustomerRepo) Create(customer *entity.Customer) error {
 // GetByID obtiene un cliente por ID.
 func (r *CustomerRepo) GetByID(id string) (*entity.Customer, error) {
 	query := `
-		SELECT id, company_id, name, tax_id, COALESCE(email, ''), COALESCE(phone, ''), is_active, created_at, updated_at
+		SELECT id, company_id, name, tax_id, COALESCE(email, ''), COALESCE(phone, ''), birth_date, is_active, created_at, updated_at
 		FROM customers WHERE id = $1`
 	var c entity.Customer
 	err := r.q.QueryRow(context.Background(), query, id).Scan(
-		&c.ID, &c.CompanyID, &c.Name, &c.TaxID, &c.Email, &c.Phone, &c.IsActive, &c.CreatedAt, &c.UpdatedAt,
+		&c.ID, &c.CompanyID, &c.Name, &c.TaxID, &c.Email, &c.Phone, &c.BirthDate, &c.IsActive, &c.CreatedAt, &c.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -66,11 +66,11 @@ func (r *CustomerRepo) GetByID(id string) (*entity.Customer, error) {
 // GetByCompanyAndTaxID obtiene un cliente por empresa y NIT/cédula.
 func (r *CustomerRepo) GetByCompanyAndTaxID(companyID, taxID string) (*entity.Customer, error) {
 	query := `
-		SELECT id, company_id, name, tax_id, COALESCE(email, ''), COALESCE(phone, ''), is_active, created_at, updated_at
+		SELECT id, company_id, name, tax_id, COALESCE(email, ''), COALESCE(phone, ''), birth_date, is_active, created_at, updated_at
 		FROM customers WHERE company_id = $1 AND tax_id = $2`
 	var c entity.Customer
 	err := r.q.QueryRow(context.Background(), query, companyID, taxID).Scan(
-		&c.ID, &c.CompanyID, &c.Name, &c.TaxID, &c.Email, &c.Phone, &c.IsActive, &c.CreatedAt, &c.UpdatedAt,
+		&c.ID, &c.CompanyID, &c.Name, &c.TaxID, &c.Email, &c.Phone, &c.BirthDate, &c.IsActive, &c.CreatedAt, &c.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -84,11 +84,11 @@ func (r *CustomerRepo) GetByCompanyAndTaxID(companyID, taxID string) (*entity.Cu
 // GetByCompanyAndEmail obtiene un cliente por empresa y correo electrónico.
 func (r *CustomerRepo) GetByCompanyAndEmail(companyID, email string) (*entity.Customer, error) {
 	query := `
-		SELECT id, company_id, name, tax_id, COALESCE(email, ''), COALESCE(phone, ''), is_active, created_at, updated_at
+		SELECT id, company_id, name, tax_id, COALESCE(email, ''), COALESCE(phone, ''), birth_date, is_active, created_at, updated_at
 		FROM customers WHERE company_id = $1 AND LOWER(email) = LOWER($2)`
 	var c entity.Customer
 	err := r.q.QueryRow(context.Background(), query, companyID, email).Scan(
-		&c.ID, &c.CompanyID, &c.Name, &c.TaxID, &c.Email, &c.Phone, &c.IsActive, &c.CreatedAt, &c.UpdatedAt,
+		&c.ID, &c.CompanyID, &c.Name, &c.TaxID, &c.Email, &c.Phone, &c.BirthDate, &c.IsActive, &c.CreatedAt, &c.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -159,6 +159,7 @@ func (r *CustomerRepo) list(joins, where string, args []any, limit, offset int) 
 			c.tax_id,
 			COALESCE(c.email, ''),
 			COALESCE(c.phone, ''),
+			c.birth_date,
 			c.is_active,
 			c.created_at,
 			c.updated_at,
@@ -177,7 +178,7 @@ func (r *CustomerRepo) list(joins, where string, args []any, limit, offset int) 
 	for rows.Next() {
 		var c entity.Customer
 		var ltv pgtype.Numeric
-		if err := rows.Scan(&c.ID, &c.CompanyID, &c.Name, &c.TaxID, &c.Email, &c.Phone, &c.IsActive, &c.CreatedAt, &c.UpdatedAt, &ltv, &c.CategoryName); err != nil {
+		if err := rows.Scan(&c.ID, &c.CompanyID, &c.Name, &c.TaxID, &c.Email, &c.Phone, &c.BirthDate, &c.IsActive, &c.CreatedAt, &c.UpdatedAt, &ltv, &c.CategoryName); err != nil {
 			return nil, fmt.Errorf("scan customer: %w", err)
 		}
 		if ltv.Valid && ltv.Int != nil {
@@ -208,10 +209,10 @@ func (r *CustomerRepo) count(joins, where string, args []any) (int64, error) {
 // Update actualiza un cliente.
 func (r *CustomerRepo) Update(customer *entity.Customer) error {
 	query := `
-		UPDATE customers SET name = $2, tax_id = $3, email = $4, phone = $5, updated_at = $6
+		UPDATE customers SET name = $2, tax_id = $3, email = $4, phone = $5, birth_date = $6, updated_at = $7
 		WHERE id = $1`
 	_, err := r.q.Exec(context.Background(), query,
-		customer.ID, customer.Name, customer.TaxID, customer.Email, customer.Phone, customer.UpdatedAt,
+		customer.ID, customer.Name, customer.TaxID, customer.Email, customer.Phone, customer.BirthDate, customer.UpdatedAt,
 	)
 	if err != nil {
 		if isUniqueViolation(err) {

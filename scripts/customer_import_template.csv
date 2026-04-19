@@ -1,0 +1,3 @@
+Nombre,Email,IDCliente,Telefono,Fecha Nacimiento,Segmento,Ventas Totales,Pedidos,Productos,Última Compra,Categoria Producto,Descripcion de Productos,Estrategia Seguimiento
+Ana Pérez,ana@example.com,CC-1001,3001234567,31-12-1990,VIP,1250000,12,4,01/2025,Moda,Ropa y accesorios,Seguimiento post compra
+Carlos Ruiz,carlos@example.com,NIT-2002,3015557788,,Premium,850000,8,2,12/2024,Tecnología,Accesorios y servicios,Campaña de fidelización

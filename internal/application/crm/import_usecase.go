@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"mime/multipart"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -24,6 +25,8 @@ import (
 	"github.com/shopspring/decimal"
 	"github.com/xuri/excelize/v2"
 )
+
+var importBirthDatePattern = regexp.MustCompile(`^\d{2}-\d{2}-\d{4}$`)
 
 var importJobs = sync.Map{}
 
@@ -379,6 +382,7 @@ func newImportJobState(jobID string, preview *dto.CRMImportPreviewResponse) *imp
 			Row:             row.Row,
 			Email:           row.Email,
 			NormalizedEmail: row.NormalizedEmail,
+			FechaNacimiento: row.FechaNacimiento,
 			Valid:           row.Valid,
 			Warnings:        append([]string(nil), row.Warnings...),
 			Errors:          append([]string(nil), row.Errors...),
@@ -423,8 +427,9 @@ func (uc *ImportUseCase) mapHeaders(headers []string) map[string]int {
 }
 
 // parseRow extrae datos de una fila según los encabezados.
-func (uc *ImportUseCase) parseRow(headerMap map[string]int, row []string) dto.ImportCRMProfileRequest {
+func (uc *ImportUseCase) parseRow(headerMap map[string]int, row []string) (dto.ImportCRMProfileRequest, []string) {
 	profile := dto.ImportCRMProfileRequest{}
+	var rowErrors []string
 
 	// Busca y asigna campos por nombre de columna (admite espacios, underscore y acentos).
 	if idx, ok := findHeaderIndex(headerMap, "nombre"); ok && idx < len(row) {
@@ -438,6 +443,19 @@ func (uc *ImportUseCase) parseRow(headerMap map[string]int, row []string) dto.Im
 	}
 	if idx, ok := findHeaderIndex(headerMap, "telefono", "teléfono", "phone", "celular"); ok && idx < len(row) {
 		profile.Telefono = strings.TrimSpace(row[idx])
+	}
+	if idx, ok := findHeaderIndex(headerMap, "fecha_nacimiento", "fecha nacimiento", "fechanacimiento", "birth_date", "birth date"); ok && idx < len(row) {
+		raw := strings.TrimSpace(row[idx])
+		if raw != "" {
+			profile.FechaNacimiento = raw
+			parsed, iso, err := parseImportBirthDate(raw)
+			if err != nil {
+				rowErrors = append(rowErrors, err.Error())
+			} else {
+				profile.BirthDate = parsed
+				profile.FechaNacimiento = iso
+			}
+		}
 	}
 	if idx, ok := findHeaderIndex(headerMap, "segmento"); ok && idx < len(row) {
 		profile.Segmento = strings.TrimSpace(row[idx])
@@ -488,7 +506,7 @@ func (uc *ImportUseCase) parseRow(headerMap map[string]int, row []string) dto.Im
 		profile.EstrategiaSeguimiento = strings.TrimSpace(row[idx])
 	}
 
-	return profile
+	return profile, rowErrors
 }
 
 func (uc *ImportUseCase) validateImportRows(rows [][]string) ([]importValidatedRow, *dto.CRMImportPreviewResponse) {
@@ -507,14 +525,19 @@ func (uc *ImportUseCase) validateImportRows(rows [][]string) ([]importValidatedR
 		if len(row) == 0 || uc.isEmptyRow(row) {
 			continue
 		}
-		profile := uc.parseRow(headerMap, row)
+		profile, rowErrors := uc.parseRow(headerMap, row)
 		previewRow := dto.ImportPreviewRow{
 			Row:             rowNumber,
 			Email:           profile.Email,
 			NormalizedEmail: profile.Email,
+			FechaNacimiento: profile.FechaNacimiento,
 			IDCliente:       strings.TrimSpace(profile.IDCliente),
 			LastPurchase:    strings.TrimSpace(profile.UltimaCompra),
 			Valid:           true,
+		}
+		if len(rowErrors) > 0 {
+			previewRow.Valid = false
+			previewRow.Errors = append(previewRow.Errors, rowErrors...)
 		}
 		if previewRow.NormalizedEmail != "" {
 			emailCounts[previewRow.NormalizedEmail]++
@@ -525,6 +548,9 @@ func (uc *ImportUseCase) validateImportRows(rows [][]string) ([]importValidatedR
 		}
 		if strings.TrimSpace(profile.UltimaCompra) == "" {
 			previewRow.Warnings = append(previewRow.Warnings, "última compra vacía")
+		}
+		if strings.TrimSpace(profile.FechaNacimiento) == "" {
+			previewRow.Warnings = append(previewRow.Warnings, "fecha_nacimiento vacía")
 		}
 		items = append(items, importValidatedRow{RowNumber: rowNumber, Profile: profile, Preview: previewRow})
 	}
@@ -588,6 +614,32 @@ func normalizeImportEmail(value string) string {
 	}, value)
 }
 
+func parseImportBirthDate(raw string) (*time.Time, string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, "", nil
+	}
+	if !importBirthDatePattern.MatchString(raw) {
+		return nil, "", fmt.Errorf("fecha_nacimiento: formato inválido, use DD-MM-YYYY")
+	}
+	parsed, err := time.Parse("02-01-2006", raw)
+	if err != nil {
+		return nil, "", fmt.Errorf("fecha_nacimiento: fecha inválida o inexistente")
+	}
+	parsed = time.Date(parsed.Year(), parsed.Month(), parsed.Day(), 0, 0, 0, 0, time.UTC)
+	iso := parsed.Format("2006-01-02")
+	return &parsed, iso, nil
+}
+
+func birthDatesEqual(a, b *time.Time) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	ay, am, ad := a.UTC().Date()
+	by, bm, bd := b.UTC().Date()
+	return ay == by && am == bm && ad == bd
+}
+
 func findHeaderIndex(headerMap map[string]int, keys ...string) (int, bool) {
 	for _, key := range keys {
 		if idx, ok := headerMap[strings.ToLower(strings.TrimSpace(key))]; ok {
@@ -644,6 +696,7 @@ func (uc *ImportUseCase) upsertProfile(
 			TaxID:     taxID,
 			Email:     profile.Email,
 			Phone:     strings.TrimSpace(profile.Telefono),
+			BirthDate: profile.BirthDate,
 			IsActive:  true,
 			CreatedAt: now,
 			UpdatedAt: now,
@@ -653,11 +706,20 @@ func (uc *ImportUseCase) upsertProfile(
 		}
 	} else {
 		incomingPhone := strings.TrimSpace(profile.Telefono)
+		incomingBirthDate := profile.BirthDate
+		needsUpdate := false
 		if incomingPhone != "" && strings.TrimSpace(customer.Phone) != incomingPhone {
 			customer.Phone = incomingPhone
+			needsUpdate = true
+		}
+		if incomingBirthDate != nil && (customer.BirthDate == nil || !customer.BirthDate.Equal(*incomingBirthDate)) {
+			customer.BirthDate = incomingBirthDate
+			needsUpdate = true
+		}
+		if needsUpdate {
 			customer.UpdatedAt = time.Now()
 			if err := uc.customerRepo.Update(customer); err != nil {
-				return false, fmt.Errorf("actualizar teléfono de cliente: %w", err)
+				return false, fmt.Errorf("actualizar cliente: %w", err)
 			}
 		}
 	}
