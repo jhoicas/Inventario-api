@@ -13,4 +13,6 @@ var (
 	ErrForbidden         = errors.New("acceso denegado")
 	ErrConflict          = errors.New("conflicto con el estado actual")
 	ErrInsufficientStock = errors.New("stock insuficiente")
+	// ErrCRMImportHeadersInvalid indica cabeceras de archivo CSV/Excel incorrectas o incompletas (preview/import CRM).
+	ErrCRMImportHeadersInvalid = errors.New("cabeceras de importación CRM inválidas")
 )

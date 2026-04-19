@@ -1,6 +1,7 @@
 package http
 
 import (
+	"errors"
 	"strconv"
 	"strings"
 	"time"
@@ -2490,6 +2491,9 @@ func (h *CRMHandler) Import(c *fiber.Ctx) error {
 	// Llamar al caso de uso de importación
 	jobID, err := h.ImportUC.ImportProfilesFromFile(c.Context(), companyID, userID, file)
 	if err != nil {
+		if errors.Is(err, domain.ErrCRMImportHeadersInvalid) {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: err.Error()})
+		}
 		if err == domain.ErrInvalidInput {
 			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "formato de archivo inválido o no soportado (.xlsx o .csv requerido)"})
 		}
@@ -2544,12 +2548,13 @@ func (h *CRMHandler) ImportSalesFromFile(c *fiber.Ctx) error {
 
 // PreviewImport analiza el archivo antes del submit y devuelve errores/advertencias por fila.
 // @Summary      Previsualizar importación CRM
-// @Description  Valida filas antes de enviar al backend: email obligatorio y único, normalización y advertencias.
+// @Description  Valida filas antes de enviar al backend. FormData: file (obligatorio), import_type o type o entity = clientes | ventas | historial (historial usa la misma plantilla que clientes).
 // @Tags         crm
 // @Security     Bearer
 // @Accept       mpfd
 // @Produce      json
-// @Param        file  formData  file  true  "Archivo Excel (.xlsx) o CSV"
+// @Param        file         formData  file    true   "Archivo Excel (.xlsx) o CSV"
+// @Param        import_type  formData  string  false  "Tipo: clientes, ventas, historial (alias: type, entity)"
 // @Success      200   {object}  dto.CRMImportPreviewResponse
 // @Failure      400   {object}  dto.ErrorResponse
 // @Failure      401   {object}  dto.ErrorResponse
@@ -2571,10 +2576,21 @@ func (h *CRMHandler) PreviewImport(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_REQUEST", Message: "archivo requerido"})
 	}
 
-	preview, err := h.ImportUC.PreviewProfilesFromFile(file)
+	importType := strings.TrimSpace(c.FormValue("import_type"))
+	if importType == "" {
+		importType = strings.TrimSpace(c.FormValue("type"))
+	}
+	if importType == "" {
+		importType = strings.TrimSpace(c.FormValue("entity"))
+	}
+
+	preview, err := h.ImportUC.PreviewImportFromFile(file, importType)
 	if err != nil {
-		if err == domain.ErrInvalidInput {
-			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "formato de archivo inválido o no soportado (.xlsx o .csv requerido)"})
+		if errors.Is(err, domain.ErrCRMImportHeadersInvalid) {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: err.Error()})
+		}
+		if errors.Is(err, domain.ErrInvalidInput) {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: err.Error()})
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}

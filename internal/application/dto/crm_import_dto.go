@@ -50,6 +50,9 @@ type ImportPreviewRow struct {
 	Warnings        []string `json:"warnings,omitempty"`
 	IDCliente       string   `json:"id_cliente,omitempty"`
 	LastPurchase    string   `json:"last_purchase,omitempty"`
+	// Campos opcionales usados en preview de ventas (plantilla órdenes / líneas).
+	OrderNumber string `json:"order_number,omitempty"`
+	ProductCode string `json:"product_code,omitempty"`
 }
 
 // ImportJobRowStatus describe el estado final o intermedio de una fila durante el job.

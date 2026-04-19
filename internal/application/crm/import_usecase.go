@@ -32,6 +32,20 @@ import (
 var importBirthDatePattern = regexp.MustCompile(`^\d{2}-\d{2}-\d{4}$`)
 var requiredCRMImportHeaders = []string{"nombre", "email", "telefono", "documento", "fecha_nacimiento", "categoria"}
 
+// salesImportHeaderRequirements: columnas mínimas de la plantilla de ventas (cualquier alias reconocido por salesCell).
+var salesImportHeaderRequirements = []struct {
+	label string
+	keys  []string
+}{
+	{"Numero_Orden", []string{"numero_orden", "numero orden", "numeroorden", "orden", "order_number", "ordernumber"}},
+	{"Fecha_Venta", []string{"fecha_venta", "fecha venta", "fechaventa", "sale_date", "saledate"}},
+	{"Email_Cliente", []string{"email_cliente", "email cliente", "email", "customer_email", "customeremail"}},
+	{"Codigo_Producto", []string{"codigo_producto", "código_producto", "codigo producto", "product_code", "productcode"}},
+	{"Nombre_Producto", []string{"nombre_producto", "nombre producto", "nombreproducto", "product_name", "productname"}},
+	{"Cantidad", []string{"cantidad", "quantity", "qty"}},
+	{"Precio_Unitario", []string{"precio_unitario", "precio unitario", "unit_price", "price"}},
+}
+
 var importJobs = sync.Map{}
 
 // JobProgress representa el estado de un job de importación en background.
@@ -125,17 +139,33 @@ func (uc *ImportUseCase) ImportProfilesFromFile(
 	return jobID, nil
 }
 
-// PreviewProfilesFromFile analiza el archivo y devuelve validaciones por fila sin persistir nada.
+// PreviewProfilesFromFile analiza el archivo de clientes (equivale a import_type=clientes).
 func (uc *ImportUseCase) PreviewProfilesFromFile(file *multipart.FileHeader) (*dto.CRMImportPreviewResponse, error) {
+	return uc.PreviewImportFromFile(file, "clientes")
+}
+
+// PreviewImportFromFile analiza el archivo según importType: clientes, ventas o historial (historial usa la misma plantilla que clientes).
+func (uc *ImportUseCase) PreviewImportFromFile(file *multipart.FileHeader, importType string) (*dto.CRMImportPreviewResponse, error) {
 	rows, err := uc.readImportRows(file)
 	if err != nil {
 		return nil, err
 	}
-	if err := validateCRMImportHeaders(rows); err != nil {
-		return nil, err
+	t := normalizeCRMImportPreviewType(importType)
+	switch t {
+	case "ventas":
+		if err := validateSalesImportHeaders(rows); err != nil {
+			return nil, err
+		}
+		return uc.validateSalesImportPreview(rows), nil
+	case "clientes", "historial":
+		if err := validateCRMImportHeaders(rows); err != nil {
+			return nil, err
+		}
+		_, preview := uc.validateImportRows(rows)
+		return preview, nil
+	default:
+		return nil, fmt.Errorf("%w: tipo de importación no reconocido; use clientes, ventas o historial", domain.ErrInvalidInput)
 	}
-	_, preview := uc.validateImportRows(rows)
-	return preview, nil
 }
 
 func (uc *ImportUseCase) readImportRows(file *multipart.FileHeader) ([][]string, error) {
@@ -729,15 +759,45 @@ func validateCRMImportHeaders(rows [][]string) error {
 
 	for _, required := range requiredCRMImportHeaders {
 		if _, ok := headerMap[required]; !ok {
-			return fmt.Errorf("cabecera requerida faltante: %s", required)
+			return fmt.Errorf("%w: cabecera requerida faltante: %s", domain.ErrCRMImportHeadersInvalid, required)
 		}
 	}
 
 	if len(headerMap) != len(requiredCRMImportHeaders) {
-		return fmt.Errorf("cabeceras inválidas: se esperaban exactamente %s", strings.Join(requiredCRMImportHeaders, ", "))
+		return fmt.Errorf("%w: cabeceras inválidas: se esperaban exactamente %s", domain.ErrCRMImportHeadersInvalid, strings.Join(requiredCRMImportHeaders, ", "))
 	}
 
 	return nil
+}
+
+func validateSalesImportHeaders(rows [][]string) error {
+	if len(rows) == 0 || len(rows[0]) == 0 {
+		return domain.ErrInvalidInput
+	}
+	hm := make(map[string]int)
+	for i, h := range rows[0] {
+		hm[normalizeHeaderKey(h)] = i
+	}
+	for _, req := range salesImportHeaderRequirements {
+		if _, ok := findHeaderIndex(hm, req.keys...); !ok {
+			return fmt.Errorf("%w: cabecera requerida faltante o no reconocida: %s", domain.ErrCRMImportHeadersInvalid, req.label)
+		}
+	}
+	return nil
+}
+
+func normalizeCRMImportPreviewType(raw string) string {
+	s := strings.TrimSpace(strings.ToLower(raw))
+	switch s {
+	case "", "clientes", "clientes_crm", "profiles", "perfiles":
+		return "clientes"
+	case "ventas", "sales", "ordenes", "órdenes":
+		return "ventas"
+	case "historial", "history", "compras":
+		return "historial"
+	default:
+		return ""
+	}
 }
 
 // isEmptyRow verifica si una fila está completamente vacía.
@@ -996,6 +1056,107 @@ type salesImportItem struct {
 	CategoryID    string
 	CustomerID    string
 	ItemsSnapshot map[string]any
+}
+
+// validateSalesImportPreview valida cada fila de datos de la plantilla de ventas (sin persistir).
+func (uc *ImportUseCase) validateSalesImportPreview(rows [][]string) *dto.CRMImportPreviewResponse {
+	out := &dto.CRMImportPreviewResponse{Rows: make([]dto.ImportPreviewRow, 0)}
+	if len(rows) < 2 {
+		return out
+	}
+	headerMap := uc.mapHeaders(rows[0])
+	dataRows := rows[1:]
+
+	for idx, row := range dataRows {
+		rowNumber := idx + 2
+		if len(row) == 0 || uc.isEmptyRow(row) {
+			continue
+		}
+
+		orderNumber := trimCell(salesCell(headerMap, row, "numero_orden", "numero orden", "numeroorden", "orden", "order_number", "ordernumber"))
+		saleDateRaw := trimCell(salesCell(headerMap, row, "fecha_venta", "fecha venta", "fechaventa", "sale_date", "saledate"))
+		email := normalizeImportEmail(salesCell(headerMap, row, "email_cliente", "email cliente", "email", "customer_email", "customeremail"))
+		phone := normalizeImportPhone(salesCell(headerMap, row, "telefono", "teléfono", "phone", "customer_phone"))
+		customerName := trimCell(salesCell(headerMap, row, "nombre_cliente", "nombre cliente", "nombrecliente", "customer_name"))
+		productCode := trimCell(salesCell(headerMap, row, "codigo_producto", "código_producto", "codigo producto", "product_code", "productcode"))
+		productName := trimCell(salesCell(headerMap, row, "nombre_producto", "nombre producto", "nombreproducto", "product_name", "productname"))
+		categoryName := trimCell(salesCell(headerMap, row, "categoria_producto", "categoría_producto", "categoria producto", "category", "product_category"))
+		qtyRaw := trimCell(salesCell(headerMap, row, "cantidad", "quantity", "qty"))
+		unitPriceRaw := trimCell(salesCell(headerMap, row, "precio_unitario", "precio unitario", "unit_price", "price"))
+
+		previewRow := dto.ImportPreviewRow{
+			Row:             rowNumber,
+			Email:           email,
+			NormalizedEmail: email,
+			Valid:           true,
+			OrderNumber:     orderNumber,
+			ProductCode:     productCode,
+		}
+		var errs []string
+		var warns []string
+
+		if orderNumber == "" {
+			errs = append(errs, "número de orden es obligatorio")
+		}
+		if saleDateRaw == "" {
+			errs = append(errs, "fecha de venta es obligatoria")
+		} else if _, err := parseSalesDate(saleDateRaw); err != nil {
+			errs = append(errs, fmt.Sprintf("fecha_venta: %v", err))
+		}
+		if email == "" {
+			errs = append(errs, "email del cliente es obligatorio")
+		}
+		if productCode == "" {
+			errs = append(errs, "código de producto es obligatorio")
+		}
+		if productName == "" {
+			errs = append(errs, "nombre de producto es obligatorio")
+		}
+		if qtyRaw == "" {
+			errs = append(errs, "cantidad es obligatoria")
+		} else {
+			qty, err := strconv.Atoi(qtyRaw)
+			if err != nil || qty <= 0 {
+				errs = append(errs, "cantidad debe ser un entero mayor que cero")
+			}
+		}
+		if unitPriceRaw == "" {
+			errs = append(errs, "precio unitario es obligatorio")
+		} else if _, err := strconv.ParseFloat(strings.ReplaceAll(unitPriceRaw, ",", ""), 64); err != nil {
+			errs = append(errs, "precio unitario numérico inválido")
+		}
+		if strings.TrimSpace(customerName) == "" {
+			warns = append(warns, "nombre_cliente vacío (se usará un nombre derivado del email al importar)")
+		}
+		if phone == "" {
+			warns = append(warns, "teléfono vacío")
+		}
+		if strings.TrimSpace(categoryName) == "" {
+			warns = append(warns, "categoría de producto vacía")
+		}
+
+		if len(errs) > 0 {
+			previewRow.Valid = false
+			previewRow.Errors = errs
+		}
+		previewRow.Warnings = warns
+
+		out.Rows = append(out.Rows, previewRow)
+		out.Summary.TotalRows++
+		if previewRow.Valid {
+			out.Summary.ValidRows++
+		} else {
+			out.Summary.InvalidRows++
+		}
+		if email == "" {
+			out.Summary.MissingEmailRows++
+		}
+		if len(warns) > 0 {
+			out.Summary.WarningRows++
+		}
+	}
+
+	return out
 }
 
 type salesImportOrder struct {
