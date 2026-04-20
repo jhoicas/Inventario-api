@@ -194,7 +194,7 @@ func (s *BulkImporterService) processBatch(
 }
 
 // processProductsBatch importa productos y crea los que falten.
-// Columnas esperadas: product_code, product_name, category (UUID de crm_categories), unit_cost
+// Columnas esperadas: product_code, product_name, category (UUID de crm_category_product_hub), unit_cost
 func (s *BulkImporterService) processProductsBatch(
 	ctx context.Context,
 	companyID string,
@@ -402,7 +402,7 @@ func stringPtr(s string) *string {
 	return &s
 }
 
-// categoryUUIDPtr interpreta la columna category como UUID de crm_categories; otros valores se ignoran (nil).
+// categoryUUIDPtr interpreta la columna category como UUID de crm_category_product_hub; otros valores se ignoran (nil).
 func categoryUUIDPtr(s string) *string {
 	s = strings.TrimSpace(s)
 	if s == "" {

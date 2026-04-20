@@ -11,7 +11,7 @@ type ProductHub struct {
 	CompanyID   string
 	ProductCode string
 	ProductName string
-	// CategoryID referencia crm_categories.id (nullable).
+	// CategoryID referencia crm_category_product_hub.id (nullable).
 	CategoryID *string
 	UnitCost   *float64
 	CreatedAt  time.Time

@@ -1305,7 +1305,7 @@ func (uc *ImportUseCase) importSingleSalesOrder(
 				categoryID = cachedID
 				createdCategory = false
 			} else {
-				categoryID, createdCategory, err = upsertCategoryHubTx(ctx, tx, companyID, normCat)
+				categoryID, createdCategory, err = upsertProductCategoryHubTx(ctx, tx, companyID, normCat)
 				if err != nil {
 					return nil, err
 				}
@@ -1424,20 +1424,22 @@ func upsertCustomerFromImportTx(ctx context.Context, tx pgx.Tx, companyID, email
 	return customerID, true, nil
 }
 
-func upsertCategoryHubTx(ctx context.Context, tx pgx.Tx, companyID, categoryName string) (string, bool, error) {
+// upsertProductCategoryHubTx resuelve categorías de producto en crm_category_product_hub (hub de ventas/analytics),
+// no en crm_categories (reservado a fidelización / perfiles CRM).
+func upsertProductCategoryHubTx(ctx context.Context, tx pgx.Tx, companyID, categoryName string) (string, bool, error) {
 	categoryName = strings.ToUpper(strings.TrimSpace(categoryName))
 	if categoryName == "" {
 		return "", false, nil
 	}
 	var existingID string
 	err := tx.QueryRow(ctx, `
-		SELECT id FROM crm_categories
+		SELECT id FROM crm_category_product_hub
 		WHERE company_id = $1 AND TRIM(name) ILIKE $2
 		LIMIT 1`, companyID, categoryName).Scan(&existingID)
 	if err == nil && existingID != "" {
-		_, err := tx.Exec(ctx, `UPDATE crm_categories SET updated_at = now() WHERE id = $1`, existingID)
+		_, err := tx.Exec(ctx, `UPDATE crm_category_product_hub SET updated_at = now() WHERE id = $1`, existingID)
 		if err != nil {
-			return "", false, fmt.Errorf("touch category hub: %w", err)
+			return "", false, fmt.Errorf("touch product category hub: %w", err)
 		}
 		return existingID, false, nil
 	}
@@ -1446,26 +1448,25 @@ func upsertCategoryHubTx(ctx context.Context, tx pgx.Tx, companyID, categoryName
 	}
 	var id string
 	err = tx.QueryRow(ctx, `
-		INSERT INTO crm_categories (id, company_id, name, created_at, updated_at)
+		INSERT INTO crm_category_product_hub (id, company_id, name, created_at, updated_at)
 		VALUES (gen_random_uuid(), $1, $2, now(), now())
 		RETURNING id`, companyID, categoryName).Scan(&id)
 	if err != nil {
 		if isPGUniqueViolation(err) {
-			// Carrera u otra sesión insertó la misma fila antes de que existiera el SELECT previo.
 			var conflictID string
 			err2 := tx.QueryRow(ctx, `
-				SELECT id FROM crm_categories
+				SELECT id FROM crm_category_product_hub
 				WHERE company_id = $1 AND TRIM(name) ILIKE $2
 				LIMIT 1`, companyID, categoryName).Scan(&conflictID)
 			if err2 == nil && conflictID != "" {
-				_, _ = tx.Exec(ctx, `UPDATE crm_categories SET updated_at = now() WHERE id = $1`, conflictID)
+				_, _ = tx.Exec(ctx, `UPDATE crm_category_product_hub SET updated_at = now() WHERE id = $1`, conflictID)
 				return conflictID, false, nil
 			}
 			if err2 != nil && !errors.Is(err2, pgx.ErrNoRows) {
-				return "", false, fmt.Errorf("upsert category hub after unique violation: %w", err2)
+				return "", false, fmt.Errorf("upsert product category hub after unique violation: %w", err2)
 			}
 		}
-		return "", false, fmt.Errorf("upsert category hub: %w", err)
+		return "", false, fmt.Errorf("upsert product category hub: %w", err)
 	}
 	return id, true, nil
 }
