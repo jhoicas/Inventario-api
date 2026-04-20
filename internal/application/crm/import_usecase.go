@@ -1018,12 +1018,9 @@ func (uc *ImportUseCase) ImportSalesFromFile(ctx context.Context, companyID, use
 		return nil, err
 	}
 
-	categoryCache := make(map[string]string)
-	var categoryCacheMu sync.Mutex
-
 	resp := &dto.ImportSalesResponse{TotalOrders: len(orders)}
 	for _, order := range orders {
-		res, err := uc.importSingleSalesOrder(ctx, companyID, userID, order, categoryCache, &categoryCacheMu)
+		res, err := uc.importSingleSalesOrder(ctx, companyID, userID, order)
 		if err != nil {
 			resp.FailedOrders++
 			resp.Errors = append(resp.Errors, dto.ImportSalesError{OrderNumber: order.OrderNumber, Message: err.Error()})
@@ -1276,8 +1273,6 @@ func (uc *ImportUseCase) importSingleSalesOrder(
 	ctx context.Context,
 	companyID, userID string,
 	order salesImportOrder,
-	categoryCache map[string]string,
-	categoryMu *sync.Mutex,
 ) (*salesImportTxResult, error) {
 	tx, err := uc.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
@@ -1286,6 +1281,10 @@ func (uc *ImportUseCase) importSingleSalesOrder(
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	result := &salesImportTxResult{}
+
+	// Caché solo dentro de esta transacción: si se reutilizara entre órdenes, un rollback
+	// dejaría UUIDs de categorías que nunca se confirmaron y fallaría el FK en crm_products_hub.
+	categoryCache := make(map[string]string)
 
 	customerID, createdCustomer, err := upsertCustomerFromImportTx(ctx, tx, companyID, order.CustomerEmail, order.CustomerName, order.CustomerPhone)
 	if err != nil {
@@ -1302,20 +1301,15 @@ func (uc *ImportUseCase) importSingleSalesOrder(
 			categoryID = ""
 			createdCategory = false
 		} else {
-			categoryMu.Lock()
 			if cachedID, ok := categoryCache[normCat]; ok {
 				categoryID = cachedID
-				categoryMu.Unlock()
 				createdCategory = false
 			} else {
-				var err error
 				categoryID, createdCategory, err = upsertCategoryHubTx(ctx, tx, companyID, normCat)
 				if err != nil {
-					categoryMu.Unlock()
 					return nil, err
 				}
 				categoryCache[normCat] = categoryID
-				categoryMu.Unlock()
 			}
 		}
 		if createdCategory {
