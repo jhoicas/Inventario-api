@@ -294,7 +294,8 @@ func NewAIAnalyticsRepository(pool *pgxpool.Pool) *AIAnalyticsRepository {
 
 // QueryView ejecuta una consulta SQL sobre la vista v_crm_ai_analytics de forma segura.
 // El SQL debe estar ya sanitizado con company_id inyectado.
-func (r *AIAnalyticsRepository) QueryView(ctx context.Context, companyID, sqlQuery string) ([]*entity.AIAnalyticsRow, error) {
+// Soporta tanto filas completas (14 columnas) como agregados (COUNT, SUM, etc.) con número arbitrario de columnas.
+func (r *AIAnalyticsRepository) QueryView(ctx context.Context, companyID, sqlQuery string) ([]map[string]interface{}, error) {
 	// Inyeccion adicional de company_id como extra layer de seguridad (deja que SQLGuard valide el SQL antes)
 	safeSQLQuery := fmt.Sprintf(`%s AND company_id = $1`, sqlQuery)
 
@@ -304,20 +305,25 @@ func (r *AIAnalyticsRepository) QueryView(ctx context.Context, companyID, sqlQue
 	}
 	defer rows.Close()
 
-	var analytics []*entity.AIAnalyticsRow
+	cols := rows.FieldDescriptions()
+	colNames := make([]string, len(cols))
+	for i, col := range cols {
+		colNames[i] = col.Name
+	}
+
+	var out []map[string]interface{}
 	for rows.Next() {
-		var row entity.AIAnalyticsRow
-		err := rows.Scan(
-			&row.CompanyID, &row.Fecha, &row.ClienteNombre, &row.Ciudad, &row.Producto,
-			&row.Categoria, &row.Cantidad, &row.PrecioUnitario, &row.IngresoNeto,
-			&row.CostoTotal, &row.Utilidad, &row.CustomerEmail, &row.SaleID, &row.ItemID,
-		)
+		vals, err := rows.Values()
 		if err != nil {
 			return nil, fmt.Errorf("scan analytics row: %w", err)
 		}
-		analytics = append(analytics, &row)
+		row := make(map[string]interface{}, len(vals))
+		for i, val := range vals {
+			row[colNames[i]] = val
+		}
+		out = append(out, row)
 	}
-	return analytics, rows.Err()
+	return out, rows.Err()
 }
 
 // RunAggregateQuery ejecuta consultas de agregacion como COUNT, SUM, AVG sobre la vista.

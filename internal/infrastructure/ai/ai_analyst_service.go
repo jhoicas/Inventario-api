@@ -68,7 +68,7 @@ func (s *AIAnalystService) Ask(ctx context.Context, companyID, question string) 
 
 	s.log.Info().Str("safe_sql", safeSQLQuery).Msg("SQL con filtro company_id inyectado")
 
-	// Paso 4: Ejecutar query sobre la vista
+	// Paso 4: Ejecutar query sobre la vista (filas completas o agregados; columnas según el SQL generado)
 	results, err := s.analyticsRepo.QueryView(ctx, companyID, safeSQLQuery)
 	if err != nil {
 		s.log.Error().Err(err).Str("safe_sql", safeSQLQuery).Msg("ejecutar query")
@@ -76,24 +76,7 @@ func (s *AIAnalystService) Ask(ctx context.Context, companyID, question string) 
 	}
 
 	// Paso 5: Sanitizar resultados (remover company_id del output al frontend)
-	rawResults := make([]map[string]interface{}, len(results))
-	for i, row := range results {
-		rawResults[i] = map[string]interface{}{
-			"fecha":           row.Fecha,
-			"cliente_nombre":  row.ClienteNombre,
-			"ciudad":          row.Ciudad,
-			"producto":        row.Producto,
-			"categoria":       row.Categoria,
-			"cantidad":        row.Cantidad,
-			"precio_unitario": row.PrecioUnitario,
-			"ingreso_neto":    row.IngresoNeto,
-			"costo_total":     row.CostoTotal,
-			"utilidad":        row.Utilidad,
-			"customer_email":  row.CustomerEmail,
-		}
-	}
-
-	sanitized := s.sqlGuard.SanitizeResult(rawResults)
+	sanitized := s.sqlGuard.SanitizeResult(results)
 	s.log.Info().Int("records", len(sanitized)).Msg("analitytics query exitosa")
 
 	return sanitized, nil
@@ -111,7 +94,7 @@ VIEW COLUMNS:
 - cliente_nombre: Customer name
 - ciudad: Customer city
 - producto: Product name
-- categoria: Product category
+- categoria: Product category (often used as "segmento" for product-based segments like VIP)
 - cantidad: Quantity sold
 - precio_unitario: Unit price
 - ingreso_neto: Net revenue (line_total)
@@ -129,6 +112,7 @@ RULES:
 5. Do NOT include company_id in WHERE clause (will be auto-injected)
 6. Use appropriate aggregations (SUM, COUNT, AVG) if the question implies it
 7. Use date ranges if the question mentions time periods
+8. For "how many customers in segment X", use COUNT(DISTINCT customer_email) or COUNT(DISTINCT cliente_nombre) filtered by categoria or similar, as appropriate
 
 Example questions and expected SQL:
 Q: "Cual es el ingreso total del mes pasado?"

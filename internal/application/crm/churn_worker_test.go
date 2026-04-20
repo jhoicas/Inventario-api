@@ -21,9 +21,9 @@ func (m *mockAIAnalyticsRepository) GetCustomersAtRiskOfChurn(ctx context.Contex
 	return nil, args.Error(1)
 }
 
-func (m *mockAIAnalyticsRepository) QueryView(ctx context.Context, companyID, sqlQuery string) ([]*entity.AIAnalyticsRow, error) {
+func (m *mockAIAnalyticsRepository) QueryView(ctx context.Context, companyID, sqlQuery string) ([]map[string]interface{}, error) {
 	args := m.Called(ctx, companyID, sqlQuery)
-	if v, ok := args.Get(0).([]*entity.AIAnalyticsRow); ok {
+	if v, ok := args.Get(0).([]map[string]interface{}); ok {
 		return v, args.Error(1)
 	}
 	return nil, args.Error(1)

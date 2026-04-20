@@ -215,7 +215,8 @@ type CRMSaleItemHubRepository interface {
 
 // AIAnalyticsRepository puerto de persistencia para queries en la vista de analytics.
 type AIAnalyticsRepository interface {
-	QueryView(ctx context.Context, companyID, sqlQuery string) ([]*entity.AIAnalyticsRow, error)
+	// QueryView ejecuta el SELECT ya filtrado; las filas se devuelven como mapas (columnas variables: agregados o filas completas).
+	QueryView(ctx context.Context, companyID, sqlQuery string) ([]map[string]interface{}, error)
 	RunAggregateQuery(ctx context.Context, companyID, sqlQuery string) (interface{}, error)
 	GetCustomersAtRiskOfChurn(ctx context.Context, daysThreshold int) ([]*entity.CustomerChurnRisk, error)
 }

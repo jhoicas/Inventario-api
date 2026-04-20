@@ -348,6 +348,7 @@ func Router(app *fiber.App, deps RouterDeps) {
 		catHub.Post("/", hubCatH.Create)
 		catHub.Get("/:id", hubCatH.GetByID)
 		catHub.Put("/:id", hubCatH.Update)
+		catHub.Patch("/:id", hubCatH.Update) // mismo cuerpo que PUT; clientes SPA suelen usar PATCH al editar
 		catHub.Delete("/:id", hubCatH.Delete)
 		prodHub := crmHub.Group("/products-hub")
 		prodHub.Get("/", hubProdH.List)
@@ -355,6 +356,7 @@ func Router(app *fiber.App, deps RouterDeps) {
 		prodHub.Patch("/:id/deactivate", hubProdH.Deactivate)
 		prodHub.Get("/:id", hubProdH.GetByID)
 		prodHub.Put("/:id", hubProdH.Update)
+		prodHub.Patch("/:id", hubProdH.Update) // mismo cuerpo que PUT; muchos clientes usan PATCH para edición parcial
 	}
 
 	// ── CRM (módulo 'crm') ─────────────────────────────────────────────────────
