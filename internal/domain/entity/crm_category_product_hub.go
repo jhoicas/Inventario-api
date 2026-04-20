@@ -10,6 +10,3 @@ type CrmCategoryProductHub struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
-
-// Category alias de compatibilidad para el catálogo inventario (/api/categories) que usa la misma tabla hub.
-type Category = CrmCategoryProductHub

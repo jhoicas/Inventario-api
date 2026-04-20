@@ -24,7 +24,7 @@ func NewCategoryRepository(q Querier) *CategoryRepo {
 	return &CategoryRepo{q: q}
 }
 
-func (r *CategoryRepo) Create(c *entity.Category) error {
+func (r *CategoryRepo) Create(c *entity.CrmCategoryProductHub) error {
 	_, err := r.q.Exec(context.Background(), `
 		INSERT INTO crm_category_product_hub (id, company_id, name, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5)`,
@@ -39,15 +39,15 @@ func (r *CategoryRepo) Create(c *entity.Category) error {
 	return nil
 }
 
-func (r *CategoryRepo) GetByID(id string) (*entity.Category, error) {
+func (r *CategoryRepo) GetByID(id string) (*entity.CrmCategoryProductHub, error) {
 	row := r.q.QueryRow(context.Background(), `
 		SELECT id, company_id, name, created_at, updated_at
 		FROM crm_category_product_hub WHERE id = $1`, id)
 	return scanCategoryHub(row)
 }
 
-func scanCategoryHub(row pgx.Row) (*entity.Category, error) {
-	var c entity.Category
+func scanCategoryHub(row pgx.Row) (*entity.CrmCategoryProductHub, error) {
+	var c entity.CrmCategoryProductHub
 	err := row.Scan(&c.ID, &c.CompanyID, &c.Name, &c.CreatedAt, &c.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -58,7 +58,7 @@ func scanCategoryHub(row pgx.Row) (*entity.Category, error) {
 	return &c, nil
 }
 
-func (r *CategoryRepo) GetByCompanyAndName(companyID, name string) (*entity.Category, error) {
+func (r *CategoryRepo) GetByCompanyAndName(companyID, name string) (*entity.CrmCategoryProductHub, error) {
 	name = strings.TrimSpace(name)
 	if companyID == "" || name == "" {
 		return nil, nil
@@ -71,7 +71,7 @@ func (r *CategoryRepo) GetByCompanyAndName(companyID, name string) (*entity.Cate
 	return scanCategoryHub(row)
 }
 
-func (r *CategoryRepo) Update(c *entity.Category) error {
+func (r *CategoryRepo) Update(c *entity.CrmCategoryProductHub) error {
 	cmd, err := r.q.Exec(context.Background(), `
 		UPDATE crm_category_product_hub
 		SET name = $2, updated_at = $3
@@ -90,7 +90,7 @@ func (r *CategoryRepo) Update(c *entity.Category) error {
 	return nil
 }
 
-func (r *CategoryRepo) ListByCompany(companyID string, limit, offset int) ([]*entity.Category, int64, error) {
+func (r *CategoryRepo) ListByCompany(companyID string, limit, offset int) ([]*entity.CrmCategoryProductHub, int64, error) {
 	var total int64
 	err := r.q.QueryRow(context.Background(),
 		`SELECT COUNT(*) FROM crm_category_product_hub WHERE company_id = $1`, companyID).Scan(&total)
@@ -107,9 +107,9 @@ func (r *CategoryRepo) ListByCompany(companyID string, limit, offset int) ([]*en
 		return nil, 0, fmt.Errorf("list crm_category_product_hub: %w", err)
 	}
 	defer rows.Close()
-	var out []*entity.Category
+	var out []*entity.CrmCategoryProductHub
 	for rows.Next() {
-		var c entity.Category
+		var c entity.CrmCategoryProductHub
 		if err := rows.Scan(&c.ID, &c.CompanyID, &c.Name, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, 0, fmt.Errorf("scan crm_category_product_hub: %w", err)
 		}

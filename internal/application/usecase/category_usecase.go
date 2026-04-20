@@ -38,7 +38,7 @@ func (uc *CategoryUseCase) Create(companyID string, in dto.CreateProductCategory
 		return nil, domain.ErrDuplicate
 	}
 	now := time.Now()
-	c := &entity.Category{
+	c := &entity.CrmCategoryProductHub{
 		ID:        uuid.New().String(),
 		CompanyID: companyID,
 		Name:      name,
@@ -126,7 +126,7 @@ func (uc *CategoryUseCase) Deactivate(companyID, id string) error {
 	return nil
 }
 
-func toCategoryResponse(c *entity.Category) *dto.ProductCategoryResponse {
+func toCategoryResponse(c *entity.CrmCategoryProductHub) *dto.ProductCategoryResponse {
 	if c == nil {
 		return nil
 	}
