@@ -28,12 +28,12 @@ func NewProductRepository(q Querier) *ProductRepo {
 // Create persiste un nuevo producto. Cost inicia en 0.
 func (r *ProductRepo) Create(product *entity.Product) error {
 	query := `
-		INSERT INTO products (id, company_id, sku, name, description, price, cost, tax_rate, unspsc_code, unit_measure, attributes, cogs, reorder_point, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`
+		INSERT INTO products (id, company_id, sku, name, description, price, cost, tax_rate, unspsc_code, unit_measure, attributes, cogs, reorder_point, is_active, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`
 	_, err := r.q.Exec(context.Background(), query,
 		product.ID, product.CompanyID, product.SKU, product.Name, product.Description,
 		product.Price, product.Cost, product.TaxRate, product.UNSPSC_Code, product.UnitMeasure,
-		product.Attributes, product.COGS, product.ReorderPoint, product.CreatedAt, product.UpdatedAt,
+		product.Attributes, product.COGS, product.ReorderPoint, product.IsActive, product.CreatedAt, product.UpdatedAt,
 	)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -57,12 +57,13 @@ func (r *ProductRepo) GetByID(id string) (*entity.Product, error) {
 		       COALESCE(attributes, '{}'::jsonb),
 		       COALESCE(cogs, 0),
 		       COALESCE(reorder_point, 0),
+		       COALESCE(is_active, true),
 		       created_at, updated_at
 		FROM products WHERE id = $1`
 	var p entity.Product
 	err := r.q.QueryRow(context.Background(), query, id).Scan(
 		&p.ID, &p.CompanyID, &p.SKU, &p.Name, &p.Description, &p.Price, &p.Cost, &p.TaxRate,
-		&p.UNSPSC_Code, &p.UnitMeasure, &p.Attributes, &p.COGS, &p.ReorderPoint, &p.CreatedAt, &p.UpdatedAt,
+		&p.UNSPSC_Code, &p.UnitMeasure, &p.Attributes, &p.COGS, &p.ReorderPoint, &p.IsActive, &p.CreatedAt, &p.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -86,12 +87,13 @@ func (r *ProductRepo) GetByCompanyAndSKU(companyID, sku string) (*entity.Product
 		       COALESCE(attributes, '{}'::jsonb),
 		       COALESCE(cogs, 0),
 		       COALESCE(reorder_point, 0),
+		       COALESCE(is_active, true),
 		       created_at, updated_at
 		FROM products WHERE company_id = $1 AND sku = $2`
 	var p entity.Product
 	err := r.q.QueryRow(context.Background(), query, companyID, sku).Scan(
 		&p.ID, &p.CompanyID, &p.SKU, &p.Name, &p.Description, &p.Price, &p.Cost, &p.TaxRate,
-		&p.UNSPSC_Code, &p.UnitMeasure, &p.Attributes, &p.COGS, &p.ReorderPoint, &p.CreatedAt, &p.UpdatedAt,
+		&p.UNSPSC_Code, &p.UnitMeasure, &p.Attributes, &p.COGS, &p.ReorderPoint, &p.IsActive, &p.CreatedAt, &p.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -105,11 +107,11 @@ func (r *ProductRepo) GetByCompanyAndSKU(companyID, sku string) (*entity.Product
 // Update actualiza un producto existente. No permite modificar Cost ni Stock (se manejan vía movimientos).
 func (r *ProductRepo) Update(product *entity.Product) error {
 	query := `
-		UPDATE products SET name = $2, description = $3, price = $4, tax_rate = $5, unspsc_code = $6, unit_measure = $7, attributes = $8, updated_at = $9
+		UPDATE products SET name = $2, description = $3, price = $4, tax_rate = $5, unspsc_code = $6, unit_measure = $7, attributes = $8, is_active = $9, updated_at = $10
 		WHERE id = $1`
 	cmd, err := r.q.Exec(context.Background(), query,
 		product.ID, product.Name, product.Description, product.Price, product.TaxRate,
-		product.UNSPSC_Code, product.UnitMeasure, product.Attributes, product.UpdatedAt,
+		product.UNSPSC_Code, product.UnitMeasure, product.Attributes, product.IsActive, product.UpdatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("update product: %w", err)
@@ -133,8 +135,8 @@ func (r *ProductRepo) UpdateCost(productID string, cost decimal.Decimal) error {
 }
 
 // ListByCompany lista productos por empresa con paginación.
-func (r *ProductRepo) ListByCompany(companyID, search string, limit, offset int) ([]*entity.Product, int64, error) {
-	where, args := r.buildFilters(companyID, search)
+func (r *ProductRepo) ListByCompany(companyID, search string, limit, offset int, activeOnly bool) ([]*entity.Product, int64, error) {
+	where, args := r.buildFilters(companyID, search, activeOnly)
 	items, err := r.list(where, args, limit, offset)
 	if err != nil {
 		return nil, 0, err
@@ -146,11 +148,14 @@ func (r *ProductRepo) ListByCompany(companyID, search string, limit, offset int)
 	return items, total, nil
 }
 
-func (r *ProductRepo) buildFilters(companyID, search string) (string, []any) {
+func (r *ProductRepo) buildFilters(companyID, search string, activeOnly bool) (string, []any) {
 	where := `
 		FROM products
 		WHERE company_id = $1`
 	args := []any{companyID}
+	if activeOnly {
+		where += ` AND COALESCE(is_active, true) = true`
+	}
 	if strings.TrimSpace(search) != "" {
 		args = append(args, "%"+strings.TrimSpace(search)+"%")
 		where += fmt.Sprintf(` AND (sku ILIKE $%d OR name ILIKE $%d OR COALESCE(description, '') ILIKE $%d)`, len(args), len(args), len(args))
@@ -171,6 +176,7 @@ func (r *ProductRepo) list(where string, args []any, limit, offset int) ([]*enti
 		       COALESCE(attributes, '{}'::jsonb),
 		       COALESCE(cogs, 0),
 		       COALESCE(reorder_point, 0),
+		       COALESCE(is_active, true),
 		       created_at, updated_at
 		` + where + fmt.Sprintf(` ORDER BY created_at DESC LIMIT $%d OFFSET $%d`, argPos, argPos+1)
 	qArgs := append(args, limit, offset)
@@ -184,7 +190,7 @@ func (r *ProductRepo) list(where string, args []any, limit, offset int) ([]*enti
 	for rows.Next() {
 		var p entity.Product
 		if err := rows.Scan(&p.ID, &p.CompanyID, &p.SKU, &p.Name, &p.Description, &p.Price, &p.Cost, &p.TaxRate,
-			&p.UNSPSC_Code, &p.UnitMeasure, &p.Attributes, &p.COGS, &p.ReorderPoint, &p.CreatedAt, &p.UpdatedAt); err != nil {
+			&p.UNSPSC_Code, &p.UnitMeasure, &p.Attributes, &p.COGS, &p.ReorderPoint, &p.IsActive, &p.CreatedAt, &p.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan product: %w", err)
 		}
 		items = append(items, &p)
@@ -209,6 +215,18 @@ func (r *ProductRepo) Delete(id string) error {
 	_, err := r.q.Exec(context.Background(), `DELETE FROM products WHERE id = $1`, id)
 	if err != nil {
 		return fmt.Errorf("delete product: %w", err)
+	}
+	return nil
+}
+
+// Deactivate marca el producto como inactivo (soft delete).
+func (r *ProductRepo) Deactivate(companyID, id string) error {
+	_, err := r.q.Exec(context.Background(),
+		`UPDATE products SET is_active = false, updated_at = now() WHERE id = $1 AND company_id = $2`,
+		id, companyID,
+	)
+	if err != nil {
+		return fmt.Errorf("deactivate product: %w", err)
 	}
 	return nil
 }

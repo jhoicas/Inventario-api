@@ -23,8 +23,9 @@ type fakeProductRepository struct {
 	getByCompanyAndSKUFunc func(companyID, sku string) (*entity.Product, error)
 	updateFunc             func(product *entity.Product) error
 	updateCostFunc         func(productID string, cost decimal.Decimal) error
-	listByCompanyFunc      func(companyID, search string, limit, offset int) ([]*entity.Product, int64, error)
+	listByCompanyFunc      func(companyID, search string, limit, offset int, activeOnly bool) ([]*entity.Product, int64, error)
 	deleteFunc             func(id string) error
+	deactivateFunc         func(companyID, id string) error
 }
 
 func (f *fakeProductRepository) Create(product *entity.Product) error {
@@ -62,9 +63,9 @@ func (f *fakeProductRepository) UpdateCost(productID string, cost decimal.Decima
 	return nil
 }
 
-func (f *fakeProductRepository) ListByCompany(companyID, search string, limit, offset int) ([]*entity.Product, int64, error) {
+func (f *fakeProductRepository) ListByCompany(companyID, search string, limit, offset int, activeOnly bool) ([]*entity.Product, int64, error) {
 	if f.listByCompanyFunc != nil {
-		return f.listByCompanyFunc(companyID, search, limit, offset)
+		return f.listByCompanyFunc(companyID, search, limit, offset, activeOnly)
 	}
 	return nil, 0, nil
 }
@@ -72,6 +73,13 @@ func (f *fakeProductRepository) ListByCompany(companyID, search string, limit, o
 func (f *fakeProductRepository) Delete(id string) error {
 	if f.deleteFunc != nil {
 		return f.deleteFunc(id)
+	}
+	return nil
+}
+
+func (f *fakeProductRepository) Deactivate(companyID, id string) error {
+	if f.deactivateFunc != nil {
+		return f.deactivateFunc(companyID, id)
 	}
 	return nil
 }
@@ -110,6 +118,7 @@ func validProductEntity(id, companyID string) *entity.Product {
 		UNSPSC_Code: "12345678",
 		UnitMeasure: "94",
 		Attributes:  nil,
+		IsActive:    true,
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
@@ -143,6 +152,7 @@ func TestProductUseCase_Create(t *testing.T) {
 						assert.Equal(t, "SKU-TEST-001", product.SKU)
 						assert.Equal(t, "Producto de prueba", product.Name)
 						assert.True(t, product.Cost.Equal(decimal.Zero))
+						assert.True(t, product.IsActive)
 						assert.NotEmpty(t, product.ID)
 						return nil
 					},
@@ -155,6 +165,7 @@ func TestProductUseCase_Create(t *testing.T) {
 				assert.Equal(t, "Producto de prueba", out.Name)
 				assert.True(t, out.TaxRate.Equal(decimal.NewFromInt(19)))
 				assert.True(t, out.Cost.Equal(decimal.Zero))
+				assert.True(t, out.IsActive)
 			},
 		},
 		{
@@ -260,6 +271,7 @@ func TestProductUseCase_Create(t *testing.T) {
 func TestProductUseCase_GetByID(t *testing.T) {
 	tests := []struct {
 		name        string
+		companyID   string
 		id          string
 		repoSetup   func() *fakeProductRepository
 		wantNil     bool
@@ -267,8 +279,9 @@ func TestProductUseCase_GetByID(t *testing.T) {
 		validateOut func(*testing.T, *dto.ProductResponse)
 	}{
 		{
-			name: "Success",
-			id:   "prod-123",
+			name:      "Success",
+			companyID: testCompanyID,
+			id:        "prod-123",
 			repoSetup: func() *fakeProductRepository {
 				return &fakeProductRepository{
 					getByIDFunc: func(id string) (*entity.Product, error) {
@@ -285,8 +298,24 @@ func TestProductUseCase_GetByID(t *testing.T) {
 			},
 		},
 		{
-			name: "NotFound_RepoReturnsNil",
-			id:   "prod-999",
+			name:      "NotFound_WrongCompany",
+			companyID: testCompanyID,
+			id:        "prod-123",
+			repoSetup: func() *fakeProductRepository {
+				return &fakeProductRepository{
+					getByIDFunc: func(id string) (*entity.Product, error) {
+						return validProductEntity(id, "otra-empresa"), nil
+					},
+				}
+			},
+			wantNil:     true,
+			wantErr:     false,
+			validateOut: nil,
+		},
+		{
+			name:      "NotFound_RepoReturnsNil",
+			companyID: testCompanyID,
+			id:        "prod-999",
 			repoSetup: func() *fakeProductRepository {
 				return &fakeProductRepository{
 					getByIDFunc: func(_ string) (*entity.Product, error) {
@@ -299,8 +328,9 @@ func TestProductUseCase_GetByID(t *testing.T) {
 			validateOut: nil,
 		},
 		{
-			name: "Repo_ReturnsError",
-			id:   "prod-123",
+			name:      "Repo_ReturnsError",
+			companyID: testCompanyID,
+			id:        "prod-123",
 			repoSetup: func() *fakeProductRepository {
 				return &fakeProductRepository{
 					getByIDFunc: func(_ string) (*entity.Product, error) {
@@ -319,7 +349,7 @@ func TestProductUseCase_GetByID(t *testing.T) {
 			repo := tt.repoSetup()
 			uc := NewProductUseCase(repo)
 
-			out, err := uc.GetByID(tt.id)
+			out, err := uc.GetByID(tt.companyID, tt.id)
 
 			if tt.wantErr {
 				require.Error(t, err)
@@ -347,22 +377,25 @@ func TestProductUseCase_List(t *testing.T) {
 		companyID   string
 		limit       int
 		offset      int
+		activeOnly  bool
 		repoSetup   func() *fakeProductRepository
 		wantErr     bool
 		validateOut func(*testing.T, *dto.ProductListResponse)
 	}{
 		{
-			name:      "Success",
-			companyID: testCompanyID,
-			limit:     20,
-			offset:    0,
+			name:       "Success",
+			companyID:  testCompanyID,
+			limit:      20,
+			offset:     0,
+			activeOnly: true,
 			repoSetup: func() *fakeProductRepository {
 				return &fakeProductRepository{
-					listByCompanyFunc: func(companyID, search string, limit, offset int) ([]*entity.Product, int64, error) {
+					listByCompanyFunc: func(companyID, search string, limit, offset int, activeOnly bool) ([]*entity.Product, int64, error) {
 						assert.Equal(t, testCompanyID, companyID)
 						assert.Equal(t, "", search)
 						assert.Equal(t, 20, limit)
 						assert.Equal(t, 0, offset)
+						assert.True(t, activeOnly)
 						return []*entity.Product{validProductEntity("p1", testCompanyID)}, 1, nil
 					},
 				}
@@ -376,15 +409,17 @@ func TestProductUseCase_List(t *testing.T) {
 			},
 		},
 		{
-			name:      "Success_EmptyList",
-			companyID: testCompanyID,
-			limit:     10,
-			offset:    5,
+			name:       "Success_EmptyList",
+			companyID:  testCompanyID,
+			limit:      10,
+			offset:     5,
+			activeOnly: true,
 			repoSetup: func() *fakeProductRepository {
 				return &fakeProductRepository{
-					listByCompanyFunc: func(_ string, _ string, limit, offset int) ([]*entity.Product, int64, error) {
+					listByCompanyFunc: func(_ string, _ string, limit, offset int, activeOnly bool) ([]*entity.Product, int64, error) {
 						assert.Equal(t, 10, limit)
 						assert.Equal(t, 5, offset)
+						assert.True(t, activeOnly)
 						return []*entity.Product{}, 0, nil
 					},
 				}
@@ -397,13 +432,14 @@ func TestProductUseCase_List(t *testing.T) {
 			},
 		},
 		{
-			name:      "Repo_ReturnsError",
-			companyID: testCompanyID,
-			limit:     20,
-			offset:    0,
+			name:       "Repo_ReturnsError",
+			companyID:  testCompanyID,
+			limit:      20,
+			offset:     0,
+			activeOnly: true,
 			repoSetup: func() *fakeProductRepository {
 				return &fakeProductRepository{
-					listByCompanyFunc: func(_ string, _ string, _, _ int) ([]*entity.Product, int64, error) {
+					listByCompanyFunc: func(_ string, _ string, _, _ int, _ bool) ([]*entity.Product, int64, error) {
 						return nil, 0, errors.New("db error")
 					},
 				}
@@ -418,7 +454,7 @@ func TestProductUseCase_List(t *testing.T) {
 			repo := tt.repoSetup()
 			uc := NewProductUseCase(repo)
 
-			out, err := uc.List(tt.companyID, "", tt.limit, tt.offset)
+			out, err := uc.List(tt.companyID, "", tt.limit, tt.offset, tt.activeOnly)
 
 			if tt.wantErr {
 				require.Error(t, err)
@@ -442,6 +478,7 @@ func TestProductUseCase_Update(t *testing.T) {
 
 	tests := []struct {
 		name        string
+		companyID   string
 		id          string
 		in          dto.UpdateProductRequest
 		repoSetup   func() *fakeProductRepository
@@ -451,9 +488,10 @@ func TestProductUseCase_Update(t *testing.T) {
 		validateOut func(*testing.T, *dto.ProductResponse)
 	}{
 		{
-			name: "Success",
-			id:   "prod-123",
-			in:   dto.UpdateProductRequest{Name: &newName, Price: &newPrice},
+			name:      "Success",
+			companyID: testCompanyID,
+			id:        "prod-123",
+			in:        dto.UpdateProductRequest{Name: &newName, Price: &newPrice},
 			repoSetup: func() *fakeProductRepository {
 				return &fakeProductRepository{
 					getByIDFunc: func(id string) (*entity.Product, error) {
@@ -474,9 +512,10 @@ func TestProductUseCase_Update(t *testing.T) {
 			},
 		},
 		{
-			name: "NotFound_RepoReturnsNilProduct",
-			id:   "prod-999",
-			in:   dto.UpdateProductRequest{Name: &newName},
+			name:      "NotFound_RepoReturnsNilProduct",
+			companyID: testCompanyID,
+			id:        "prod-999",
+			in:        dto.UpdateProductRequest{Name: &newName},
 			repoSetup: func() *fakeProductRepository {
 				return &fakeProductRepository{
 					getByIDFunc: func(_ string) (*entity.Product, error) {
@@ -489,8 +528,25 @@ func TestProductUseCase_Update(t *testing.T) {
 			validateOut: nil,
 		},
 		{
-			name: "Success_CustomTaxRate",
-			id:   "prod-123",
+			name:      "NotFound_WrongCompany",
+			companyID: testCompanyID,
+			id:        "prod-123",
+			in:        dto.UpdateProductRequest{Name: &newName},
+			repoSetup: func() *fakeProductRepository {
+				return &fakeProductRepository{
+					getByIDFunc: func(id string) (*entity.Product, error) {
+						return validProductEntity(id, "otra-empresa"), nil
+					},
+				}
+			},
+			wantNil:     true,
+			wantErr:     false,
+			validateOut: nil,
+		},
+		{
+			name:      "Success_CustomTaxRate",
+			companyID: testCompanyID,
+			id:        "prod-123",
 			in: dto.UpdateProductRequest{
 				TaxRate: func() *decimal.Decimal { d := decimal.NewFromInt(7); return &d }(),
 			},
@@ -513,8 +569,9 @@ func TestProductUseCase_Update(t *testing.T) {
 			},
 		},
 		{
-			name: "InvalidInput_TaxRateNegative",
-			id:   "prod-123",
+			name:      "InvalidInput_TaxRateNegative",
+			companyID: testCompanyID,
+			id:        "prod-123",
 			in: dto.UpdateProductRequest{
 				TaxRate: func() *decimal.Decimal { d := decimal.NewFromInt(-1); return &d }(),
 			},
@@ -530,9 +587,10 @@ func TestProductUseCase_Update(t *testing.T) {
 			errIs:   domain.ErrInvalidInput,
 		},
 		{
-			name: "RepoGetByID_ReturnsError",
-			id:   "prod-123",
-			in:   dto.UpdateProductRequest{Name: &newName},
+			name:      "RepoGetByID_ReturnsError",
+			companyID: testCompanyID,
+			id:        "prod-123",
+			in:        dto.UpdateProductRequest{Name: &newName},
 			repoSetup: func() *fakeProductRepository {
 				return &fakeProductRepository{
 					getByIDFunc: func(_ string) (*entity.Product, error) {
@@ -545,9 +603,10 @@ func TestProductUseCase_Update(t *testing.T) {
 			validateOut: nil,
 		},
 		{
-			name: "RepoUpdate_ReturnsError",
-			id:   "prod-123",
-			in:   dto.UpdateProductRequest{Name: &newName},
+			name:      "RepoUpdate_ReturnsError",
+			companyID: testCompanyID,
+			id:        "prod-123",
+			in:        dto.UpdateProductRequest{Name: &newName},
 			repoSetup: func() *fakeProductRepository {
 				return &fakeProductRepository{
 					getByIDFunc: func(_ string) (*entity.Product, error) {
@@ -569,7 +628,7 @@ func TestProductUseCase_Update(t *testing.T) {
 			repo := tt.repoSetup()
 			uc := NewProductUseCase(repo)
 
-			out, err := uc.Update(tt.id, tt.in)
+			out, err := uc.Update(tt.companyID, tt.id, tt.in)
 
 			if tt.wantErr {
 				require.Error(t, err)
@@ -588,6 +647,77 @@ func TestProductUseCase_Update(t *testing.T) {
 			if tt.validateOut != nil {
 				tt.validateOut(t, out)
 			}
+		})
+	}
+}
+
+// ── Tests Deactivate ───────────────────────────────────────────────────────────
+
+func TestProductUseCase_Deactivate(t *testing.T) {
+	tests := []struct {
+		name      string
+		companyID string
+		id        string
+		repoSetup func() *fakeProductRepository
+		wantErr   error
+	}{
+		{
+			name:      "Success",
+			companyID: testCompanyID,
+			id:        "prod-123",
+			repoSetup: func() *fakeProductRepository {
+				return &fakeProductRepository{
+					getByIDFunc: func(id string) (*entity.Product, error) {
+						return validProductEntity(id, testCompanyID), nil
+					},
+					deactivateFunc: func(cid, pid string) error {
+						assert.Equal(t, testCompanyID, cid)
+						assert.Equal(t, "prod-123", pid)
+						return nil
+					},
+				}
+			},
+			wantErr: nil,
+		},
+		{
+			name:      "NotFound",
+			companyID: testCompanyID,
+			id:        "prod-999",
+			repoSetup: func() *fakeProductRepository {
+				return &fakeProductRepository{
+					getByIDFunc: func(_ string) (*entity.Product, error) {
+						return nil, nil
+					},
+				}
+			},
+			wantErr: domain.ErrNotFound,
+		},
+		{
+			name:      "NotFound_WrongCompany",
+			companyID: testCompanyID,
+			id:        "prod-123",
+			repoSetup: func() *fakeProductRepository {
+				return &fakeProductRepository{
+					getByIDFunc: func(id string) (*entity.Product, error) {
+						return validProductEntity(id, "otra-empresa"), nil
+					},
+				}
+			},
+			wantErr: domain.ErrNotFound,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := tt.repoSetup()
+			uc := NewProductUseCase(repo)
+			err := uc.Deactivate(tt.companyID, tt.id)
+			if tt.wantErr != nil {
+				require.Error(t, err)
+				assert.ErrorIs(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
 		})
 	}
 }

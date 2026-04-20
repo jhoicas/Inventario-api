@@ -93,6 +93,9 @@ func (uc *RegisterMovementUseCase) RegisterMovement(ctx context.Context, input M
 	if product.CompanyID != input.CompanyID {
 		return domain.ErrForbidden
 	}
+	if !product.IsActive {
+		return domain.ErrInvalidInput
+	}
 
 	if input.Type == string(entity.MovementTypeTRANSFER) {
 		fromWh, _ := uc.warehouseRepo.GetByID(input.FromWarehouseID)

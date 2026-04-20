@@ -90,7 +90,7 @@ func (f *fakeProductRepo) UpdateCost(productID string, cost decimal.Decimal) err
 	}
 	return nil
 }
-func (f *fakeProductRepo) ListByCompany(companyID, search string, limit, offset int) ([]*entity.Product, int64, error) {
+func (f *fakeProductRepo) ListByCompany(companyID, search string, limit, offset int, _ bool) ([]*entity.Product, int64, error) {
 	if f.listByCompanyFunc != nil {
 		return f.listByCompanyFunc(companyID, search, limit, offset)
 	}
@@ -100,6 +100,10 @@ func (f *fakeProductRepo) Delete(id string) error {
 	if f.deleteFunc != nil {
 		return f.deleteFunc(id)
 	}
+	return nil
+}
+
+func (f *fakeProductRepo) Deactivate(companyID, id string) error {
 	return nil
 }
 
@@ -243,6 +247,7 @@ func validProduct(companyID string) *entity.Product {
 		SKU:       "SKU-001",
 		Name:      "Producto Test",
 		Cost:      decimal.NewFromInt(5000),
+		IsActive:  true,
 	}
 }
 

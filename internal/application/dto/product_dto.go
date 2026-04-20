@@ -28,6 +28,7 @@ type UpdateProductRequest struct {
 	UNSPSC_Code *string          `json:"unspsc_code"`
 	UnitMeasure *string          `json:"unit_measure"`
 	Attributes  json.RawMessage  `json:"attributes"`
+	IsActive    *bool            `json:"is_active"`
 }
 
 // ProductResponse salida de un producto.
@@ -43,6 +44,7 @@ type ProductResponse struct {
 	UNSPSC_Code string          `json:"unspsc_code"`
 	UnitMeasure string          `json:"unit_measure"`
 	Attributes  json.RawMessage `json:"attributes"`
+	IsActive    bool            `json:"is_active"`
 	CreatedAt   time.Time       `json:"created_at"`
 	UpdatedAt   time.Time       `json:"updated_at"`
 }

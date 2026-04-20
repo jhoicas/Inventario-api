@@ -181,6 +181,9 @@ func (uc *CreateCreditNoteUseCase) CreateCreditNote(
 				if product.CompanyID != companyID {
 					return domain.ErrForbidden
 				}
+				if !product.IsActive {
+					return domain.ErrInvalidInput
+				}
 				if err := uc.inventoryUC.RegisterReturnInTx(
 					ctx,
 					movRepo, stockRepo, productRepo,

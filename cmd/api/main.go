@@ -73,6 +73,7 @@ func main() {
 	userRepo := postgres.NewUserRepository(pool)
 	warehouseRepo := postgres.NewWarehouseRepository(pool)
 	productRepo := postgres.NewProductRepository(pool)
+	categoryRepo := postgres.NewCategoryRepository(pool)
 	supplierRepo := postgres.NewSupplierRepository(pool)
 	customerRepo := postgres.NewCustomerRepository(pool)
 	invoiceRepo := postgres.NewInvoiceRepository(pool)
@@ -159,6 +160,10 @@ func main() {
 	companyScreenUC := usecase.NewCompanyScreenUseCase(companyRepo, rbacRepo)
 	warehouseUC := usecase.NewWarehouseUseCase(warehouseRepo)
 	productUC := usecase.NewProductUseCase(productRepo)
+	categoryUC := usecase.NewCategoryUseCase(categoryRepo)
+	crmHubProductRepo := postgres.NewCrmHubProductRepository(pool)
+	crmHubCategoryUC := usecase.NewCrmHubCategoryUseCase(categoryUC)
+	crmHubProductUC := usecase.NewCrmHubProductUseCase(crmHubProductRepo, categoryRepo)
 	supplierUC := usecase.NewSupplierUseCase(supplierRepo)
 	purchaseOrderUC := inventory.NewPurchaseOrderUseCase(purchaseOrderRepo, supplierRepo, warehouseRepo, txRunner, registerMovementUC)
 	updateReorderConfigUC := inventory.NewUpdateReorderConfigUseCase(productRepo, reorderConfigRepo)
@@ -379,6 +384,7 @@ func main() {
 		CompanyRepo:            companyRepo,
 		WarehouseUC:            warehouseUC,
 		ProductUC:              productUC,
+		CategoryUC:             categoryUC,
 		SupplierUC:             supplierUC,
 		UserRepo:               userRepo,
 		RegisterMovement:       registerMovementUC,
@@ -402,6 +408,8 @@ func main() {
 		DashboardUC:            dashboardUC,
 		AIUC:                   aiUC,
 		CRMHandler:             crmHandler,
+		CrmHubCategoryUC:       crmHubCategoryUC,
+		CrmHubProductUC:        crmHubProductUC,
 		CRMAIHandler:           crmAIHandler,
 		EmailHandler:           emailHandler,
 		CustomerLookup:         customerLookupHandler,

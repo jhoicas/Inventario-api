@@ -9,9 +9,10 @@ import (
 // ProductUseCase interface para permitir mocking en tests.
 type ProductUseCase interface {
 	Create(companyID string, in dto.CreateProductRequest) (*dto.ProductResponse, error)
-	GetByID(id string) (*dto.ProductResponse, error)
-	List(companyID, search string, limit, offset int) (*dto.ProductListResponse, error)
-	Update(id string, in dto.UpdateProductRequest) (*dto.ProductResponse, error)
+	GetByID(companyID, id string) (*dto.ProductResponse, error)
+	List(companyID, search string, limit, offset int, activeOnly bool) (*dto.ProductListResponse, error)
+	Update(companyID, id string, in dto.UpdateProductRequest) (*dto.ProductResponse, error)
+	Deactivate(companyID, id string) error
 }
 
 // ProductHandler maneja las peticiones HTTP para Product (protegido).
@@ -70,11 +71,15 @@ func (h *ProductHandler) Create(c *fiber.Ctx) error {
 // @Failure      404  {object}  dto.ErrorResponse
 // @Router       /api/products/{id} [get]
 func (h *ProductHandler) GetByID(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	if companyID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "company_id requerido"})
+	}
 	id := c.Params("id")
 	if id == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "MISSING_ID", Message: "id es requerido"})
 	}
-	out, err := h.uc.GetByID(id)
+	out, err := h.uc.GetByID(companyID, id)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}
@@ -111,7 +116,9 @@ func (h *ProductHandler) List(c *fiber.Ctx) error {
 		offset = 0
 	}
 	search := c.Query("search")
-	out, err := h.uc.List(companyID, search, limit, offset)
+	includeInactive := c.QueryBool("include_inactive", false)
+	activeOnly := !includeInactive
+	out, err := h.uc.List(companyID, search, limit, offset, activeOnly)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}
@@ -139,12 +146,38 @@ func (h *ProductHandler) Update(c *fiber.Ctx) error {
 	if err := c.BodyParser(&in); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
 	}
-	out, err := h.uc.Update(id, in)
+	companyID := GetCompanyID(c)
+	if companyID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "company_id requerido"})
+	}
+	out, err := h.uc.Update(companyID, id, in)
 	if err != nil {
+		if err == domain.ErrInvalidInput {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: err.Error()})
+		}
 		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
 	}
 	if out == nil {
 		return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "producto no encontrado"})
 	}
 	return c.JSON(out)
+}
+
+// Deactivate PATCH /api/products/:id/deactivate — soft delete (is_active = false).
+func (h *ProductHandler) Deactivate(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	if companyID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "company_id requerido"})
+	}
+	id := c.Params("id")
+	if id == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "MISSING_ID", Message: "id es requerido"})
+	}
+	if err := h.uc.Deactivate(companyID, id); err != nil {
+		if err == domain.ErrNotFound {
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "producto no encontrado"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.SendStatus(fiber.StatusNoContent)
 }

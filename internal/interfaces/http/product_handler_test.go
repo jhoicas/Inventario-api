@@ -21,10 +21,11 @@ import (
 // ── Fake ProductUseCase (mock manual para tests) ────────────────────────────────
 
 type fakeProductUseCase struct {
-	createFunc  func(companyID string, in dto.CreateProductRequest) (*dto.ProductResponse, error)
-	getByIDFunc func(id string) (*dto.ProductResponse, error)
-	listFunc    func(companyID, search string, limit, offset int) (*dto.ProductListResponse, error)
-	updateFunc  func(id string, in dto.UpdateProductRequest) (*dto.ProductResponse, error)
+	createFunc     func(companyID string, in dto.CreateProductRequest) (*dto.ProductResponse, error)
+	getByIDFunc    func(companyID, id string) (*dto.ProductResponse, error)
+	listFunc       func(companyID, search string, limit, offset int, activeOnly bool) (*dto.ProductListResponse, error)
+	updateFunc     func(companyID, id string, in dto.UpdateProductRequest) (*dto.ProductResponse, error)
+	deactivateFunc func(companyID, id string) error
 }
 
 func (f *fakeProductUseCase) Create(companyID string, in dto.CreateProductRequest) (*dto.ProductResponse, error) {
@@ -34,25 +35,32 @@ func (f *fakeProductUseCase) Create(companyID string, in dto.CreateProductReques
 	return nil, errors.New("create not configured")
 }
 
-func (f *fakeProductUseCase) GetByID(id string) (*dto.ProductResponse, error) {
+func (f *fakeProductUseCase) GetByID(companyID, id string) (*dto.ProductResponse, error) {
 	if f.getByIDFunc != nil {
-		return f.getByIDFunc(id)
+		return f.getByIDFunc(companyID, id)
 	}
 	return nil, errors.New("getByID not configured")
 }
 
-func (f *fakeProductUseCase) List(companyID, search string, limit, offset int) (*dto.ProductListResponse, error) {
+func (f *fakeProductUseCase) List(companyID, search string, limit, offset int, activeOnly bool) (*dto.ProductListResponse, error) {
 	if f.listFunc != nil {
-		return f.listFunc(companyID, search, limit, offset)
+		return f.listFunc(companyID, search, limit, offset, activeOnly)
 	}
 	return nil, errors.New("list not configured")
 }
 
-func (f *fakeProductUseCase) Update(id string, in dto.UpdateProductRequest) (*dto.ProductResponse, error) {
+func (f *fakeProductUseCase) Update(companyID, id string, in dto.UpdateProductRequest) (*dto.ProductResponse, error) {
 	if f.updateFunc != nil {
-		return f.updateFunc(id, in)
+		return f.updateFunc(companyID, id, in)
 	}
 	return nil, errors.New("update not configured")
+}
+
+func (f *fakeProductUseCase) Deactivate(companyID, id string) error {
+	if f.deactivateFunc != nil {
+		return f.deactivateFunc(companyID, id)
+	}
+	return errors.New("deactivate not configured")
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -90,6 +98,7 @@ func validProductResponse() *dto.ProductResponse {
 		UNSPSC_Code: "",
 		UnitMeasure: "94",
 		Attributes:  nil,
+		IsActive:    true,
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
 	}
@@ -250,7 +259,8 @@ func TestProductHandler_GetByID(t *testing.T) {
 			id:   "prod-123",
 			mockSetup: func() *fakeProductUseCase {
 				return &fakeProductUseCase{
-					getByIDFunc: func(id string) (*dto.ProductResponse, error) {
+					getByIDFunc: func(_, id string) (*dto.ProductResponse, error) {
+						assert.Equal(t, "prod-123", id)
 						return validProductResponse(), nil
 					},
 				}
@@ -275,7 +285,7 @@ func TestProductHandler_GetByID(t *testing.T) {
 			id:   "prod-999",
 			mockSetup: func() *fakeProductUseCase {
 				return &fakeProductUseCase{
-					getByIDFunc: func(_ string) (*dto.ProductResponse, error) {
+					getByIDFunc: func(_, _ string) (*dto.ProductResponse, error) {
 						return nil, nil
 					},
 				}
@@ -292,7 +302,7 @@ func TestProductHandler_GetByID(t *testing.T) {
 			id:   "prod-123",
 			mockSetup: func() *fakeProductUseCase {
 				return &fakeProductUseCase{
-					getByIDFunc: func(_ string) (*dto.ProductResponse, error) {
+					getByIDFunc: func(_, _ string) (*dto.ProductResponse, error) {
 						return nil, errors.New("db error")
 					},
 				}
@@ -348,7 +358,7 @@ func TestProductHandler_List(t *testing.T) {
 			query: "",
 			mockSetup: func() *fakeProductUseCase {
 				return &fakeProductUseCase{
-					listFunc: func(_ string, _ string, limit, offset int) (*dto.ProductListResponse, error) {
+					listFunc: func(_ string, _ string, limit, offset int, _ bool) (*dto.ProductListResponse, error) {
 						return &dto.ProductListResponse{
 							Items:  []dto.ProductResponse{*validProductResponse()},
 							Total:  1,
@@ -374,7 +384,7 @@ func TestProductHandler_List(t *testing.T) {
 			query: "?limit=10&offset=5",
 			mockSetup: func() *fakeProductUseCase {
 				return &fakeProductUseCase{
-					listFunc: func(_ string, _ string, limit, offset int) (*dto.ProductListResponse, error) {
+					listFunc: func(_ string, _ string, limit, offset int, _ bool) (*dto.ProductListResponse, error) {
 						return &dto.ProductListResponse{
 							Items:  []dto.ProductResponse{},
 							Total:  0,
@@ -411,7 +421,7 @@ func TestProductHandler_List(t *testing.T) {
 			query: "",
 			mockSetup: func() *fakeProductUseCase {
 				return &fakeProductUseCase{
-					listFunc: func(_ string, _ string, _, _ int) (*dto.ProductListResponse, error) {
+					listFunc: func(_ string, _ string, _, _ int, _ bool) (*dto.ProductListResponse, error) {
 						return nil, errors.New("db error")
 					},
 				}
@@ -475,7 +485,8 @@ func TestProductHandler_Update(t *testing.T) {
 			},
 			mockSetup: func() *fakeProductUseCase {
 				return &fakeProductUseCase{
-					updateFunc: func(id string, _ dto.UpdateProductRequest) (*dto.ProductResponse, error) {
+					updateFunc: func(_, id string, _ dto.UpdateProductRequest) (*dto.ProductResponse, error) {
+						assert.Equal(t, "prod-123", id)
 						updated := validProductResponse()
 						updated.Name = "Nombre actualizado"
 						updated.Price = price
@@ -516,7 +527,7 @@ func TestProductHandler_Update(t *testing.T) {
 			body: dto.UpdateProductRequest{Name: &name},
 			mockSetup: func() *fakeProductUseCase {
 				return &fakeProductUseCase{
-					updateFunc: func(_ string, _ dto.UpdateProductRequest) (*dto.ProductResponse, error) {
+					updateFunc: func(_, _ string, _ dto.UpdateProductRequest) (*dto.ProductResponse, error) {
 						return nil, nil
 					},
 				}
@@ -534,7 +545,7 @@ func TestProductHandler_Update(t *testing.T) {
 			body: dto.UpdateProductRequest{Name: &name},
 			mockSetup: func() *fakeProductUseCase {
 				return &fakeProductUseCase{
-					updateFunc: func(_ string, _ dto.UpdateProductRequest) (*dto.ProductResponse, error) {
+					updateFunc: func(_, _ string, _ dto.UpdateProductRequest) (*dto.ProductResponse, error) {
 						return nil, errors.New("db error")
 					},
 				}
@@ -572,6 +583,58 @@ func TestProductHandler_Update(t *testing.T) {
 			if tt.validateBody != nil {
 				tt.validateBody(t, resp)
 			}
+		})
+	}
+}
+
+func TestProductHandler_Deactivate(t *testing.T) {
+	tests := []struct {
+		name           string
+		id             string
+		mockSetup      func() *fakeProductUseCase
+		expectedStatus int
+	}{
+		{
+			name: "Success",
+			id:   "prod-123",
+			mockSetup: func() *fakeProductUseCase {
+				return &fakeProductUseCase{
+					deactivateFunc: func(companyID, pid string) error {
+						assert.Equal(t, testCompanyID, companyID)
+						assert.Equal(t, "prod-123", pid)
+						return nil
+					},
+				}
+			},
+			expectedStatus: http.StatusNoContent,
+		},
+		{
+			name: "NotFound",
+			id:   "prod-999",
+			mockSetup: func() *fakeProductUseCase {
+				return &fakeProductUseCase{
+					deactivateFunc: func(_, _ string) error {
+						return domain.ErrNotFound
+					},
+				}
+			},
+			expectedStatus: http.StatusNotFound,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fakeUC := tt.mockSetup()
+			app := fiber.New(fiber.Config{DisableStartupMessage: true})
+			app.Use(mockCompanyMiddleware(testCompanyID))
+			app.Patch("/products/:id/deactivate", NewProductHandler(fakeUC).Deactivate)
+
+			path := "/products/" + tt.id + "/deactivate"
+			req := httptest.NewRequest(http.MethodPatch, path, nil)
+			resp, err := app.Test(req, -1)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
 		})
 	}
 }

@@ -46,6 +46,7 @@ func (uc *ProductUseCase) Create(companyID string, in dto.CreateProductRequest) 
 		UNSPSC_Code: in.UNSPSC_Code,
 		UnitMeasure: in.UnitMeasure,
 		Attributes:  in.Attributes,
+		IsActive:    true,
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
@@ -55,25 +56,25 @@ func (uc *ProductUseCase) Create(companyID string, in dto.CreateProductRequest) 
 	return toProductResponse(product), nil
 }
 
-// GetByID obtiene un producto por ID.
-func (uc *ProductUseCase) GetByID(id string) (*dto.ProductResponse, error) {
+// GetByID obtiene un producto por ID (solo si pertenece a la empresa).
+func (uc *ProductUseCase) GetByID(companyID, id string) (*dto.ProductResponse, error) {
 	product, err := uc.repo.GetByID(id)
 	if err != nil {
 		return nil, err
 	}
-	if product == nil {
+	if product == nil || product.CompanyID != companyID {
 		return nil, nil
 	}
 	return toProductResponse(product), nil
 }
 
 // Update actualiza un producto. No permite modificar Cost ni Stock (se manejan vía movimientos).
-func (uc *ProductUseCase) Update(id string, in dto.UpdateProductRequest) (*dto.ProductResponse, error) {
+func (uc *ProductUseCase) Update(companyID, id string, in dto.UpdateProductRequest) (*dto.ProductResponse, error) {
 	product, err := uc.repo.GetByID(id)
 	if err != nil {
 		return nil, err
 	}
-	if product == nil {
+	if product == nil || product.CompanyID != companyID {
 		return nil, nil
 	}
 	if in.Name != nil {
@@ -100,6 +101,9 @@ func (uc *ProductUseCase) Update(id string, in dto.UpdateProductRequest) (*dto.P
 	if len(in.Attributes) > 0 {
 		product.Attributes = in.Attributes
 	}
+	if in.IsActive != nil {
+		product.IsActive = *in.IsActive
+	}
 	product.UpdatedAt = time.Now()
 	if err := uc.repo.Update(product); err != nil {
 		return nil, err
@@ -107,9 +111,21 @@ func (uc *ProductUseCase) Update(id string, in dto.UpdateProductRequest) (*dto.P
 	return toProductResponse(product), nil
 }
 
-// List lista productos por empresa con paginación.
-func (uc *ProductUseCase) List(companyID, search string, limit, offset int) (*dto.ProductListResponse, error) {
-	list, total, err := uc.repo.ListByCompany(companyID, search, limit, offset)
+// Deactivate marca el producto como inactivo (soft delete).
+func (uc *ProductUseCase) Deactivate(companyID, id string) error {
+	p, err := uc.repo.GetByID(id)
+	if err != nil {
+		return err
+	}
+	if p == nil || p.CompanyID != companyID {
+		return domain.ErrNotFound
+	}
+	return uc.repo.Deactivate(companyID, id)
+}
+
+// List lista productos por empresa con paginación. Si activeOnly es true, excluye inactivos.
+func (uc *ProductUseCase) List(companyID, search string, limit, offset int, activeOnly bool) (*dto.ProductListResponse, error) {
+	list, total, err := uc.repo.ListByCompany(companyID, search, limit, offset, activeOnly)
 	if err != nil {
 		return nil, err
 	}
@@ -146,6 +162,7 @@ func toProductResponse(p *entity.Product) *dto.ProductResponse {
 		UNSPSC_Code: p.UNSPSC_Code,
 		UnitMeasure: p.UnitMeasure,
 		Attributes:  p.Attributes,
+		IsActive:    p.IsActive,
 		CreatedAt:   p.CreatedAt,
 		UpdatedAt:   p.UpdatedAt,
 	}

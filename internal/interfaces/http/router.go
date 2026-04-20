@@ -19,6 +19,7 @@ type RouterDeps struct {
 	CompanyRepo            repository.CompanyRepository // Para inyectar configuración DIAN
 	WarehouseUC            *usecase.WarehouseUseCase
 	ProductUC              *usecase.ProductUseCase
+	CategoryUC             *usecase.CategoryUseCase
 	SupplierUC             *usecase.SupplierUseCase
 	UserRepo               repository.UserRepository
 	RegisterMovement       *inventory.RegisterMovementUseCase
@@ -43,6 +44,8 @@ type RouterDeps struct {
 	DashboardUC            *appanalytics.DashboardUseCase
 	AIUC                   *usecase.AIUseCase
 	CRMHandler             *CRMHandler
+	CrmHubCategoryUC       *usecase.CrmHubCategoryUseCase
+	CrmHubProductUC        *usecase.CrmHubProductUseCase
 	CRMAIHandler           *CRMAIHandler
 	EmailHandler           *EmailHandler
 	CustomerLookup         *dianws.CustomerLookupHandler
@@ -150,6 +153,17 @@ func Router(app *fiber.App, deps RouterDeps) {
 	prod.Get("/:id", productHandler.GetByID)
 	prod.Post("/", productHandler.Create)
 	prod.Put("/:id", productHandler.Update)
+	prod.Patch("/:id/deactivate", productHandler.Deactivate)
+
+	if deps.CategoryUC != nil {
+		categoryHandler := NewCategoryHandler(deps.CategoryUC)
+		cat := protected.Group("/categories", RequireModule(entity.ModuleInventory, deps.ModuleService), screenAccess)
+		cat.Get("/", categoryHandler.List)
+		cat.Get("/:id", categoryHandler.GetByID)
+		cat.Post("/", categoryHandler.Create)
+		cat.Put("/:id", categoryHandler.Update)
+		cat.Patch("/:id/deactivate", categoryHandler.Deactivate)
+	}
 
 	supplierHandler := NewSupplierHandler(deps.SupplierUC)
 	sup := protected.Group("/suppliers", RequireModule(entity.ModuleInventory, deps.ModuleService), screenAccess)
@@ -323,6 +337,25 @@ func Router(app *fiber.App, deps RouterDeps) {
 	dashboardHandler := NewDashboardHandler(deps.DashboardUC)
 	dashboardGroup := protected.Group("/dashboard", RequireRole(entity.RoleAdmin))
 	dashboardGroup.Get("/summary", dashboardHandler.GetSummary)
+
+	// ── CRM Hub catálogo (crm_category_product_hub / crm_products_hub) ─────────
+	if deps.CrmHubCategoryUC != nil && deps.CrmHubProductUC != nil {
+		hubCatH := NewCrmHubCategoryHandler(deps.CrmHubCategoryUC)
+		hubProdH := NewCrmHubProductHandler(deps.CrmHubProductUC)
+		crmHub := protected.Group("/crm", RequireModule(entity.ModuleCRM, deps.ModuleService), screenAccess)
+		catHub := crmHub.Group("/categories-hub")
+		catHub.Get("/", hubCatH.List)
+		catHub.Post("/", hubCatH.Create)
+		catHub.Get("/:id", hubCatH.GetByID)
+		catHub.Put("/:id", hubCatH.Update)
+		catHub.Delete("/:id", hubCatH.Delete)
+		prodHub := crmHub.Group("/products-hub")
+		prodHub.Get("/", hubProdH.List)
+		prodHub.Post("/", hubProdH.Create)
+		prodHub.Patch("/:id/deactivate", hubProdH.Deactivate)
+		prodHub.Get("/:id", hubProdH.GetByID)
+		prodHub.Put("/:id", hubProdH.Update)
+	}
 
 	// ── CRM (módulo 'crm') ─────────────────────────────────────────────────────
 	if deps.CRMHandler != nil {

@@ -117,6 +117,9 @@ func (uc *CreateInvoiceUseCase) CreateInvoice(ctx context.Context, companyID, us
 		if product.CompanyID != companyID {
 			return nil, domain.ErrForbidden
 		}
+		if !product.IsActive {
+			return nil, domain.ErrInvalidInput
+		}
 		productsByID[item.ProductID] = product
 		if item.UnitPrice.LessThan(decimal.Zero) {
 			return nil, domain.ErrInvalidInput

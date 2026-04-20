@@ -85,6 +85,9 @@ func (uc *CreateDebitNoteUseCase) CreateDebitNote(
 		if product.CompanyID != companyID {
 			return nil, domain.ErrForbidden
 		}
+		if !product.IsActive {
+			return nil, domain.ErrInvalidInput
+		}
 
 		lineSubtotal := item.Quantity.Mul(item.UnitPrice)
 		netTotal = netTotal.Add(lineSubtotal)
