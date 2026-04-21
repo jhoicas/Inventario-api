@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	stdlog "log"
 	"strings"
 	"time"
 
@@ -56,6 +57,7 @@ func (s *AIAnalystService) Ask(ctx context.Context, companyID, question string) 
 	}
 
 	sqlQuery := textToSQL.SQL
+	stdlog.Printf("SQL Generado por Anthropic: %s", sqlQuery)
 	if s.log != nil {
 		s.log.Info().Str("question", question).Str("generated_sql", sqlQuery).Msg("SQL generado (Text-to-SQL)")
 	}
@@ -75,6 +77,7 @@ func (s *AIAnalystService) Ask(ctx context.Context, companyID, question string) 
 
 	results, err := s.analyticsRepo.ExecuteRawSelect(ctx, sqlQuery)
 	if err != nil {
+		stdlog.Printf("Error ejecutando SQL generado: %v", err)
 		if s.log != nil {
 			s.log.Error().Err(err).Str("sql", sqlQuery).Msg("ejecutar SQL generado")
 		}

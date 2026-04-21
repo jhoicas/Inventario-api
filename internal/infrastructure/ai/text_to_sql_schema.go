@@ -38,5 +38,7 @@ crm_products_hub:
   - product_code (text)
   - category_id (uuid, nullable)
 
+PARA OBTENER VENTAS POR CATEGORIA, DEBES SUMAR EL TOTAL DE crm_sales_hub, HACER UN JOIN CON crm_products_hub (PARA SABER QUE PRODUCTO SE VENDIO) Y LUEGO UN JOIN CON crm_categories (USANDO EL category_id DEL PRODUCTO). NO USES COLUMNAS QUE NO EXISTAN.
+
 PRECAUCION CON COLUMNAS JSONB: SI VAS A CONSULTAR O EXTRAER DATOS DE UNA COLUMNA JSONB QUE ES UN ARREGLO (ARRAY), DEBES USAR jsonb_array_elements() O jsonb_array_elements_text(). NUNCA USES jsonb_object_keys() SOBRE UN ARREGLO.
 `
