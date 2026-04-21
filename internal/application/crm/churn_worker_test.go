@@ -29,6 +29,14 @@ func (m *mockAIAnalyticsRepository) QueryView(ctx context.Context, companyID, sq
 	return nil, args.Error(1)
 }
 
+func (m *mockAIAnalyticsRepository) ExecuteRawSelect(ctx context.Context, sql string) ([]map[string]interface{}, error) {
+	args := m.Called(ctx, sql)
+	if v, ok := args.Get(0).([]map[string]interface{}); ok {
+		return v, args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
 func (m *mockAIAnalyticsRepository) RunAggregateQuery(ctx context.Context, companyID, sqlQuery string) (interface{}, error) {
 	args := m.Called(ctx, companyID, sqlQuery)
 	return args.Get(0), args.Error(1)

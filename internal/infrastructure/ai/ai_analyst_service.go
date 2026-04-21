@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/jhoicas/Inventario-api/internal/application/dto"
 	"github.com/jhoicas/Inventario-api/internal/application/ports"
 	"github.com/jhoicas/Inventario-api/internal/domain/repository"
 	"github.com/jhoicas/Inventario-api/pkg/logger"
 )
 
-// AIAnalystService traduce preguntas en lenguaje natural a SQL sobre v_crm_ai_analytics
-// con protecciones automaticas de security (SQL Guard + company_id injection).
+// AIAnalystService motor Text-to-SQL (Gemini) + ejecución en PostgreSQL con validación de seguridad.
 type AIAnalystService struct {
 	llmService    ports.LLMService
 	sqlGuard      *SQLGuard
@@ -20,23 +20,22 @@ type AIAnalystService struct {
 	log           *logger.Logger
 }
 
-// NewAIAnalystService constructor.
+// NewAIAnalystService constructor (usar Gemini u otro LLM que implemente GenerateTextWithSystem).
 func NewAIAnalystService(
-	llmService ports.LLMService,
+	llm ports.LLMService,
 	analyticsRepo repository.AIAnalyticsRepository,
 	log *logger.Logger,
 ) *AIAnalystService {
 	return &AIAnalystService{
-		llmService:    llmService,
+		llmService:    llm,
 		sqlGuard:      NewSQLGuard(),
 		analyticsRepo: analyticsRepo,
 		log:           log,
 	}
 }
 
-// Ask traduce una pregunta en lenguaje natural a SQL SELECT sobre v_crm_ai_analytics
-// y retorna los datos del analisis. company_id se inyecta automaticamente.
-func (s *AIAnalystService) Ask(ctx context.Context, companyID, question string) ([]map[string]interface{}, error) {
+// Ask traduce la pregunta a SQL SELECT, valida, ejecuta y devuelve answer + data + sql.
+func (s *AIAnalystService) Ask(ctx context.Context, companyID, question string) (*dto.CRMTextToSQLResponse, error) {
 	if question == "" {
 		return nil, fmt.Errorf("pregunta vacia")
 	}
@@ -44,110 +43,146 @@ func (s *AIAnalystService) Ask(ctx context.Context, companyID, question string) 
 		return nil, fmt.Errorf("company_id requerido")
 	}
 
-	// Paso 1: Generar SQL usando LLM con schema context
-	sqlQuery, err := s.generateSQLFromQuestion(ctx, question)
+	sqlQuery, err := s.generateSQLFromQuestion(ctx, companyID, question)
 	if err != nil {
-		s.log.Error().Err(err).Msg("generar SQL desde pregunta")
+		if s.log != nil {
+			s.log.Error().Err(err).Msg("generar SQL desde pregunta")
+		}
 		return nil, fmt.Errorf("generar SQL: %w", err)
 	}
 
-	s.log.Info().Str("question", question).Str("generated_sql", sqlQuery).Msg("SQL generado del LLM")
+	if s.log != nil {
+		s.log.Info().Str("question", question).Str("generated_sql", sqlQuery).Msg("SQL generado (Text-to-SQL)")
+	}
 
-	// Paso 2: Validar SQL con SQL Guard (bloquea DELETE, DROP, INSERT, etc)
 	if err := s.sqlGuard.ValidateQuery(sqlQuery); err != nil {
-		s.log.Warn().Err(err).Str("query", sqlQuery).Msg("SQL rechazado por validacion")
+		if s.log != nil {
+			s.log.Warn().Err(err).Str("query", sqlQuery).Msg("SQL rechazado por validacion")
+		}
 		return nil, fmt.Errorf("SQL no seguro: %w", err)
 	}
-
-	// Paso 3: Inyectar company_id obligatorio para aislamiento multi-tenancy
-	safeSQLQuery, err := s.sqlGuard.InjectCompanyFilter(sqlQuery, companyID)
-	if err != nil {
-		s.log.Warn().Err(err).Msg("inyectar filtro company_id")
-		return nil, fmt.Errorf("inyectar company_id: %w", err)
+	if err := assertSingleStatement(sqlQuery); err != nil {
+		return nil, err
+	}
+	if err := assertCompanyFilter(sqlQuery, companyID); err != nil {
+		return nil, err
 	}
 
-	s.log.Info().Str("safe_sql", safeSQLQuery).Msg("SQL con filtro company_id inyectado")
-
-	// Paso 4: Ejecutar query sobre la vista (filas completas o agregados; columnas según el SQL generado)
-	results, err := s.analyticsRepo.QueryView(ctx, companyID, safeSQLQuery)
+	results, err := s.analyticsRepo.ExecuteRawSelect(ctx, sqlQuery)
 	if err != nil {
-		s.log.Error().Err(err).Str("safe_sql", safeSQLQuery).Msg("ejecutar query")
-		return nil, fmt.Errorf("ejecutar analitytics query: %w", err)
+		if s.log != nil {
+			s.log.Error().Err(err).Str("sql", sqlQuery).Msg("ejecutar SQL generado")
+		}
+		return nil, fmt.Errorf("ejecutar SQL: %w", err)
 	}
 
-	// Paso 5: Sanitizar resultados (remover company_id del output al frontend)
 	sanitized := s.sqlGuard.SanitizeResult(results)
-	s.log.Info().Int("records", len(sanitized)).Msg("analitytics query exitosa")
+	answer := s.summarizeAnswer(ctx, question, sanitized)
 
-	return sanitized, nil
+	if s.log != nil {
+		s.log.Info().Int("records", len(sanitized)).Msg("text-to-sql ok")
+	}
+
+	return &dto.CRMTextToSQLResponse{
+		Answer: answer,
+		Data:   sanitized,
+		SQL:    sqlQuery,
+	}, nil
 }
 
-// generateSQLFromQuestion usa el LLM para traducir pregunta a SQL SELECT.
-// Incluye schema context para que el LLM genere queries correctas.
-func (s *AIAnalystService) generateSQLFromQuestion(ctx context.Context, question string) (string, error) {
-	schemaContext := `You are an expert SQL analyst. Convert the user's question into a single, valid PostgreSQL SELECT statement.
-Target VIEW: v_crm_ai_analytics
+func buildTextToSQLSystemPrompt(companyID string) string {
+	return fmt.Sprintf(`Eres un experto en PostgreSQL. Tu única tarea es convertir la pregunta del usuario en una consulta SQL SELECT válida basada en el esquema provisto.
 
-VIEW COLUMNS:
-- company_id: UUID of the company (will be auto-injected)
-- fecha: DATE of the sale
-- cliente_nombre: Customer name
-- ciudad: Customer city
-- producto: Product name
-- categoria: Product category (often used as "segmento" for product-based segments like VIP)
-- cantidad: Quantity sold
-- precio_unitario: Unit price
-- ingreso_neto: Net revenue (line_total)
-- costo_total: Total cost
-- utilidad: Profit (ingreso_neto - costo_total)
-- customer_email: Customer email
-- sale_id: Sale ID
-- item_id: Item ID
+SEGURIDAD CRÍTICA: Siempre debes incluir un filtro WHERE company_id = '%s' (usa exactamente este UUID entre comillas simples) para asegurar que los datos no se mezclen entre empresas. En JOINs, aplica company_id en las tablas que lo tengan.
 
-RULES:
-1. Always start with SELECT (no DELETE, INSERT, UPDATE, DROP, CREATE)
-2. Always reference columns from v_crm_ai_analytics
-3. Return ONLY the SQL statement, no explanation
-4. Use column aliases in Spanish if needed
-5. Do NOT include company_id in WHERE clause (will be auto-injected)
-6. Use appropriate aggregations (SUM, COUNT, AVG) if the question implies it
-7. Use date ranges if the question mentions time periods
-8. For "how many customers in segment X", use COUNT(DISTINCT customer_email) or COUNT(DISTINCT cliente_nombre) filtered by categoria or similar, as appropriate
+Responde ÚNICAMENTE con el código SQL, sin explicaciones ni bloques de markdown.
 
-Example questions and expected SQL:
-Q: "Cual es el ingreso total del mes pasado?"
-A: SELECT SUM(ingreso_neto) as total_ingreso FROM v_crm_ai_analytics WHERE fecha >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')
+Esquema:
+%s`, companyID, TextToSQLSchemaDescription)
+}
 
-Q: "Cuales son los productos mas vendidos?"
-A: SELECT producto, SUM(cantidad) as total_cantidad FROM v_crm_ai_analytics GROUP BY producto ORDER BY total_cantidad DESC LIMIT 10
+func (s *AIAnalystService) generateSQLFromQuestion(ctx context.Context, companyID, question string) (string, error) {
+	sys := buildTextToSQLSystemPrompt(companyID)
+	user := fmt.Sprintf("Pregunta del usuario:\n%s", strings.TrimSpace(question))
 
-User question: %s`
-
-	fullPrompt := fmt.Sprintf(schemaContext, question)
-
-	sqlText, err := s.llmService.GenerateText(ctx, fullPrompt)
+	sqlText, err := s.llmService.GenerateTextWithSystem(ctx, sys, user)
 	if err != nil {
-		return "", fmt.Errorf("LLM generateText: %w", err)
+		return "", fmt.Errorf("LLM: %w", err)
 	}
 
-	// Limpiar respuesta que podria incluir ajeno
-	sqlText = strings.TrimSpace(sqlText)
-	// Remover markdown code blocks si el LLM los aniade
-	sqlText = strings.TrimPrefix(sqlText, "```sql")
-	sqlText = strings.TrimPrefix(sqlText, "```")
-	sqlText = strings.TrimSuffix(sqlText, "```")
-	sqlText = strings.TrimSpace(sqlText)
-
-	// Validar que empiece con SELECT despues de limpiar
+	sqlText = cleanGeneratedSQL(sqlText)
+	if sqlText == "" {
+		return "", fmt.Errorf("el modelo devolvio SQL vacio")
+	}
 	if !strings.HasPrefix(strings.ToUpper(strings.TrimSpace(sqlText)), "SELECT") {
-		return "", fmt.Errorf("LLM no genero un SELECT valido: %s", sqlText)
+		return "", fmt.Errorf("el modelo no genero un SELECT valido: %s", sqlText)
 	}
-
 	return sqlText, nil
 }
 
-// AggregateQuery ejecuta una consulta de agregacion (COUNT, SUM, AVG) sobre analytics.
-// Util para dashboards y resumenes rapidos.
+func cleanGeneratedSQL(s string) string {
+	s = strings.TrimSpace(s)
+	s = strings.TrimPrefix(s, "```sql")
+	s = strings.TrimPrefix(s, "```SQL")
+	s = strings.TrimPrefix(s, "```")
+	s = strings.TrimSuffix(s, "```")
+	s = strings.TrimSpace(s)
+	s = strings.TrimSuffix(s, ";")
+	return strings.TrimSpace(s)
+}
+
+func assertSingleStatement(sql string) error {
+	parts := strings.Split(sql, ";")
+	n := 0
+	for _, p := range parts {
+		if strings.TrimSpace(p) != "" {
+			n++
+		}
+	}
+	if n != 1 {
+		return fmt.Errorf("solo se permite una sentencia SQL")
+	}
+	return nil
+}
+
+func assertCompanyFilter(sql, companyID string) error {
+	if companyID == "" {
+		return fmt.Errorf("company_id invalido")
+	}
+	if !strings.Contains(sql, companyID) {
+		return fmt.Errorf("el SQL debe incluir el company_id de la sesion (%s)", companyID)
+	}
+	lower := strings.ToLower(sql)
+	if !strings.Contains(lower, "company_id") {
+		return fmt.Errorf("el SQL debe referenciar la columna company_id")
+	}
+	return nil
+}
+
+func (s *AIAnalystService) summarizeAnswer(ctx context.Context, question string, data []map[string]interface{}) string {
+	if len(data) == 0 {
+		return "No se encontraron resultados para tu consulta."
+	}
+	preview, err := json.Marshal(data)
+	if err != nil {
+		preview = []byte("[]")
+	}
+	if len(preview) > 2500 {
+		preview = preview[:2500]
+	}
+	user := fmt.Sprintf("Pregunta: %s\n\nResultado (JSON, posiblemente truncado):\n%s", question, string(preview))
+	sys := "Eres un analista de datos. Responde en una sola frase breve en español, sin markdown."
+	ans, err := s.llmService.GenerateTextWithSystem(ctx, sys, user)
+	if err != nil {
+		if s.log != nil {
+			s.log.Warn().Err(err).Msg("resumen IA (usando fallback)")
+		}
+		return fmt.Sprintf("Consulta ejecutada: se devolvieron %d filas.", len(data))
+	}
+	return strings.TrimSpace(ans)
+}
+
+// AggregateQuery ejecuta una consulta de agregacion (COUNT, SUM, AVG) sobre analytics (vista legacy).
 func (s *AIAnalystService) AggregateQuery(ctx context.Context, companyID, sqlQuery string) (interface{}, error) {
 	if err := s.sqlGuard.ValidateQuery(sqlQuery); err != nil {
 		return nil, fmt.Errorf("SQL no seguro: %w", err)

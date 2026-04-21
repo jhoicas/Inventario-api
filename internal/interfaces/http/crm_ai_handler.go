@@ -2,7 +2,6 @@ package http
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -44,7 +43,7 @@ func (h *CRMAIHandler) AskAI(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"code": "VALIDATION", "message": "question es requerido"})
 	}
 
-	rows, err := h.aiAnalyst.Ask(c.Context(), companyID, req.Question)
+	out, err := h.aiAnalyst.Ask(c.Context(), companyID, req.Question)
 	if err != nil {
 		if h.log != nil {
 			h.log.Error().Err(err).Str("company_id", companyID).Msg("crm_ai.ask failed")
@@ -52,10 +51,10 @@ func (h *CRMAIHandler) AskAI(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"code": "INTERNAL", "message": err.Error()})
 	}
 
-	summary := fmt.Sprintf("Se encontraron %d registros para la consulta.", len(rows))
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"summary": summary,
-		"data":    rows,
+		"answer": out.Answer,
+		"data":   out.Data,
+		"sql":    out.SQL,
 	})
 }
 

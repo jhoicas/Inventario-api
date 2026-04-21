@@ -45,10 +45,7 @@ func (s *AISalesAssistant) GenerateRetentionPitch(ctx context.Context, customerN
 
 	userPrompt := fmt.Sprintf("Cliente: %s, Producto habitual: %s, Días sin comprar: %d", customerName, favoriteProduct, daysInactive)
 
-	// El puerto LLM actual expone solo GenerateText, por lo que encapsulamos ambos prompts en un unico mensaje.
-	fullPrompt := fmt.Sprintf("System Prompt:\n%s\n\nUser Prompt:\n%s\n\nResponde unicamente con el mensaje final (maximo 3 lineas).", retentionSystemPrompt, userPrompt)
-
-	pitch, err := s.llm.GenerateText(ctx, fullPrompt)
+	pitch, err := s.llm.GenerateTextWithSystem(ctx, retentionSystemPrompt, userPrompt)
 	if err != nil {
 		if s.log != nil {
 			s.log.Error().Err(err).Str("customer_name", customerName).Msg("generar pitch de retencion")

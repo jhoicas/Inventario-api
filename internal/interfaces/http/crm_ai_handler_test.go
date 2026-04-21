@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/jhoicas/Inventario-api/internal/application/dto"
 	"github.com/jhoicas/Inventario-api/pkg/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -41,11 +42,15 @@ func TestAskAI_Success(t *testing.T) {
 	handler := NewCRMAIHandler(aiMock, bulkMock, log)
 	app := newCRMAITestApp(handler, companyID)
 
-	expectedRows := []map[string]interface{}{
-		{"producto": "A", "cantidad": 10.0},
-		{"producto": "B", "cantidad": 5.0},
+	expected := &dto.CRMTextToSQLResponse{
+		Answer: "Resumen de prueba.",
+		Data: []map[string]interface{}{
+			{"producto": "A", "cantidad": 10.0},
+			{"producto": "B", "cantidad": 5.0},
+		},
+		SQL: "SELECT 1",
 	}
-	aiMock.On("Ask", mock.Anything, companyID, "ventas").Return(expectedRows, nil).Once()
+	aiMock.On("Ask", mock.Anything, companyID, "ventas").Return(expected, nil).Once()
 
 	body := []byte(`{"question":"ventas"}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/crm/ai/ask", bytes.NewReader(body))
@@ -60,11 +65,13 @@ func TestAskAI_Success(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	var out struct {
-		Summary string                   `json:"summary"`
-		Data    []map[string]interface{} `json:"data"`
+		Answer string                   `json:"answer"`
+		Data   []map[string]interface{} `json:"data"`
+		SQL    string                   `json:"sql"`
 	}
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
-	assert.Equal(t, "Se encontraron 2 registros para la consulta.", out.Summary)
+	assert.Equal(t, "Resumen de prueba.", out.Answer)
+	assert.Equal(t, "SELECT 1", out.SQL)
 	assert.Len(t, out.Data, 2)
 	assert.Equal(t, "A", out.Data[0]["producto"])
 	aiMock.AssertExpectations(t)

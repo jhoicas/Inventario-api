@@ -22,4 +22,7 @@ type LLMService interface {
 
 	// GenerateText genera texto libre a partir de un prompt (para CRM: copy de campaña, resúmenes, sentimiento).
 	GenerateText(ctx context.Context, prompt string) (string, error)
+
+	// GenerateTextWithSystem usa instrucción de sistema y mensaje de usuario (p.ej. Text-to-SQL con Gemini).
+	GenerateTextWithSystem(ctx context.Context, systemInstruction, userText string) (string, error)
 }

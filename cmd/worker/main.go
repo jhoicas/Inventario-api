@@ -34,8 +34,8 @@ func main() {
 	templateRepo := postgres.NewCRMCampaignTemplateRepository(pool)
 	taskRepo := postgres.NewCRMTaskRepository(pool)
 	aiAnalyticsRepo := postgres.NewAIAnalyticsRepository(pool)
-	anthropicSvc := infraai.NewAnthropicService(cfg.AI.AnthropicAPIKey, cfg.AI.AnthropicModel)
-	salesAssistant := crm.NewAISalesAssistant(anthropicSvc, logg)
+	geminiSvc := infraai.NewGeminiService(cfg.AI.GeminiAPIKey, cfg.AI.GeminiModel)
+	salesAssistant := crm.NewAISalesAssistant(geminiSvc, logg)
 	automationUC := crm.NewAutomationUseCase(automationRepo, campaignRepo, templateRepo, nil, logg, nil)
 
 	automationWorker, err := crm.NewAutomationCronWorker(automationUC, logg)

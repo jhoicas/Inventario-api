@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 
+	"github.com/jhoicas/Inventario-api/internal/application/dto"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -10,10 +11,10 @@ type mockAIAnalystService struct {
 	mock.Mock
 }
 
-func (m *mockAIAnalystService) Ask(ctx context.Context, companyID, question string) ([]map[string]interface{}, error) {
+func (m *mockAIAnalystService) Ask(ctx context.Context, companyID, question string) (*dto.CRMTextToSQLResponse, error) {
 	args := m.Called(ctx, companyID, question)
-	if rows, ok := args.Get(0).([]map[string]interface{}); ok {
-		return rows, args.Error(1)
+	if out, ok := args.Get(0).(*dto.CRMTextToSQLResponse); ok {
+		return out, args.Error(1)
 	}
 	return nil, args.Error(1)
 }

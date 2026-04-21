@@ -326,6 +326,35 @@ func (r *AIAnalyticsRepository) QueryView(ctx context.Context, companyID, sqlQue
 	return out, rows.Err()
 }
 
+// ExecuteRawSelect ejecuta un SELECT completo (Text-to-SQL); sin inyectar filtros adicionales.
+func (r *AIAnalyticsRepository) ExecuteRawSelect(ctx context.Context, sql string) ([]map[string]interface{}, error) {
+	rows, err := r.pool.Query(ctx, sql)
+	if err != nil {
+		return nil, fmt.Errorf("execute raw select: %w", err)
+	}
+	defer rows.Close()
+
+	cols := rows.FieldDescriptions()
+	colNames := make([]string, len(cols))
+	for i, col := range cols {
+		colNames[i] = col.Name
+	}
+
+	var out []map[string]interface{}
+	for rows.Next() {
+		vals, err := rows.Values()
+		if err != nil {
+			return nil, fmt.Errorf("scan raw select row: %w", err)
+		}
+		row := make(map[string]interface{}, len(vals))
+		for i, val := range vals {
+			row[colNames[i]] = val
+		}
+		out = append(out, row)
+	}
+	return out, rows.Err()
+}
+
 // RunAggregateQuery ejecuta consultas de agregacion como COUNT, SUM, AVG sobre la vista.
 func (r *AIAnalyticsRepository) RunAggregateQuery(ctx context.Context, companyID, sqlQuery string) (interface{}, error) {
 	safeSQLQuery := fmt.Sprintf(`%s AND company_id = $1`, sqlQuery)

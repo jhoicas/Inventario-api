@@ -2,16 +2,15 @@ package ports
 
 import (
 	"context"
+
+	"github.com/jhoicas/Inventario-api/internal/application/dto"
 )
 
 // AIAnalystService define el puerto para traducir preguntas en lenguaje natural a consultas SQL
-// sobre la vista semantica v_crm_ai_analytics con protecciones de seguridad incluidas.
-// Implementar: SQL Guard para inyeccion de company_id, bloqueo de palabras clave daninhas.
+// (Text-to-SQL sobre el esquema CRM) con protecciones de seguridad incluidas.
 type AIAnalystService interface {
-	// Ask traduce una pregunta en lenguaje natural a una consulta SQL segura
-	// sobre la vista v_crm_ai_analytics, inyectando company_id automaticamente.
-	// Retorna los datos como lista de mapas (clave-valor) para flexibilidad.
-	Ask(ctx context.Context, companyID, question string) ([]map[string]interface{}, error)
+	// Ask traduce una pregunta a SQL SELECT, ejecuta en PostgreSQL y devuelve respuesta estructurada.
+	Ask(ctx context.Context, companyID, question string) (*dto.CRMTextToSQLResponse, error)
 }
 
 // SQLGuardService define el contrato de seguridad para prevenir inyeccion SQL y leakage de datos
