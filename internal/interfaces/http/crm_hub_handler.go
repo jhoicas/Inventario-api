@@ -25,6 +25,7 @@ func mapProductCategoryToHub(in *dto.ProductCategoryResponse) *dto.CrmHubCategor
 	}
 	return &dto.CrmHubCategoryResponse{
 		ID: in.ID, CompanyID: in.CompanyID, Name: in.Name,
+		IsActive: in.IsActive,
 		CreatedAt: in.CreatedAt, UpdatedAt: in.UpdatedAt,
 	}
 }
@@ -115,7 +116,7 @@ func (h *CrmHubCategoryHandler) Update(c *fiber.Ctx) error {
 	if err := c.BodyParser(&body); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "INVALID_BODY", Message: "cuerpo inválido"})
 	}
-	in := dto.UpdateProductCategoryRequest{Name: body.Name}
+	in := dto.UpdateProductCategoryRequest{Name: body.Name, IsActive: body.IsActive}
 	out, err := h.uc.Update(companyID, id, in)
 	if err != nil {
 		if err == domain.ErrInvalidInput {

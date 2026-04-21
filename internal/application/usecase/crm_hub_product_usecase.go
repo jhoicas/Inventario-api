@@ -148,6 +148,9 @@ func (uc *CrmHubProductUseCase) Update(companyID, id string, in dto.CrmHubProduc
 	if in.UnitCost != nil {
 		p.UnitCost = in.UnitCost
 	}
+	if in.IsActive != nil {
+		p.IsActive = *in.IsActive
+	}
 	p.UpdatedAt = time.Now()
 	if err := uc.repo.Update(p); err != nil {
 		return nil, err

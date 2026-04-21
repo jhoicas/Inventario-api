@@ -11,7 +11,7 @@ func NewCrmHubCategoryUseCase(inner *CategoryUseCase) *CrmHubCategoryUseCase {
 	return &CrmHubCategoryUseCase{CategoryUseCase: inner}
 }
 
-// Delete elimina la categoría en BD (DELETE); productos hub quedan con category_id NULL por FK.
+// Delete desactiva la categoría (is_active = false).
 func (c *CrmHubCategoryUseCase) Delete(companyID, id string) error {
 	return c.CategoryUseCase.Deactivate(companyID, id)
 }

@@ -16,7 +16,8 @@ type CrmHubCategoryCreateRequest struct {
 
 // CrmHubCategoryUpdateRequest body PUT
 type CrmHubCategoryUpdateRequest struct {
-	Name *string `json:"name"`
+	Name     *string `json:"name"`
+	IsActive *bool   `json:"is_active"`
 }
 
 // CrmHubCategoryResponse respuesta categoría hub.
@@ -24,6 +25,7 @@ type CrmHubCategoryResponse struct {
 	ID        string    `json:"id"`
 	CompanyID string    `json:"company_id"`
 	Name      string    `json:"name"`
+	IsActive  bool      `json:"is_active"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -52,6 +54,7 @@ type CrmHubProductUpdateRequest struct {
 	ProductCode *string          `json:"product_code"`
 	ProductName *string          `json:"product_name"`
 	UnitCost    *decimal.Decimal `json:"unit_cost"`
+	IsActive    *bool            `json:"is_active"`
 }
 
 // CrmHubProductResponse respuesta producto hub.

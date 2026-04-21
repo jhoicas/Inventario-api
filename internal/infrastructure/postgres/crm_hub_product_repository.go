@@ -100,10 +100,10 @@ func (r *CrmHubProductRepository) Update(p *entity.CrmProductHub) error {
 	cid := strings.TrimSpace(p.CategoryID)
 	cmd, err := r.q.Exec(context.Background(), `
 		UPDATE crm_products_hub
-		SET category_id = $2, product_code = $3, product_name = $4, unit_cost = $5, updated_at = $6
-		WHERE id = $1 AND company_id = $7`,
+		SET category_id = $2, product_code = $3, product_name = $4, unit_cost = $5, is_active = $6, updated_at = $7
+		WHERE id = $1 AND company_id = $8`,
 		p.ID, nullableUUIDArg(&cid), p.ProductCode, p.ProductName,
-		nullableDecimalArg(p.UnitCost), p.UpdatedAt, p.CompanyID,
+		nullableDecimalArg(p.UnitCost), p.IsActive, p.UpdatedAt, p.CompanyID,
 	)
 	if err != nil {
 		if isUniqueViolation(err) {

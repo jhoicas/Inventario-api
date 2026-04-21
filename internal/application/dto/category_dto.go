@@ -11,7 +11,8 @@ type CreateProductCategoryRequest struct {
 
 // UpdateProductCategoryRequest actualiza el nombre en el hub.
 type UpdateProductCategoryRequest struct {
-	Name *string `json:"name"`
+	Name     *string `json:"name"`
+	IsActive *bool   `json:"is_active"`
 }
 
 // ProductCategoryResponse salida HTTP (crm_category_product_hub).
@@ -19,6 +20,7 @@ type ProductCategoryResponse struct {
 	ID        string    `json:"id"`
 	CompanyID string    `json:"company_id"`
 	Name      string    `json:"name"`
+	IsActive  bool      `json:"is_active"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }

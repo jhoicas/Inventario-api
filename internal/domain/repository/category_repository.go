@@ -10,6 +10,6 @@ type CategoryRepository interface {
 	GetByCompanyAndName(companyID, name string) (*entity.CrmCategoryProductHub, error)
 	Update(category *entity.CrmCategoryProductHub) error
 	ListByCompany(companyID string, limit, offset int) ([]*entity.CrmCategoryProductHub, int64, error)
-	// Deactivate elimina la categoría del hub; crm_products_hub.category_id pasa a NULL (ON DELETE SET NULL).
+	// Deactivate marca la categoría como inactiva (is_active = false).
 	Deactivate(companyID, id string) error
 }

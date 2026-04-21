@@ -42,6 +42,7 @@ func (uc *CategoryUseCase) Create(companyID string, in dto.CreateProductCategory
 		ID:        uuid.New().String(),
 		CompanyID: companyID,
 		Name:      name,
+		IsActive:  true,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
@@ -94,6 +95,9 @@ func (uc *CategoryUseCase) Update(companyID, id string, in dto.UpdateProductCate
 	if in.Name != nil {
 		c.Name = strings.TrimSpace(*in.Name)
 	}
+	if in.IsActive != nil {
+		c.IsActive = *in.IsActive
+	}
 	if c.Name == "" {
 		return nil, domain.ErrInvalidInput
 	}
@@ -134,6 +138,7 @@ func toCategoryResponse(c *entity.CrmCategoryProductHub) *dto.ProductCategoryRes
 		ID:        c.ID,
 		CompanyID: c.CompanyID,
 		Name:      c.Name,
+		IsActive:  c.IsActive,
 		CreatedAt: c.CreatedAt,
 		UpdatedAt: c.UpdatedAt,
 	}

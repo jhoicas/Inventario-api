@@ -26,9 +26,9 @@ func NewCategoryRepository(q Querier) *CategoryRepo {
 
 func (r *CategoryRepo) Create(c *entity.CrmCategoryProductHub) error {
 	_, err := r.q.Exec(context.Background(), `
-		INSERT INTO crm_category_product_hub (id, company_id, name, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5)`,
-		c.ID, c.CompanyID, strings.TrimSpace(c.Name), c.CreatedAt, c.UpdatedAt,
+		INSERT INTO crm_category_product_hub (id, company_id, name, is_active, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6)`,
+		c.ID, c.CompanyID, strings.TrimSpace(c.Name), c.IsActive, c.CreatedAt, c.UpdatedAt,
 	)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -41,14 +41,14 @@ func (r *CategoryRepo) Create(c *entity.CrmCategoryProductHub) error {
 
 func (r *CategoryRepo) GetByID(id string) (*entity.CrmCategoryProductHub, error) {
 	row := r.q.QueryRow(context.Background(), `
-		SELECT id, company_id, name, created_at, updated_at
+		SELECT id, company_id, name, is_active, created_at, updated_at
 		FROM crm_category_product_hub WHERE id = $1`, id)
 	return scanCategoryHub(row)
 }
 
 func scanCategoryHub(row pgx.Row) (*entity.CrmCategoryProductHub, error) {
 	var c entity.CrmCategoryProductHub
-	err := row.Scan(&c.ID, &c.CompanyID, &c.Name, &c.CreatedAt, &c.UpdatedAt)
+	err := row.Scan(&c.ID, &c.CompanyID, &c.Name, &c.IsActive, &c.CreatedAt, &c.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
@@ -64,7 +64,7 @@ func (r *CategoryRepo) GetByCompanyAndName(companyID, name string) (*entity.CrmC
 		return nil, nil
 	}
 	row := r.q.QueryRow(context.Background(), `
-		SELECT id, company_id, name, created_at, updated_at
+		SELECT id, company_id, name, is_active, created_at, updated_at
 		FROM crm_category_product_hub
 		WHERE company_id = $1 AND upper(trim(name)) = upper(trim($2))
 		LIMIT 1`, companyID, name)
@@ -74,9 +74,9 @@ func (r *CategoryRepo) GetByCompanyAndName(companyID, name string) (*entity.CrmC
 func (r *CategoryRepo) Update(c *entity.CrmCategoryProductHub) error {
 	cmd, err := r.q.Exec(context.Background(), `
 		UPDATE crm_category_product_hub
-		SET name = $2, updated_at = $3
-		WHERE id = $1 AND company_id = $4`,
-		c.ID, strings.TrimSpace(c.Name), c.UpdatedAt, c.CompanyID,
+		SET name = $2, is_active = $3, updated_at = $4
+		WHERE id = $1 AND company_id = $5`,
+		c.ID, strings.TrimSpace(c.Name), c.IsActive, c.UpdatedAt, c.CompanyID,
 	)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -98,7 +98,7 @@ func (r *CategoryRepo) ListByCompany(companyID string, limit, offset int) ([]*en
 		return nil, 0, fmt.Errorf("count crm_category_product_hub: %w", err)
 	}
 	rows, err := r.q.Query(context.Background(), `
-		SELECT id, company_id, name, created_at, updated_at
+		SELECT id, company_id, name, is_active, created_at, updated_at
 		FROM crm_category_product_hub
 		WHERE company_id = $1
 		ORDER BY name ASC
@@ -110,7 +110,7 @@ func (r *CategoryRepo) ListByCompany(companyID string, limit, offset int) ([]*en
 	var out []*entity.CrmCategoryProductHub
 	for rows.Next() {
 		var c entity.CrmCategoryProductHub
-		if err := rows.Scan(&c.ID, &c.CompanyID, &c.Name, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.CompanyID, &c.Name, &c.IsActive, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, 0, fmt.Errorf("scan crm_category_product_hub: %w", err)
 		}
 		out = append(out, &c)
@@ -120,10 +120,11 @@ func (r *CategoryRepo) ListByCompany(companyID string, limit, offset int) ([]*en
 
 func (r *CategoryRepo) Deactivate(companyID, id string) error {
 	cmd, err := r.q.Exec(context.Background(), `
-		DELETE FROM crm_category_product_hub
+		UPDATE crm_category_product_hub
+		SET is_active = false, updated_at = now()
 		WHERE id = $1 AND company_id = $2`, id, companyID)
 	if err != nil {
-		return fmt.Errorf("delete crm_category_product_hub: %w", err)
+		return fmt.Errorf("deactivate crm_category_product_hub: %w", err)
 	}
 	if cmd.RowsAffected() == 0 {
 		return nil
