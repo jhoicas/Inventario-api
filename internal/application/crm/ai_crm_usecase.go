@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/jhoicas/Inventario-api/internal/application/ports"
 	"github.com/jhoicas/Inventario-api/internal/domain/entity"
@@ -24,6 +25,8 @@ func (uc *AICRMUseCase) GenerateCampaignCopy(ctx context.Context, prompt string)
 	if prompt == "" {
 		return "", nil
 	}
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
 	systemInstruction := "Eres un estratega senior de CRM y email marketing. Redacta mensajes profesionales, claros y persuasivos, con tono cercano. Entrega solo el texto final listo para enviar, sin explicaciones ni markdown."
 	userText := fmt.Sprintf("Contexto de campaña:\n%s", prompt)
 	return uc.llm.GenerateTextWithSystem(ctx, systemInstruction, userText)
@@ -34,6 +37,8 @@ func (uc *AICRMUseCase) SummarizeTimeline(ctx context.Context, interactions []*e
 	if len(interactions) == 0 {
 		return "", nil
 	}
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
 	var b strings.Builder
 	for i, m := range interactions {
 		fmt.Fprintf(&b, "%d. [%s] %s - %s\n   %s\n", i+1, m.CreatedAt.Format("2006-01-02 15:04"), m.Type, m.Subject, m.Body)
@@ -48,6 +53,8 @@ func (uc *AICRMUseCase) AnalyzePQRSentiment(ctx context.Context, description str
 	if description == "" {
 		return "", nil
 	}
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
 	systemInstruction := "Eres un clasificador de sentimiento para tickets CRM."
 	userText := fmt.Sprintf("Clasifica el sentimiento del siguiente texto (petición, queja o reclamo de un cliente) en exactamente una de estas tres palabras: positive, neutral, negative. Responde ÚNICAMENTE con una de esas tres palabras, nada más.\n\nTexto:\n%s", description)
 	raw, err := uc.llm.GenerateTextWithSystem(ctx, systemInstruction, userText)

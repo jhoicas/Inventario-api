@@ -7,7 +7,7 @@ import (
 )
 
 // LLMService define el puerto de salida para los servicios de inteligencia artificial.
-// Cualquier adaptador (Gemini, OpenAI, Ollama, mock) debe implementar esta interfaz.
+// Cualquier adaptador (Anthropic, OpenAI, Ollama, mock) debe implementar esta interfaz.
 // Siguiendo el principio de inversión de dependencias (DIP), el dominio/aplicación
 // solo conoce este contrato, no la implementación concreta.
 type LLMService interface {
@@ -23,6 +23,6 @@ type LLMService interface {
 	// GenerateText genera texto libre a partir de un prompt (para CRM: copy de campaña, resúmenes, sentimiento).
 	GenerateText(ctx context.Context, prompt string) (string, error)
 
-	// GenerateTextWithSystem usa instrucción de sistema y mensaje de usuario (p.ej. Text-to-SQL con Gemini).
+	// GenerateTextWithSystem usa instrucción de sistema y mensaje de usuario (p.ej. Text-to-SQL).
 	GenerateTextWithSystem(ctx context.Context, systemInstruction, userText string) (string, error)
 }

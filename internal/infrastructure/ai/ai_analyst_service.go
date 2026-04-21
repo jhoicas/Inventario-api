@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/jhoicas/Inventario-api/internal/application/dto"
 	"github.com/jhoicas/Inventario-api/internal/application/ports"
@@ -12,7 +13,7 @@ import (
 	"github.com/jhoicas/Inventario-api/pkg/logger"
 )
 
-// AIAnalystService motor Text-to-SQL (Gemini) + ejecución en PostgreSQL con validación de seguridad.
+// AIAnalystService motor Text-to-SQL + ejecución en PostgreSQL con validación de seguridad.
 type AIAnalystService struct {
 	llmService    ports.LLMService
 	sqlGuard      *SQLGuard
@@ -20,7 +21,7 @@ type AIAnalystService struct {
 	log           *logger.Logger
 }
 
-// NewAIAnalystService constructor (usar Gemini u otro LLM que implemente GenerateTextWithSystem).
+// NewAIAnalystService constructor (usar Anthropic u otro LLM que implemente GenerateTextWithSystem).
 func NewAIAnalystService(
 	llm ports.LLMService,
 	analyticsRepo repository.AIAnalyticsRepository,
@@ -36,6 +37,9 @@ func NewAIAnalystService(
 
 // Ask traduce la pregunta a SQL SELECT, valida, ejecuta y devuelve answer + data + sql.
 func (s *AIAnalystService) Ask(ctx context.Context, companyID, question string) (*dto.CRMTextToSQLResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+
 	if question == "" {
 		return nil, fmt.Errorf("pregunta vacia")
 	}
@@ -43,7 +47,7 @@ func (s *AIAnalystService) Ask(ctx context.Context, companyID, question string) 
 		return nil, fmt.Errorf("company_id requerido")
 	}
 
-	sqlQuery, err := s.generateSQLFromQuestion(ctx, companyID, question)
+	textToSQL, err := s.generateSQLFromQuestion(ctx, companyID, question)
 	if err != nil {
 		if s.log != nil {
 			s.log.Error().Err(err).Msg("generar SQL desde pregunta")
@@ -51,6 +55,7 @@ func (s *AIAnalystService) Ask(ctx context.Context, companyID, question string) 
 		return nil, fmt.Errorf("generar SQL: %w", err)
 	}
 
+	sqlQuery := textToSQL.SQL
 	if s.log != nil {
 		s.log.Info().Str("question", question).Str("generated_sql", sqlQuery).Msg("SQL generado (Text-to-SQL)")
 	}
@@ -77,7 +82,10 @@ func (s *AIAnalystService) Ask(ctx context.Context, companyID, question string) 
 	}
 
 	sanitized := s.sqlGuard.SanitizeResult(results)
-	answer := s.summarizeAnswer(ctx, question, sanitized)
+	answer := textToSQL.Answer
+	if answer == "" {
+		answer = s.summarizeAnswer(ctx, question, sanitized)
+	}
 
 	if s.log != nil {
 		s.log.Info().Int("records", len(sanitized)).Msg("text-to-sql ok")
@@ -95,29 +103,49 @@ func buildTextToSQLSystemPrompt(companyID string) string {
 
 SEGURIDAD CRÍTICA: Siempre debes incluir un filtro WHERE company_id = '%s' (usa exactamente este UUID entre comillas simples) para asegurar que los datos no se mezclen entre empresas. En JOINs, aplica company_id en las tablas que lo tengan.
 
-Responde ÚNICAMENTE con el código SQL, sin explicaciones ni bloques de markdown.
+Responde ÚNICAMENTE un JSON válido con esta estructura exacta:
+{"answer":"<respuesta breve en español>","sql":"<consulta SELECT>"}
+No incluyas markdown ni texto adicional.
 
 Esquema:
 %s`, companyID, TextToSQLSchemaDescription)
 }
 
-func (s *AIAnalystService) generateSQLFromQuestion(ctx context.Context, companyID, question string) (string, error) {
+type textToSQLOutput struct {
+	Answer string `json:"answer"`
+	SQL    string `json:"sql"`
+}
+
+func (s *AIAnalystService) generateSQLFromQuestion(ctx context.Context, companyID, question string) (*textToSQLOutput, error) {
 	sys := buildTextToSQLSystemPrompt(companyID)
 	user := fmt.Sprintf("Pregunta del usuario:\n%s", strings.TrimSpace(question))
 
-	sqlText, err := s.llmService.GenerateTextWithSystem(ctx, sys, user)
+	rawText, err := s.llmService.GenerateTextWithSystem(ctx, sys, user)
 	if err != nil {
-		return "", fmt.Errorf("LLM: %w", err)
+		return nil, fmt.Errorf("LLM: %w", err)
+	}
+	rawText = extractJSON(rawText)
+
+	var out textToSQLOutput
+	if err := json.Unmarshal([]byte(rawText), &out); err != nil {
+		// fallback de compatibilidad: si el modelo devolvió SQL plano.
+		sqlText := cleanGeneratedSQL(rawText)
+		if sqlText == "" {
+			return nil, fmt.Errorf("respuesta de IA inválida (JSON requerido): %w", err)
+		}
+		return &textToSQLOutput{Answer: "", SQL: sqlText}, nil
 	}
 
-	sqlText = cleanGeneratedSQL(sqlText)
+	sqlText := cleanGeneratedSQL(out.SQL)
 	if sqlText == "" {
-		return "", fmt.Errorf("el modelo devolvio SQL vacio")
+		return nil, fmt.Errorf("el modelo devolvio SQL vacio")
 	}
 	if !strings.HasPrefix(strings.ToUpper(strings.TrimSpace(sqlText)), "SELECT") {
-		return "", fmt.Errorf("el modelo no genero un SELECT valido: %s", sqlText)
+		return nil, fmt.Errorf("el modelo no genero un SELECT valido: %s", sqlText)
 	}
-	return sqlText, nil
+	out.SQL = sqlText
+	out.Answer = strings.TrimSpace(out.Answer)
+	return &out, nil
 }
 
 func cleanGeneratedSQL(s string) string {

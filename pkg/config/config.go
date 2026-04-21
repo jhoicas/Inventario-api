@@ -22,8 +22,8 @@ type Config struct {
 
 // AIConfig configuración para servicios de Inteligencia Artificial.
 type AIConfig struct {
-	GeminiAPIKey    string // Google Gemini (GEMINI_API_KEY) — Text-to-SQL CRM / clasificación
-	GeminiModel     string // p.ej. gemini-2.0-flash (GEMINI_MODEL)
+	AnthropicAPIKey string // clave de la API de Anthropic (ANTHROPIC_API_KEY)
+	AnthropicModel  string // modelo a usar, p.ej. "claude-3-5-haiku-20241022" (ANTHROPIC_MODEL)
 }
 
 // SMTPConfig configuración del servidor de correo saliente.
@@ -166,8 +166,8 @@ func Load() (*Config, error) {
 			CertStoragePath: getString(v, "DIAN_CERT_STORAGE_PATH", ""),
 		},
 		AI: AIConfig{
-			GeminiAPIKey:    getString(v, "GEMINI_API_KEY", ""),
-			GeminiModel:     getString(v, "GEMINI_MODEL", "gemini-2.0-flash"),
+			AnthropicAPIKey: getString(v, "ANTHROPIC_API_KEY", ""),
+			AnthropicModel:  getString(v, "ANTHROPIC_MODEL", "claude-3-5-haiku-20241022"),
 		},
 		SMTP: SMTPConfig{
 			Host:         getString(v, "SMTP_HOST", ""),

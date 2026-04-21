@@ -181,8 +181,8 @@ func main() {
 	listMovementsUC := inventory.NewGetMovementsUseCase(movementRepo)
 	dashboardUC := appanalytics.NewDashboardUseCase(analyticsRepo)
 
-	geminiSvc := infraai.NewGeminiService(cfg.AI.GeminiAPIKey, cfg.AI.GeminiModel)
-	aiUC := usecase.NewAIUseCase(geminiSvc)
+	anthropicSvc := infraai.NewAnthropicService(cfg.AI.AnthropicAPIKey, cfg.AI.AnthropicModel)
+	aiUC := usecase.NewAIUseCase(anthropicSvc)
 
 	// CRM: repositorios y casos de uso (módulo crm)
 	crmCategoryRepo := postgres.NewCRMCategoryRepository(pool)
@@ -218,9 +218,9 @@ func main() {
 	loyaltyUC := crm.NewLoyaltyUseCase(crmProfileRepo, customerRepo, crmCategoryRepo, crmBenefitRepo, crmInteractionRepo)
 	crmAnalyticsUC := crm.NewAnalyticsUseCase(crmProfileRepo)
 	taskUC := crm.NewTaskUseCase(crmTaskRepo)
-	aiCRMUC := crm.NewAICRMUseCase(geminiSvc)
+	aiCRMUC := crm.NewAICRMUseCase(anthropicSvc)
 	aiAnalyticsRepo := postgres.NewAIAnalyticsRepository(pool)
-	aiAnalystSvc := infraai.NewAIAnalystService(geminiSvc, aiAnalyticsRepo, log)
+	aiAnalystSvc := infraai.NewAIAnalystService(anthropicSvc, aiAnalyticsRepo, log)
 	productHubRepo := postgres.NewCRMProductHubRepository(pool)
 	salesHubRepo := postgres.NewCRMSalesHubRepository(pool)
 	saleItemHubRepo := postgres.NewCRMSaleItemHubRepository(pool)

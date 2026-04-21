@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/jhoicas/Inventario-api/internal/application/ports"
 	"github.com/jhoicas/Inventario-api/pkg/logger"
@@ -45,6 +46,8 @@ func (s *AISalesAssistant) GenerateRetentionPitch(ctx context.Context, customerN
 
 	userPrompt := fmt.Sprintf("Cliente: %s, Producto habitual: %s, Días sin comprar: %d", customerName, favoriteProduct, daysInactive)
 
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
 	pitch, err := s.llm.GenerateTextWithSystem(ctx, retentionSystemPrompt, userPrompt)
 	if err != nil {
 		if s.log != nil {
