@@ -106,6 +106,8 @@ func buildTextToSQLSystemPrompt(companyID string) string {
 
 SEGURIDAD CRÍTICA: Siempre debes incluir un filtro WHERE company_id = '%s' (usa exactamente este UUID entre comillas simples) para asegurar que los datos no se mezclen entre empresas. En JOINs, aplica company_id en las tablas que lo tengan.
 
+REGLA DE NEGOCIO: Si el usuario pide "ventas por categoria" sin especificar "de producto", interpreta categoria como segmento/categoria de CLIENTE (crm_categories), no categoria de producto.
+
 Responde ÚNICAMENTE un JSON válido con esta estructura exacta:
 {"answer":"<respuesta breve en español>","sql":"<consulta SELECT>","chartType":"bar|pie|line|none"}
 No incluyas markdown ni texto adicional.
