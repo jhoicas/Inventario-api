@@ -48,7 +48,7 @@ func TestAskAI_Success(t *testing.T) {
 			{"producto": "A", "cantidad": 10.0},
 			{"producto": "B", "cantidad": 5.0},
 		},
-		SQL: "SELECT 1",
+		ChartType: "bar",
 	}
 	aiMock.On("Ask", mock.Anything, companyID, "ventas").Return(expected, nil).Once()
 
@@ -65,16 +65,24 @@ func TestAskAI_Success(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	var out struct {
-		Answer string                   `json:"answer"`
-		Data   []map[string]interface{} `json:"data"`
-		SQL    string                   `json:"sql"`
+		Answer    string                   `json:"answer"`
+		Data      []map[string]interface{} `json:"data"`
+		ChartType string                   `json:"chartType"`
 	}
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
 	assert.Equal(t, "Resumen de prueba.", out.Answer)
-	assert.Equal(t, "SELECT 1", out.SQL)
+	assert.Equal(t, "bar", out.ChartType)
+	assert.NotContains(t, string(mustJSONMarshal(t, out)), "sql")
 	assert.Len(t, out.Data, 2)
 	assert.Equal(t, "A", out.Data[0]["producto"])
 	aiMock.AssertExpectations(t)
+}
+
+func mustJSONMarshal(t *testing.T, v interface{}) []byte {
+	t.Helper()
+	b, err := json.Marshal(v)
+	require.NoError(t, err)
+	return b
 }
 
 func TestAskAI_InvalidBody(t *testing.T) {

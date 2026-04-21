@@ -52,9 +52,9 @@ func (h *CRMAIHandler) AskAI(c *fiber.Ctx) error {
 	}
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"answer": out.Answer,
-		"data":   out.Data,
-		"sql":    out.SQL,
+		"answer":    out.Answer,
+		"data":      out.Data,
+		"chartType": out.ChartType,
 	})
 }
 

@@ -35,7 +35,7 @@ func NewAIAnalystService(
 	}
 }
 
-// Ask traduce la pregunta a SQL SELECT, valida, ejecuta y devuelve answer + data + sql.
+// Ask traduce la pregunta a SQL SELECT, valida, ejecuta y devuelve answer + data + chartType.
 func (s *AIAnalystService) Ask(ctx context.Context, companyID, question string) (*dto.CRMTextToSQLResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
@@ -92,9 +92,9 @@ func (s *AIAnalystService) Ask(ctx context.Context, companyID, question string) 
 	}
 
 	return &dto.CRMTextToSQLResponse{
-		Answer: answer,
-		Data:   sanitized,
-		SQL:    sqlQuery,
+		Answer:    answer,
+		Data:      sanitized,
+		ChartType: normalizeChartType(textToSQL.ChartType),
 	}, nil
 }
 
@@ -104,7 +104,7 @@ func buildTextToSQLSystemPrompt(companyID string) string {
 SEGURIDAD CRÍTICA: Siempre debes incluir un filtro WHERE company_id = '%s' (usa exactamente este UUID entre comillas simples) para asegurar que los datos no se mezclen entre empresas. En JOINs, aplica company_id en las tablas que lo tengan.
 
 Responde ÚNICAMENTE un JSON válido con esta estructura exacta:
-{"answer":"<respuesta breve en español>","sql":"<consulta SELECT>"}
+{"answer":"<respuesta breve en español>","sql":"<consulta SELECT>","chartType":"bar|pie|line|none"}
 No incluyas markdown ni texto adicional.
 
 Esquema:
@@ -112,8 +112,9 @@ Esquema:
 }
 
 type textToSQLOutput struct {
-	Answer string `json:"answer"`
-	SQL    string `json:"sql"`
+	Answer    string `json:"answer"`
+	SQL       string `json:"sql"`
+	ChartType string `json:"chartType"`
 }
 
 func (s *AIAnalystService) generateSQLFromQuestion(ctx context.Context, companyID, question string) (*textToSQLOutput, error) {
@@ -145,7 +146,21 @@ func (s *AIAnalystService) generateSQLFromQuestion(ctx context.Context, companyI
 	}
 	out.SQL = sqlText
 	out.Answer = strings.TrimSpace(out.Answer)
+	out.ChartType = normalizeChartType(out.ChartType)
 	return &out, nil
+}
+
+func normalizeChartType(raw string) string {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "bar":
+		return "bar"
+	case "pie":
+		return "pie"
+	case "line":
+		return "line"
+	default:
+		return "none"
+	}
 }
 
 func cleanGeneratedSQL(s string) string {

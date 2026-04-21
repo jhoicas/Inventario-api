@@ -37,4 +37,6 @@ crm_products_hub:
   - product_name (text)
   - product_code (text)
   - category_id (uuid, nullable)
+
+PRECAUCION CON COLUMNAS JSONB: SI VAS A CONSULTAR O EXTRAER DATOS DE UNA COLUMNA JSONB QUE ES UN ARREGLO (ARRAY), DEBES USAR jsonb_array_elements() O jsonb_array_elements_text(). NUNCA USES jsonb_object_keys() SOBRE UN ARREGLO.
 `
