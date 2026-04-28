@@ -7,6 +7,7 @@ import (
 	"fmt"
 	stdlog "log"
 	"net/http"
+	"regexp"
 	"reflect"
 	"strings"
 	"time"
@@ -31,6 +32,14 @@ type CampaignUseCase struct {
 	azureTriggerURL string
 	httpClient      *http.Client
 }
+
+var (
+	rePlaceholderFirstName = regexp.MustCompile(`(?i)\{\{\s*firstName\s*\}\}`)
+	rePlaceholderSegmento  = regexp.MustCompile(`(?i)\{\{\s*segmento\s*\}\}`)
+	rePlaceholderCategoria = regexp.MustCompile(`(?i)\{\{\s*categoria\s*\}\}`)
+	rePlaceholderEmail     = regexp.MustCompile(`(?i)\{\{\s*email\s*\}\}`)
+	rePlaceholderPhone     = regexp.MustCompile(`(?i)\{\{\s*phone\s*\}\}`)
+)
 
 // NewCampaignUseCase construye el caso de uso.
 func NewCampaignUseCase(
@@ -557,23 +566,11 @@ func renderCampaignTemplate(template string, customer dto.CampaignRecipientDTO, 
 	// Compatibilidad hacia atrás con plantillas históricas.
 	rendered = strings.ReplaceAll(rendered, "[Nombre]", firstName)
 
-	// Variantes comunes de placeholders.
-	replacements := map[string]string{
-		"{{firstName}}": firstName,
-		"{{firstname}}": firstName,
-		"{{FIRSTNAME}}": firstName,
-		"{{segmento}}":  segment,
-		"{{SEGMENTO}}":  segment,
-		"{{categoria}}": segment,
-		"{{CATEGORIA}}": segment,
-		"{{email}}":     email,
-		"{{EMAIL}}":     email,
-		"{{phone}}":     phone,
-		"{{PHONE}}":     phone,
-	}
-	for tag, value := range replacements {
-		rendered = strings.ReplaceAll(rendered, tag, value)
-	}
+	rendered = rePlaceholderFirstName.ReplaceAllString(rendered, firstName)
+	rendered = rePlaceholderSegmento.ReplaceAllString(rendered, segment)
+	rendered = rePlaceholderCategoria.ReplaceAllString(rendered, segment)
+	rendered = rePlaceholderEmail.ReplaceAllString(rendered, email)
+	rendered = rePlaceholderPhone.ReplaceAllString(rendered, phone)
 
 	return rendered
 }
