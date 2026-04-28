@@ -123,18 +123,15 @@ func (uc *CampaignUseCase) Create(ctx context.Context, companyID, userID string,
 			if (channel == "WHATSAPP" || channel == "SMS") && phone == "" {
 				continue
 			}
-			custName := "Cliente"
-			cust, err := uc.customerRepo.GetByID(recipient.CustomerID)
-			if err == nil && cust != nil && strings.TrimSpace(cust.Name) != "" {
-				custName = strings.TrimSpace(cust.Name)
-			}
-			customBody := strings.ReplaceAll(req.Body, "[Nombre]", custName)
+
+			customSubject := renderCampaignTemplate(req.Subject, recipient, recipient.Segment)
+			customBody := renderCampaignTemplate(req.Body, recipient, recipient.Segment)
 			recipients = append(recipients, &entity.CampaignRecipient{
 				CustomerID: recipient.CustomerID,
 				CompanyID:  companyID,
 				Email:      email,
 				Phone:      phone,
-				Subject:    req.Subject,
+				Subject:    customSubject,
 				Body:       customBody,
 				Status:     "QUEUED",
 				QueuedAt:   now,
@@ -532,4 +529,51 @@ func normalizeTimePtrToUTC(t *time.Time) *time.Time {
 	}
 	utc := t.UTC()
 	return &utc
+}
+
+func renderCampaignTemplate(template string, customer dto.CampaignRecipientDTO, categoryName string) string {
+	rendered := template
+
+	fullName := strings.TrimSpace(customer.Name)
+	firstName := "Cliente"
+	if fullName != "" {
+		parts := strings.Fields(fullName)
+		if len(parts) > 0 && strings.TrimSpace(parts[0]) != "" {
+			firstName = strings.TrimSpace(parts[0])
+		}
+	}
+
+	segment := strings.TrimSpace(categoryName)
+	if segment == "" {
+		segment = strings.TrimSpace(customer.Segment)
+	}
+	if segment == "" {
+		segment = "Cliente"
+	}
+
+	email := strings.TrimSpace(customer.Email)
+	phone := strings.TrimSpace(customer.Phone)
+
+	// Compatibilidad hacia atrás con plantillas históricas.
+	rendered = strings.ReplaceAll(rendered, "[Nombre]", firstName)
+
+	// Variantes comunes de placeholders.
+	replacements := map[string]string{
+		"{{firstName}}": firstName,
+		"{{firstname}}": firstName,
+		"{{FIRSTNAME}}": firstName,
+		"{{segmento}}":  segment,
+		"{{SEGMENTO}}":  segment,
+		"{{categoria}}": segment,
+		"{{CATEGORIA}}": segment,
+		"{{email}}":     email,
+		"{{EMAIL}}":     email,
+		"{{phone}}":     phone,
+		"{{PHONE}}":     phone,
+	}
+	for tag, value := range replacements {
+		rendered = strings.ReplaceAll(rendered, tag, value)
+	}
+
+	return rendered
 }
