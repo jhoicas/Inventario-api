@@ -419,8 +419,30 @@ func (r *CRMProfileRepo) ResolveCampaignRecipients(ctx context.Context, companyI
 	)
 	if strings.TrimSpace(categoryID) == "" {
 		query = `
-			SELECT c.id, COALESCE(c.name, '') AS name, COALESCE(c.email, '') AS email, COALESCE(c.phone, '') AS phone
+			SELECT
+				c.id,
+				COALESCE(c.name, '') AS name,
+				COALESCE(c.email, '') AS email,
+				COALESCE(c.phone, '') AS phone,
+				COALESCE(cat.name, '') AS segment,
+				COALESCE(ben.benefits, '') AS category_benefits
 			FROM customers c
+			LEFT JOIN crm_customer_profiles p
+				ON p.customer_id = c.id
+				AND p.company_id = c.company_id
+			LEFT JOIN crm_categories cat
+				ON cat.id = p.category_id
+			LEFT JOIN LATERAL (
+				SELECT string_agg(
+					COALESCE(NULLIF(TRIM(b.description), ''), NULLIF(TRIM(b.name), ''), ''),
+					'; '
+					ORDER BY b.name
+				) AS benefits
+				FROM crm_benefits b
+				WHERE b.company_id = c.company_id
+				  AND b.category_id = p.category_id
+				  AND b.is_active = true
+			) ben ON true
 			WHERE c.company_id = $1
 			  AND c.is_active = true
 			  AND COALESCE(NULLIF(TRIM(c.email), ''), '') <> ''
@@ -428,8 +450,30 @@ func (r *CRMProfileRepo) ResolveCampaignRecipients(ctx context.Context, companyI
 		args = []any{companyID}
 	} else {
 		query = `
-			SELECT c.id, COALESCE(c.name, '') AS name, COALESCE(c.email, '') AS email, COALESCE(c.phone, '') AS phone
+			SELECT
+				c.id,
+				COALESCE(c.name, '') AS name,
+				COALESCE(c.email, '') AS email,
+				COALESCE(c.phone, '') AS phone,
+				COALESCE(cat.name, '') AS segment,
+				COALESCE(ben.benefits, '') AS category_benefits
 			FROM customers c
+			LEFT JOIN crm_customer_profiles p
+				ON p.customer_id = c.id
+				AND p.company_id = c.company_id
+			LEFT JOIN crm_categories cat
+				ON cat.id = p.category_id
+			LEFT JOIN LATERAL (
+				SELECT string_agg(
+					COALESCE(NULLIF(TRIM(b.description), ''), NULLIF(TRIM(b.name), ''), ''),
+					'; '
+					ORDER BY b.name
+				) AS benefits
+				FROM crm_benefits b
+				WHERE b.company_id = c.company_id
+				  AND b.category_id = p.category_id
+				  AND b.is_active = true
+			) ben ON true
 			WHERE c.company_id = $1
 			  AND c.is_active = true
 			  AND COALESCE(NULLIF(TRIM(c.email), ''), '') <> ''
@@ -453,7 +497,7 @@ func (r *CRMProfileRepo) ResolveCampaignRecipients(ctx context.Context, companyI
 	recipients := make([]dto.CampaignRecipientDTO, 0)
 	for rows.Next() {
 		var item dto.CampaignRecipientDTO
-		if err := rows.Scan(&item.CustomerID, &item.Name, &item.Email, &item.Phone); err != nil {
+		if err := rows.Scan(&item.CustomerID, &item.Name, &item.Email, &item.Phone, &item.Segment, &item.CategoryBenefits); err != nil {
 			return nil, fmt.Errorf("scan campaign recipient: %w", err)
 		}
 		recipients = append(recipients, item)

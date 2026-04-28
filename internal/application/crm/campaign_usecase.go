@@ -37,6 +37,7 @@ var (
 	rePlaceholderFirstName = regexp.MustCompile(`(?i)\{\{\s*firstName\s*\}\}`)
 	rePlaceholderSegmento  = regexp.MustCompile(`(?i)\{\{\s*segmento\s*\}\}`)
 	rePlaceholderCategoria = regexp.MustCompile(`(?i)\{\{\s*categoria\s*\}\}`)
+	rePlaceholderBeneficiosCategoria = regexp.MustCompile(`(?i)\{\{\s*beneficiosCategoria\s*\}\}`)
 	rePlaceholderEmail     = regexp.MustCompile(`(?i)\{\{\s*email\s*\}\}`)
 	rePlaceholderPhone     = regexp.MustCompile(`(?i)\{\{\s*phone\s*\}\}`)
 )
@@ -133,8 +134,8 @@ func (uc *CampaignUseCase) Create(ctx context.Context, companyID, userID string,
 				continue
 			}
 
-			customSubject := renderCampaignTemplate(req.Subject, recipient, recipient.Segment)
-			customBody := renderCampaignTemplate(req.Body, recipient, recipient.Segment)
+			customSubject := renderCampaignTemplate(req.Subject, recipient, recipient.Segment, recipient.CategoryBenefits)
+			customBody := renderCampaignTemplate(req.Body, recipient, recipient.Segment, recipient.CategoryBenefits)
 			recipients = append(recipients, &entity.CampaignRecipient{
 				CustomerID: recipient.CustomerID,
 				CompanyID:  companyID,
@@ -556,7 +557,7 @@ func normalizeTimePtrToUTC(t *time.Time) *time.Time {
 	return &utc
 }
 
-func renderCampaignTemplate(template string, customer dto.CampaignRecipientDTO, categoryName string) string {
+func renderCampaignTemplate(template string, customer dto.CampaignRecipientDTO, categoryName, categoryBenefits string) string {
 	rendered := template
 
 	fullName := strings.TrimSpace(customer.Name)
@@ -578,6 +579,10 @@ func renderCampaignTemplate(template string, customer dto.CampaignRecipientDTO, 
 
 	email := strings.TrimSpace(customer.Email)
 	phone := strings.TrimSpace(customer.Phone)
+	benefits := strings.TrimSpace(categoryBenefits)
+	if benefits == "" {
+		benefits = strings.TrimSpace(customer.CategoryBenefits)
+	}
 
 	// Compatibilidad hacia atrás con plantillas históricas.
 	rendered = strings.ReplaceAll(rendered, "[Nombre]", firstName)
@@ -585,6 +590,7 @@ func renderCampaignTemplate(template string, customer dto.CampaignRecipientDTO, 
 	rendered = rePlaceholderFirstName.ReplaceAllString(rendered, firstName)
 	rendered = rePlaceholderSegmento.ReplaceAllString(rendered, segment)
 	rendered = rePlaceholderCategoria.ReplaceAllString(rendered, segment)
+	rendered = rePlaceholderBeneficiosCategoria.ReplaceAllString(rendered, benefits)
 	rendered = rePlaceholderEmail.ReplaceAllString(rendered, email)
 	rendered = rePlaceholderPhone.ReplaceAllString(rendered, phone)
 

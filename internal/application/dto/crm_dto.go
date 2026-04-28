@@ -401,11 +401,12 @@ type ResolveCampaignRecipientsRequest struct {
 }
 
 type CampaignRecipientDTO struct {
-	CustomerID string `json:"customer_id"`
-	Name       string `json:"name"`
-	Email      string `json:"email"`
-	Phone      string `json:"phone"`
-	Segment    string `json:"segment"`
+	CustomerID        string `json:"customer_id"`
+	Name              string `json:"name"`
+	Email             string `json:"email"`
+	Phone             string `json:"phone"`
+	Segment           string `json:"segment"`
+	CategoryBenefits  string `json:"category_benefits,omitempty"`
 }
 
 type ResolveCampaignRecipientsResponse struct {
