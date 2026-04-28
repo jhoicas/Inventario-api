@@ -411,6 +411,7 @@ func Router(app *fiber.App, deps RouterDeps) {
 		crmGroup.Put("/opportunities/:id/stage", h.UpdateOpportunityStage)
 		crmGroup.Get("/opportunities/funnel", h.GetOpportunityFunnel)
 		crmGroup.Get("/campaigns", h.ListCampaigns)
+		crmGroup.Get("/campaigns/:id", h.GetCampaignByID)
 		crmGroup.Post("/campaigns", h.CreateCampaign)
 		crmGroup.Put("/campaigns/:id", h.UpdateCampaign)
 		crmGroup.Delete("/campaigns/:id", h.DeleteCampaign)

@@ -204,6 +204,22 @@ func (uc *CampaignUseCase) ListCampaigns(ctx context.Context, companyID string, 
 	}, nil
 }
 
+// GetCampaignByID devuelve el detalle completo de una campaña.
+func (uc *CampaignUseCase) GetCampaignByID(ctx context.Context, companyID, campaignID string) (*dto.CampaignDetailDTO, error) {
+	if strings.TrimSpace(companyID) == "" || strings.TrimSpace(campaignID) == "" {
+		return nil, domain.ErrInvalidInput
+	}
+
+	out, err := uc.repo.GetCampaignDetails(ctx, campaignID)
+	if err != nil {
+		return nil, err
+	}
+	if out == nil || out.CompanyID != companyID {
+		return nil, domain.ErrNotFound
+	}
+	return out, nil
+}
+
 // ExecuteCampaign procesa una campaña pendiente o programada de forma manual.
 func (uc *CampaignUseCase) ExecuteCampaign(ctx context.Context, companyID, userID, campaignID string) error {
 	c, err := uc.repo.GetByID(ctx, campaignID)

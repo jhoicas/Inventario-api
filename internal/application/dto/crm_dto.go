@@ -339,6 +339,28 @@ type CampaignMetricsResponse struct {
 	Revenue    decimal.Decimal `json:"revenue"`
 }
 
+// CampaignDetailRecipientDTO destinatario de una campaña.
+type CampaignDetailRecipientDTO struct {
+	Email        string     `json:"email"`
+	Phone        string     `json:"phone"`
+	Status       string     `json:"status"`
+	SentAt       *time.Time `json:"sent_at,omitempty"`
+	ErrorMessage string     `json:"error_message,omitempty"`
+}
+
+// CampaignDetailDTO detalle de una campaña con destinatarios.
+type CampaignDetailDTO struct {
+	ID          string                      `json:"id"`
+	CompanyID   string                      `json:"-"`
+	Name        string                      `json:"name"`
+	Status      string                      `json:"status"`
+	Channel     string                      `json:"channel"`
+	Subject     string                      `json:"subject"`
+	Body        string                      `json:"body"`
+	ScheduledAt *time.Time                  `json:"scheduled_at,omitempty"`
+	Recipients  []CampaignDetailRecipientDTO `json:"recipients"`
+}
+
 // ──────────────────────────────────────────────────────────────────────────────
 // Campaign Templates
 // ──────────────────────────────────────────────────────────────────────────────

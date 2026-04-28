@@ -2232,6 +2232,43 @@ func (h *CRMHandler) ListCampaigns(c *fiber.Ctx) error {
 	return c.JSON(out)
 }
 
+// GetCampaignByID devuelve el detalle de una campaña específica.
+// @Summary      Obtener detalle de campaña
+// @Description  Devuelve datos de campaña y su lista de destinatarios
+// @Tags         crm
+// @Security     Bearer
+// @Produce      json
+// @Param        id  path  string  true  "Campaign ID"
+// @Success      200  {object}  dto.CampaignDetailDTO
+// @Failure      401  {object}  dto.ErrorResponse
+// @Failure      404  {object}  dto.ErrorResponse
+// @Router       /api/crm/campaigns/{id} [get]
+func (h *CRMHandler) GetCampaignByID(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	id := c.Params("id")
+	if companyID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if strings.TrimSpace(id) == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "id requerido"})
+	}
+	if h.CampaignUC == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "campaigns no configurado"})
+	}
+
+	out, err := h.CampaignUC.GetCampaignByID(c.Context(), companyID, id)
+	if err != nil {
+		if err == domain.ErrNotFound {
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "campaña no encontrada"})
+		}
+		if err == domain.ErrInvalidInput {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "solicitud inválida"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.JSON(out)
+}
+
 // ExecuteCampaign ejecuta una campaña manualmente.
 // @Summary      Ejecutar campaña
 // @Description  Ejecuta una campaña pendiente o programada manualmente

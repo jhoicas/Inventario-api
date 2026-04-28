@@ -1830,6 +1830,67 @@ func (r *CRMCampaignRepo) GetByID(ctx context.Context, id string) (*entity.Campa
 	return &c, nil
 }
 
+func (r *CRMCampaignRepo) GetCampaignDetails(ctx context.Context, id string) (*dto.CampaignDetailDTO, error) {
+	var (
+		detail        dto.CampaignDetailDTO
+		subject       *string
+		body          *string
+		scheduledAt   *time.Time
+	)
+
+	err := r.q.QueryRow(ctx, `
+		SELECT id, company_id, name, status, channel, subject, body, scheduled_at
+		FROM crm_campaigns
+		WHERE id = $1`, id,
+	).Scan(
+		&detail.ID,
+		&detail.CompanyID,
+		&detail.Name,
+		&detail.Status,
+		&detail.Channel,
+		&subject,
+		&body,
+		&scheduledAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get campaign details campaign: %w", err)
+	}
+	if subject != nil {
+		detail.Subject = *subject
+	}
+	if body != nil {
+		detail.Body = *body
+	}
+	detail.ScheduledAt = toUTCTimePtr(scheduledAt)
+
+	rows, err := r.q.Query(ctx, `
+		SELECT COALESCE(email, ''), COALESCE(phone, ''), status, sent_at, COALESCE(error_message, '')
+		FROM crm_campaign_recipients
+		WHERE campaign_id = $1
+		ORDER BY queued_at ASC`, id)
+	if err != nil {
+		return nil, fmt.Errorf("get campaign details recipients: %w", err)
+	}
+	defer rows.Close()
+
+	detail.Recipients = make([]dto.CampaignDetailRecipientDTO, 0)
+	for rows.Next() {
+		var rec dto.CampaignDetailRecipientDTO
+		if err := rows.Scan(&rec.Email, &rec.Phone, &rec.Status, &rec.SentAt, &rec.ErrorMessage); err != nil {
+			return nil, fmt.Errorf("scan campaign detail recipient: %w", err)
+		}
+		detail.Recipients = append(detail.Recipients, rec)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate campaign detail recipients: %w", err)
+	}
+
+	return &detail, nil
+}
+
 // CRMAuditLogRepo implementación de AuditLogRepository.
 type CRMAuditLogRepo struct{ q Querier }
 

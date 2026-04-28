@@ -144,6 +144,7 @@ type CRMCampaignRepository interface {
 	Update(ctx context.Context, c *entity.Campaign) error
 	Delete(ctx context.Context, id, companyID string) error
 	GetByID(ctx context.Context, id string) (*entity.Campaign, error)
+	GetCampaignDetails(ctx context.Context, id string) (*dto.CampaignDetailDTO, error)
 	GetMetrics(ctx context.Context, campaignID string) (*entity.CampaignMetrics, error)
 	QueueRecipients(ctx context.Context, campaignID string, recipients []*entity.CampaignRecipient) (int, error)
 	BatchInsertCampaignRecipients(ctx context.Context, recipients []domain.CampaignRecipient) error
