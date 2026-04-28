@@ -1,7 +1,12 @@
 package crm
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
+	stdlog "log"
+	"net/http"
 	"reflect"
 	"strings"
 	"time"
@@ -23,6 +28,8 @@ type CampaignUseCase struct {
 	providers       map[string]repository.MessageProvider
 	mailSender      *inframail.SMTPSender
 	auditUC         *AuditLogUseCase
+	azureTriggerURL string
+	httpClient      *http.Client
 }
 
 // NewCampaignUseCase construye el caso de uso.
@@ -34,6 +41,7 @@ func NewCampaignUseCase(
 	providers map[string]repository.MessageProvider,
 	mailSender *inframail.SMTPSender,
 	auditUC *AuditLogUseCase,
+	azureTriggerURL string,
 ) *CampaignUseCase {
 	return &CampaignUseCase{
 		repo:            repo,
@@ -43,6 +51,10 @@ func NewCampaignUseCase(
 		providers:       providers,
 		mailSender:      mailSender,
 		auditUC:         auditUC,
+		azureTriggerURL: strings.TrimSpace(azureTriggerURL),
+		httpClient: &http.Client{
+			Timeout: 15 * time.Second,
+		},
 	}
 }
 
@@ -201,23 +213,50 @@ func (uc *CampaignUseCase) ExecuteCampaign(ctx context.Context, companyID, userI
 		return domain.ErrConflict
 	}
 
-	// Reutilizamos la lógica de envío masivo
-	req := dto.SendCampaignRequest{
-		Channel:    c.Channel,
-		Subject:    c.Subject,
-		Body:       c.Body,
-		CategoryID: "", // Podríamos guardar la categoría en la entidad si fuera necesario
-	}
-
-	err = uc.SendCampaign(ctx, companyID, userID, req)
-	if err != nil {
+	// Reflejar cambio inmediato en frontend.
+	c.Status = entity.CampaignStatusSending
+	c.UpdatedAt = time.Now()
+	if err := uc.repo.Update(ctx, c); err != nil {
 		return err
 	}
 
-	// Marcar como completada
-	c.Status = entity.CampaignStatusCompleted
-	c.UpdatedAt = time.Now()
-	return uc.repo.Update(ctx, c)
+	triggerURL := strings.TrimSpace(uc.azureTriggerURL)
+	if triggerURL == "" {
+		return fmt.Errorf("AZURE_CAMPAIGN_TRIGGER_URL no configurado")
+	}
+
+	// Disparo asíncrono para no bloquear respuesta del endpoint.
+	go uc.triggerAzureCampaign(campaignID)
+	return nil
+}
+
+func (uc *CampaignUseCase) triggerAzureCampaign(campaignID string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	body, err := json.Marshal(map[string]string{"campaign_id": campaignID})
+	if err != nil {
+		stdlog.Printf("campaign trigger: marshal payload: %v", err)
+		return
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, uc.azureTriggerURL, bytes.NewReader(body))
+	if err != nil {
+		stdlog.Printf("campaign trigger: create request: %v", err)
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := uc.httpClient.Do(req)
+	if err != nil {
+		stdlog.Printf("campaign trigger: http post failed: %v", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		stdlog.Printf("campaign trigger: unexpected status code %d", resp.StatusCode)
+	}
 }
 
 // UpdateCampaign actualiza la configuración de una campaña.

@@ -243,7 +243,16 @@ func main() {
 	providers["WHATSAPP"] = metaProvider
 
 	auditLogUC := crm.NewAuditLogUseCase(auditLogRepo)
-	campaignUC := crm.NewCampaignUseCase(crmCampaignRepo, customerRepo, crmProfileRepo, crmInteractionRepo, providers, mailSender, auditLogUC)
+	campaignUC := crm.NewCampaignUseCase(
+		crmCampaignRepo,
+		customerRepo,
+		crmProfileRepo,
+		crmInteractionRepo,
+		providers,
+		mailSender,
+		auditLogUC,
+		cfg.App.AzureCampaignTriggerURL,
+	)
 	automationUC := crm.NewAutomationUseCase(crmAutomationRepo, crmCampaignRepo, crmTemplateRepo, nil, log, auditLogUC)
 	templateUC := crm.NewCampaignTemplateUseCase(crmTemplateRepo, auditLogUC)
 	opportunityUC := crm.NewOpportunityUseCase(crmOpportunityRepo)

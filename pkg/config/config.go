@@ -50,8 +50,9 @@ type DIANConfig struct {
 
 // AppConfig configuración general de la aplicación.
 type AppConfig struct {
-	Env  string // development, staging, production
-	Name string
+	Env                     string // development, staging, production
+	Name                    string
+	AzureCampaignTriggerURL string // URL de Azure Function para ejecutar campañas (AZURE_CAMPAIGN_TRIGGER_URL)
 }
 
 // DBConfig configuración de PostgreSQL.
@@ -135,8 +136,9 @@ func Load() (*Config, error) {
 
 	cfg := &Config{
 		App: AppConfig{
-			Env:  getString(v, "APP_ENV", "development"),
-			Name: getString(v, "APP_NAME", "inventory-pro"),
+			Env:                     getString(v, "APP_ENV", "development"),
+			Name:                    getString(v, "APP_NAME", "inventory-pro"),
+			AzureCampaignTriggerURL: getString(v, "AZURE_CAMPAIGN_TRIGGER_URL", ""),
 		},
 		DB: DBConfig{
 			DatabaseURL: getString(v, "DATABASE_URL", ""),
