@@ -30,6 +30,7 @@ var _ repository.CRMTicketRepository = (*CRMTicketRepo)(nil)
 var _ repository.CRMCampaignRepository = (*CRMCampaignRepo)(nil)
 var _ repository.CRMAutomationRepository = (*CRMAutomationRepo)(nil)
 var _ repository.CRMOpportunityRepository = (*CRMOpportunityRepo)(nil)
+var _ repository.NotificationLogRepository = (*CRMNotificationLogRepo)(nil)
 
 // CRMCategoryRepo implementación de CRMCategoryRepository.
 type CRMCategoryRepo struct{ q Querier }
@@ -2340,6 +2341,112 @@ func derefString(v *string) string {
 		return ""
 	}
 	return *v
+}
+
+type CRMNotificationLogRepo struct{ q Querier }
+
+func NewCRMNotificationLogRepository(q Querier) *CRMNotificationLogRepo {
+	return &CRMNotificationLogRepo{q: q}
+}
+
+func (r *CRMNotificationLogRepo) Create(ctx context.Context, log *entity.NotificationLog) error {
+	if log == nil {
+		return fmt.Errorf("notification log requerido")
+	}
+	if strings.TrimSpace(log.ID) == "" {
+		log.ID = uuid.New().String()
+	}
+	if log.SentAt.IsZero() {
+		log.SentAt = time.Now().UTC()
+	}
+	_, err := r.q.Exec(ctx, `
+		INSERT INTO notification_logs (
+			id, company_id, customer_id, type, channel, subject, body, sent_at, status, error_message
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+		log.ID,
+		log.CompanyID,
+		nullIfEmpty(log.CustomerID),
+		log.Type,
+		log.Channel,
+		nullIfEmpty(log.Subject),
+		nullIfEmpty(log.Body),
+		log.SentAt,
+		log.Status,
+		nullIfEmpty(log.ErrorMessage),
+	)
+	if err != nil {
+		return fmt.Errorf("create notification log: %w", err)
+	}
+	return nil
+}
+
+func (r *CRMNotificationLogRepo) List(ctx context.Context, filters repository.NotificationLogFilters) ([]*entity.NotificationLog, int64, error) {
+	limit := filters.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+	offset := filters.Offset
+	if offset < 0 {
+		offset = 0
+	}
+
+	where := " FROM notification_logs WHERE company_id = $1"
+	args := []any{filters.CompanyID}
+	argPos := 2
+
+	if strings.TrimSpace(filters.Type) != "" {
+		where += fmt.Sprintf(" AND UPPER(type) = UPPER($%d)", argPos)
+		args = append(args, filters.Type)
+		argPos++
+	}
+	if filters.StartDate != nil {
+		where += fmt.Sprintf(" AND sent_at >= $%d", argPos)
+		args = append(args, *filters.StartDate)
+		argPos++
+	}
+	if filters.EndDate != nil {
+		where += fmt.Sprintf(" AND sent_at <= $%d", argPos)
+		args = append(args, *filters.EndDate)
+		argPos++
+	}
+
+	query := `
+		SELECT id, company_id, COALESCE(customer_id::text, ''), type, channel, COALESCE(subject, ''), COALESCE(body, ''), sent_at, status, COALESCE(error_message, '')
+	` + where + fmt.Sprintf(" ORDER BY sent_at DESC LIMIT $%d OFFSET $%d", argPos, argPos+1)
+	rows, err := r.q.Query(ctx, query, append(args, limit, offset)...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list notification logs: %w", err)
+	}
+	defer rows.Close()
+
+	items := make([]*entity.NotificationLog, 0)
+	for rows.Next() {
+		var item entity.NotificationLog
+		if err := rows.Scan(
+			&item.ID,
+			&item.CompanyID,
+			&item.CustomerID,
+			&item.Type,
+			&item.Channel,
+			&item.Subject,
+			&item.Body,
+			&item.SentAt,
+			&item.Status,
+			&item.ErrorMessage,
+		); err != nil {
+			return nil, 0, fmt.Errorf("scan notification log: %w", err)
+		}
+		items = append(items, &item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("iterate notification logs: %w", err)
+	}
+
+	var total int64
+	if err := r.q.QueryRow(ctx, `SELECT COUNT(*) `+where, args...).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("count notification logs: %w", err)
+	}
+	return items, total, nil
 }
 
 func (r *CRMAutomationRepo) GetCustomersForBirthday(ctx context.Context, companyID uuid.UUID) ([]*entity.Customer, error) {

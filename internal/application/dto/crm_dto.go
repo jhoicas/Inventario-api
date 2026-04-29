@@ -572,6 +572,32 @@ type CampaignListResponse struct {
 	Offset int                `json:"offset"`
 }
 
+type NotificationLogResponse struct {
+	ID           string    `json:"id"`
+	CompanyID    string    `json:"company_id"`
+	CustomerID   string    `json:"customer_id"`
+	Type         string    `json:"type"`
+	Channel      string    `json:"channel"`
+	Subject      string    `json:"subject"`
+	Body         string    `json:"body"`
+	SentAt       time.Time `json:"sent_at"`
+	Status       string    `json:"status"`
+	ErrorMessage string    `json:"error_message,omitempty"`
+}
+
+type NotificationLogListResponse struct {
+	Items  []NotificationLogResponse `json:"items"`
+	Total  int64                     `json:"total"`
+	Limit  int                       `json:"limit"`
+	Offset int                       `json:"offset"`
+}
+
+type TriggerBirthdayResultResponse struct {
+	Processed int `json:"processed"`
+	Sent      int `json:"sent"`
+	Failed    int `json:"failed"`
+}
+
 // ──────────────────────────────────────────────────────────────────────────────
 // CRM Automations
 // ──────────────────────────────────────────────────────────────────────────────

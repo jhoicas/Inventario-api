@@ -46,6 +46,7 @@ type CRMHandler struct {
 	OpportunityUC   *crm.OpportunityUseCase
 	CampaignUC      *crm.CampaignUseCase
 	TemplateUC      *crm.CampaignTemplateUseCase
+	NotificationUC  *crm.NotificationLogUseCase
 	InvoiceHistory  invoiceHistoryRepo
 	ProfileRepo     repository.CRMProfileRepository
 	ImportUC        *crm.ImportUseCase
@@ -75,6 +76,7 @@ func NewCRMHandler(
 	invoiceHistory invoiceHistoryRepo,
 	campaignUC *crm.CampaignUseCase,
 	templateUC *crm.CampaignTemplateUseCase,
+	notificationUC *crm.NotificationLogUseCase,
 	importUC *crm.ImportUseCase,
 ) *CRMHandler {
 	return &CRMHandler{
@@ -89,11 +91,68 @@ func NewCRMHandler(
 		OpportunityUC:   opportunityUC,
 		CampaignUC:      campaignUC,
 		TemplateUC:      templateUC,
+		NotificationUC:  notificationUC,
 		InvoiceHistory:  invoiceHistory,
 		ProfileRepo:     nil,
 		ImportUC:        importUC,
 		InteractionRepo: interactionRepo,
 	}
+}
+
+// ListNotifications lista la bitácora de notificaciones por empresa.
+func (h *CRMHandler) ListNotifications(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	if companyID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if h.NotificationUC == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "notifications no configurado"})
+	}
+
+	typ := strings.TrimSpace(c.Query("type"))
+	var startDate *time.Time
+	var endDate *time.Time
+	if raw := strings.TrimSpace(c.Query("start_date")); raw != "" {
+		t, err := time.Parse(time.RFC3339, raw)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "start_date debe estar en formato RFC3339"})
+		}
+		startDate = &t
+	}
+	if raw := strings.TrimSpace(c.Query("end_date")); raw != "" {
+		t, err := time.Parse(time.RFC3339, raw)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "end_date debe estar en formato RFC3339"})
+		}
+		endDate = &t
+	}
+	limit := c.QueryInt("limit", 50)
+	offset := c.QueryInt("offset", 0)
+
+	out, err := h.NotificationUC.List(c.Context(), companyID, typ, startDate, endDate, limit, offset)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.JSON(out)
+}
+
+// TriggerBirthdayAutomations dispara el flujo diario de cumpleaños hiperpersonalizado.
+func (h *CRMHandler) TriggerBirthdayAutomations(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	if companyID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if h.AutomationUC == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "automations no configurado"})
+	}
+	out, err := h.AutomationUC.TriggerBirthdays(c.Context(), companyID)
+	if err != nil {
+		if err == domain.ErrInvalidInput {
+			return c.Status(fiber.StatusBadRequest).JSON(dto.ErrorResponse{Code: "VALIDATION", Message: "solicitud inválida"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.JSON(out)
 }
 
 // CreateAutomation crea una automatización CRM para la empresa autenticada.

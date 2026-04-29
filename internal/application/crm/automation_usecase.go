@@ -4,25 +4,36 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jhoicas/Inventario-api/internal/application/dto"
+	"github.com/jhoicas/Inventario-api/internal/application/ports"
 	"github.com/jhoicas/Inventario-api/internal/domain"
 	"github.com/jhoicas/Inventario-api/internal/domain/entity"
 	"github.com/jhoicas/Inventario-api/internal/domain/repository"
+	inframail "github.com/jhoicas/Inventario-api/internal/infrastructure/mail"
 	"github.com/jhoicas/Inventario-api/pkg/logger"
 )
 
 // AutomationUseCase orquesta la ejecución diaria de automatizaciones CRM.
 type AutomationUseCase struct {
-	automationRepo repository.CRMAutomationRepository
-	campaignRepo   repository.CRMCampaignRepository
-	templateRepo   repository.CRMCampaignTemplateRepository
-	factory        *AutomationStrategyFactory
-	log            *logger.Logger
-	auditUC        *AuditLogUseCase
+	automationRepo   repository.CRMAutomationRepository
+	campaignRepo     repository.CRMCampaignRepository
+	templateRepo     repository.CRMCampaignTemplateRepository
+	invoiceRepo      repository.InvoiceRepository
+	customerRepo     repository.CustomerRepository
+	profileRepo      repository.CRMProfileRepository
+	benefitRepo      repository.CRMBenefitRepository
+	notificationRepo repository.NotificationLogRepository
+	llm              ports.LLMService
+	mailSender       *inframail.SMTPSender
+	factory          *AutomationStrategyFactory
+	log              *logger.Logger
+	auditUC          *AuditLogUseCase
 }
 
 const defaultAutomationScheduleCron = "0 0 * * *"
@@ -32,6 +43,13 @@ func NewAutomationUseCase(
 	automationRepo repository.CRMAutomationRepository,
 	campaignRepo repository.CRMCampaignRepository,
 	templateRepo repository.CRMCampaignTemplateRepository,
+	invoiceRepo repository.InvoiceRepository,
+	customerRepo repository.CustomerRepository,
+	profileRepo repository.CRMProfileRepository,
+	benefitRepo repository.CRMBenefitRepository,
+	notificationRepo repository.NotificationLogRepository,
+	llm ports.LLMService,
+	mailSender *inframail.SMTPSender,
 	factory *AutomationStrategyFactory,
 	log *logger.Logger,
 	auditUC *AuditLogUseCase,
@@ -43,11 +61,20 @@ func NewAutomationUseCase(
 		automationRepo: automationRepo,
 		campaignRepo:   campaignRepo,
 		templateRepo:   templateRepo,
+		invoiceRepo:    invoiceRepo,
+		customerRepo:   customerRepo,
+		profileRepo:    profileRepo,
+		benefitRepo:    benefitRepo,
+		notificationRepo: notificationRepo,
+		llm:              llm,
+		mailSender:       mailSender,
 		factory:        factory,
 		log:            log,
 		auditUC:        auditUC,
 	}
 }
+
+var discountPercentRegex = regexp.MustCompile(`(?i)(\d{1,3})(?:[\.,]\d+)?\s*%`)
 
 // RunDailyAutomations ejecuta las automatizaciones activas del día.
 func (uc *AutomationUseCase) RunDailyAutomations(ctx context.Context) error {
@@ -365,4 +392,126 @@ func toAutomationResponse(a *entity.CRMAutomation) *dto.AutomationResponse {
 		IsActive:     a.IsActive,
 		LastRunAt:    a.LastRunAt,
 	}
+}
+
+func (uc *AutomationUseCase) TriggerBirthdays(ctx context.Context, companyID string) (*dto.TriggerBirthdayResultResponse, error) {
+	if uc == nil || uc.automationRepo == nil || uc.mailSender == nil || uc.llm == nil || uc.notificationRepo == nil {
+		return nil, domain.ErrInvalidInput
+	}
+	companyUUID, err := uuid.Parse(strings.TrimSpace(companyID))
+	if err != nil {
+		return nil, domain.ErrInvalidInput
+	}
+
+	customers, err := uc.automationRepo.GetCustomersForBirthday(ctx, companyUUID)
+	if err != nil {
+		return nil, err
+	}
+
+	result := &dto.TriggerBirthdayResultResponse{Processed: len(customers)}
+	for _, c := range customers {
+		if c == nil || strings.TrimSpace(c.Email) == "" {
+			continue
+		}
+
+		customer, err := uc.customerRepo.GetByID(c.ID)
+		if err != nil || customer == nil || customer.CompanyID != companyID {
+			continue
+		}
+
+		topProducts, err := uc.invoiceRepo.GetTopProductNamesByCustomer(customer.ID, 3)
+		if err != nil {
+			topProducts = []string{}
+		}
+		maxDiscount := uc.resolveMaxDiscountPercent(customer.ID)
+		body, subject, aiErr := uc.generateBirthdayHTML(ctx, customer, topProducts, maxDiscount)
+
+		status := "SENT"
+		errorMessage := ""
+		if aiErr != nil {
+			status = "FAILED"
+			errorMessage = aiErr.Error()
+		} else if err := uc.mailSender.Send(customer.Email, subject, body); err != nil {
+			status = "FAILED"
+			errorMessage = err.Error()
+		}
+
+		if status == "SENT" {
+			result.Sent++
+		} else {
+			result.Failed++
+		}
+
+		_ = uc.notificationRepo.Create(ctx, &entity.NotificationLog{
+			CompanyID:    companyID,
+			CustomerID:   customer.ID,
+			Type:         "BIRTHDAY",
+			Channel:      "EMAIL",
+			Subject:      subject,
+			Body:         body,
+			SentAt:       time.Now().UTC(),
+			Status:       status,
+			ErrorMessage: errorMessage,
+		})
+	}
+	return result, nil
+}
+
+func (uc *AutomationUseCase) resolveMaxDiscountPercent(customerID string) int {
+	if uc.profileRepo == nil || uc.benefitRepo == nil {
+		return 0
+	}
+	profile, err := uc.profileRepo.GetByCustomerID(customerID)
+	if err != nil || profile == nil || strings.TrimSpace(profile.CategoryID) == "" {
+		return 0
+	}
+	benefits, _, err := uc.benefitRepo.ListByCategory(profile.CategoryID, 200, 0)
+	if err != nil {
+		return 0
+	}
+	maxDiscount := 0
+	for _, b := range benefits {
+		if b == nil {
+			continue
+		}
+		text := strings.TrimSpace(b.Name + " " + b.Description)
+		match := discountPercentRegex.FindStringSubmatch(text)
+		if len(match) < 2 {
+			continue
+		}
+		v, err := strconv.Atoi(match[1])
+		if err != nil {
+			continue
+		}
+		if v > maxDiscount {
+			maxDiscount = v
+		}
+	}
+	return maxDiscount
+}
+
+func (uc *AutomationUseCase) generateBirthdayHTML(ctx context.Context, customer *entity.Customer, topProducts []string, maxDiscount int) (string, string, error) {
+	firstName := strings.TrimSpace(customer.Name)
+	if firstName == "" {
+		firstName = "Cliente"
+	}
+	parts := strings.Fields(firstName)
+	if len(parts) > 0 {
+		firstName = parts[0]
+	}
+	productList := "nuestros productos favoritos"
+	if len(topProducts) > 0 {
+		productList = strings.Join(topProducts, ", ")
+	}
+	discountText := "0"
+	if maxDiscount > 0 {
+		discountText = strconv.Itoa(maxDiscount)
+	}
+	systemPrompt := "Eres un experto en fidelización. Escribe un correo de feliz cumpleaños cálido para [Nombre del Cliente]. Menciona sutilmente que sabemos que le encantan los productos como [Lista de Productos]. Ofrécele un descuento exclusivo de cumpleaños de [X]% (solo si X > 0). El mensaje debe ser corto, profesional pero muy cercano, y generar ventas sin sonar desesperado. Formato HTML ligero."
+	userPrompt := fmt.Sprintf("Nombre del cliente: %s\nLista de productos: %s\nDescuento maximo permitido: %s", firstName, productList, discountText)
+	body, err := uc.llm.GenerateTextWithSystem(ctx, systemPrompt, userPrompt)
+	if err != nil {
+		return "", "", err
+	}
+	return body, fmt.Sprintf("Feliz cumpleaños, %s", firstName), nil
 }

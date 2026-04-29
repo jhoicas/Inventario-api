@@ -539,3 +539,40 @@ func (r *InvoiceRepo) GetCustomerStats(customerID string) (*repository.CustomerP
 	}
 	return &stats, nil
 }
+
+func (r *InvoiceRepo) GetTopProductNamesByCustomer(customerID string, limit int) ([]string, error) {
+	if strings.TrimSpace(customerID) == "" {
+		return []string{}, nil
+	}
+	if limit <= 0 {
+		limit = 3
+	}
+
+	rows, err := r.q.Query(context.Background(), `
+		SELECT p.name
+		FROM invoice_details d
+		INNER JOIN invoices i ON i.id = d.invoice_id
+		INNER JOIN products p ON p.id = d.product_id
+		WHERE i.customer_id = $1
+		  AND i.document_type = 'INVOICE'
+		GROUP BY p.name
+		ORDER BY SUM(d.quantity) DESC, p.name ASC
+		LIMIT $2`, customerID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("get top products by customer: %w", err)
+	}
+	defer rows.Close()
+
+	names := make([]string, 0, limit)
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, fmt.Errorf("scan top product name: %w", err)
+		}
+		names = append(names, strings.TrimSpace(name))
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate top product names: %w", err)
+	}
+	return names, nil
+}

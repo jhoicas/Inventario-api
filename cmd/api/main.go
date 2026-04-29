@@ -194,6 +194,7 @@ func main() {
 	crmCampaignRepo := postgres.NewCRMCampaignRepository(pool)
 	crmAutomationRepo := postgres.NewCRMAutomationRepository(pool)
 	crmTemplateRepo := postgres.NewCRMCampaignTemplateRepository(pool)
+	notificationLogRepo := postgres.NewCRMNotificationLogRepository(pool)
 	auditLogRepo := postgres.NewCRMAuditLogRepository(pool)
 	crmOpportunityRepo := postgres.NewCRMOpportunityRepository(pool)
 	slaConfigRepo := postgres.NewSLAConfigRepository(pool)
@@ -243,6 +244,7 @@ func main() {
 	providers["WHATSAPP"] = metaProvider
 
 	auditLogUC := crm.NewAuditLogUseCase(auditLogRepo)
+	notificationLogUC := crm.NewNotificationLogUseCase(notificationLogRepo)
 	campaignUC := crm.NewCampaignUseCase(
 		crmCampaignRepo,
 		customerRepo,
@@ -253,11 +255,41 @@ func main() {
 		auditLogUC,
 		cfg.App.AzureCampaignTriggerURL,
 	)
-	automationUC := crm.NewAutomationUseCase(crmAutomationRepo, crmCampaignRepo, crmTemplateRepo, nil, log, auditLogUC)
+	automationUC := crm.NewAutomationUseCase(
+		crmAutomationRepo,
+		crmCampaignRepo,
+		crmTemplateRepo,
+		invoiceRepo,
+		customerRepo,
+		crmProfileRepo,
+		crmBenefitRepo,
+		notificationLogRepo,
+		anthropicSvc,
+		mailSender,
+		nil,
+		log,
+		auditLogUC,
+	)
 	templateUC := crm.NewCampaignTemplateUseCase(crmTemplateRepo, auditLogUC)
 	opportunityUC := crm.NewOpportunityUseCase(crmOpportunityRepo)
 	importUC := crm.NewImportUseCase(pool, crmProfileRepo, customerRepo, crmCategoryRepo, crmTaskRepo, crmOpportunityRepo)
-	crmHandler := httpRouter.NewCRMHandler(loyaltyUC, crmAnalyticsUC, automationUC, auditLogUC, taskUC, pqrUC, aiCRMUC, customerUC, crmInteractionRepo, opportunityUC, invoiceRepo, campaignUC, templateUC, importUC)
+	crmHandler := httpRouter.NewCRMHandler(
+		loyaltyUC,
+		crmAnalyticsUC,
+		automationUC,
+		auditLogUC,
+		taskUC,
+		pqrUC,
+		aiCRMUC,
+		customerUC,
+		crmInteractionRepo,
+		opportunityUC,
+		invoiceRepo,
+		campaignUC,
+		templateUC,
+		notificationLogUC,
+		importUC,
+	)
 	crmAIHandler := httpRouter.NewCRMAIHandler(aiAnalystSvc, bulkImporterSvc, log)
 	emailHandler := httpRouter.NewEmailHandler(emailUC)
 

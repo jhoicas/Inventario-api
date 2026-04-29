@@ -361,6 +361,7 @@ func Router(app *fiber.App, deps RouterDeps) {
 
 	// ── CRM (módulo 'crm') ─────────────────────────────────────────────────────
 	if deps.CRMHandler != nil {
+		protected.Get("/notifications", RequireModule(entity.ModuleCRM, deps.ModuleService), screenAccess, deps.CRMHandler.ListNotifications)
 		crmGroup := protected.Group("/crm", RequireModule(entity.ModuleCRM, deps.ModuleService), screenAccess)
 		h := deps.CRMHandler
 		if deps.CRMAIHandler != nil {
@@ -426,6 +427,7 @@ func Router(app *fiber.App, deps RouterDeps) {
 		crmGroup.Get("/analytics/monthly-evolution", h.GetAnalyticsMonthlyEvolution)
 		crmGroup.Post("/campaigns/recipients/resolve", h.ResolveCampaignRecipients)
 		crmGroup.Post("/automations", h.CreateAutomation)
+		crmGroup.Post("/automations/trigger-birthdays", RequireRole(entity.RoleAdmin), h.TriggerBirthdayAutomations)
 		crmGroup.Get("/automations", h.ListAutomations)
 		crmGroup.Put("/automations/:id", h.UpdateAutomation)
 		crmGroup.Delete("/automations/:id", h.DeleteAutomation)

@@ -35,6 +35,8 @@ type InvoiceRepository interface {
 
 	// GetCustomerStats retorna estadísticas de compra agregadas para un cliente.
 	GetCustomerStats(customerID string) (*CustomerPurchaseStats, error)
+	// GetTopProductNamesByCustomer retorna los productos más comprados por el cliente.
+	GetTopProductNamesByCustomer(customerID string, limit int) ([]string, error)
 }
 
 // InvoiceListFilter parámetros de consulta para el listado de facturas.
