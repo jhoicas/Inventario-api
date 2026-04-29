@@ -361,9 +361,9 @@ func Router(app *fiber.App, deps RouterDeps) {
 
 	// ── CRM (módulo 'crm') ─────────────────────────────────────────────────────
 	if deps.CRMHandler != nil {
-		protected.Get("/notifications", RequireModule(entity.ModuleCRM, deps.ModuleService), screenAccess, deps.CRMHandler.ListNotifications)
 		crmGroup := protected.Group("/crm", RequireModule(entity.ModuleCRM, deps.ModuleService), screenAccess)
 		h := deps.CRMHandler
+		crmGroup.Get("/notifications", h.ListNotifications)
 		if deps.CRMAIHandler != nil {
 			crmGroup.Post("/ai/ask", deps.CRMAIHandler.AskAI)
 			crmGroup.Post("/sales/import", RequireRole(entity.RoleAdmin, "gerente"), deps.CRMAIHandler.ImportSalesFile)
