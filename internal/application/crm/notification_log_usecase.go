@@ -2,6 +2,8 @@ package crm
 
 import (
 	"context"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/jhoicas/Inventario-api/internal/application/dto"
@@ -33,6 +35,11 @@ func (uc *NotificationLogUseCase) List(
 	if err != nil {
 		return nil, err
 	}
+	types, err := uc.repo.ListTypes(ctx, companyID, startDate, endDate)
+	if err != nil {
+		return nil, err
+	}
+	types = normalizeNotificationTypes(types)
 
 	out := make([]dto.NotificationLogResponse, 0, len(items))
 	for _, item := range items {
@@ -55,5 +62,24 @@ func (uc *NotificationLogUseCase) List(
 		Total:  total,
 		Limit:  limit,
 		Offset: offset,
+		Types:  types,
 	}, nil
+}
+
+func normalizeNotificationTypes(in []string) []string {
+	seen := make(map[string]struct{}, len(in))
+	out := make([]string, 0, len(in))
+	for _, raw := range in {
+		t := strings.ToUpper(strings.TrimSpace(raw))
+		if t == "" {
+			continue
+		}
+		if _, ok := seen[t]; ok {
+			continue
+		}
+		seen[t] = struct{}{}
+		out = append(out, t)
+	}
+	sort.Strings(out)
+	return out
 }

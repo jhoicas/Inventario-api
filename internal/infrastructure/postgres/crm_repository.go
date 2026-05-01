@@ -2449,6 +2449,33 @@ func (r *CRMNotificationLogRepo) List(ctx context.Context, filters repository.No
 	return items, total, nil
 }
 
+func (r *CRMNotificationLogRepo) ListTypes(ctx context.Context, companyID string, startDate, endDate *time.Time) ([]string, error) {
+	rows, err := r.q.Query(ctx, `
+		SELECT DISTINCT UPPER(type) AS type
+		FROM notification_logs
+		WHERE company_id = $1
+		  AND ($2::timestamptz IS NULL OR sent_at >= $2)
+		  AND ($3::timestamptz IS NULL OR sent_at <= $3)
+		ORDER BY type ASC`, companyID, startDate, endDate)
+	if err != nil {
+		return nil, fmt.Errorf("list notification types: %w", err)
+	}
+	defer rows.Close()
+
+	types := make([]string, 0)
+	for rows.Next() {
+		var t string
+		if err := rows.Scan(&t); err != nil {
+			return nil, fmt.Errorf("scan notification type: %w", err)
+		}
+		types = append(types, strings.TrimSpace(t))
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate notification types: %w", err)
+	}
+	return types, nil
+}
+
 func (r *CRMAutomationRepo) GetCustomersForBirthday(ctx context.Context, companyID uuid.UUID) ([]*entity.Customer, error) {
 	rows, err := r.q.Query(ctx, `
 		SELECT c.id, c.company_id, c.name, c.tax_id, COALESCE(c.email, ''), COALESCE(c.phone, ''), c.birth_date, COALESCE(p.ltv, 0), COALESCE(cat.name, ''), c.is_active, c.created_at, c.updated_at

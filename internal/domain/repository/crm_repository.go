@@ -176,6 +176,7 @@ type NotificationLogFilters struct {
 type NotificationLogRepository interface {
 	Create(ctx context.Context, log *entity.NotificationLog) error
 	List(ctx context.Context, filters NotificationLogFilters) ([]*entity.NotificationLog, int64, error)
+	ListTypes(ctx context.Context, companyID string, startDate, endDate *time.Time) ([]string, error)
 }
 
 // CRMCampaignTemplateRepository puerto de persistencia para plantillas de campañas.
