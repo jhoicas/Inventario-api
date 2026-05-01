@@ -659,6 +659,29 @@ func (h *CRMHandler) GetProfile360(c *fiber.Ctx) error {
 	return c.JSON(out)
 }
 
+// GetCustomerByID obtiene solo la información base del cliente.
+func (h *CRMHandler) GetCustomerByID(c *fiber.Ctx) error {
+	companyID := GetCompanyID(c)
+	customerID := c.Params("id")
+	if companyID == "" || customerID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(dto.ErrorResponse{Code: "UNAUTHORIZED", Message: "token inválido"})
+	}
+	if h.LoyaltyUC == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(dto.ErrorResponse{Code: "SERVICE_UNAVAILABLE", Message: "crm loyalty no configurado"})
+	}
+	out, err := h.LoyaltyUC.GetProfile360(c.Context(), companyID, customerID)
+	if err != nil {
+		if err == domain.ErrNotFound {
+			return c.Status(fiber.StatusNotFound).JSON(dto.ErrorResponse{Code: "NOT_FOUND", Message: "cliente no encontrado"})
+		}
+		if err == domain.ErrForbidden {
+			return c.Status(fiber.StatusForbidden).JSON(dto.ErrorResponse{Code: "FORBIDDEN", Message: "acceso denegado"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(dto.ErrorResponse{Code: "INTERNAL", Message: err.Error()})
+	}
+	return c.JSON(out.Customer)
+}
+
 // AssignCategory asigna categoría de fidelización al cliente.
 // @Summary      Asignar categoría al cliente
 // @Description  Asigna o actualiza la categoría de fidelización y el LTV de un cliente

@@ -376,6 +376,7 @@ func Router(app *fiber.App, deps RouterDeps) {
 		crmGroup.Get("/import/status/:jobID", RequireRole(entity.RoleAdmin, "gerente"), h.GetImportStatus)
 		crmGroup.Get("/customers", h.ListCustomers)
 		crmGroup.Post("/customers", h.CreateCustomer)
+		crmGroup.Get("/customers/:id", h.GetCustomerByID)
 		crmGroup.Put("/customers/:id", h.UpdateCustomer)
 		crmGroup.Put("/customers/:id/deactivate", h.DeactivateCustomer)
 		crmGroup.Get("/customers/:id/profile360", h.GetProfile360)
