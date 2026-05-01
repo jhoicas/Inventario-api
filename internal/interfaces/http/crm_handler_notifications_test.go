@@ -37,12 +37,18 @@ func (f *fakeNotificationLogRepo) ListTypes(ctx context.Context, companyID strin
 }
 
 func TestCRMHandler_ListNotifications_WithFiltersAndTypes(t *testing.T) {
+	customerName := "Juan Perez"
+	customerEmail := "juan@example.com"
+	customerPhone := "+573001112233"
 	repo := &fakeNotificationLogRepo{
 		items: []*entity.NotificationLog{
 			{
 				ID:         "n1",
 				CompanyID:  "comp-1",
 				CustomerID: "cust-1",
+				CustomerName: &customerName,
+				CustomerEmail: &customerEmail,
+				CustomerPhone: &customerPhone,
 				Type:       "BIRTHDAY",
 				Channel:    "EMAIL",
 				Subject:    "Feliz cumpleaños",
@@ -84,11 +90,57 @@ func TestCRMHandler_ListNotifications_WithFiltersAndTypes(t *testing.T) {
 	assert.Equal(t, 10, out.Limit)
 	assert.Equal(t, 5, out.Offset)
 	assert.Equal(t, []string{"BIRTHDAY", "CAMPAIGN"}, out.Types)
+	assert.Equal(t, "Juan Perez", out.Items[0]["customer_name"])
+	assert.Equal(t, "juan@example.com", out.Items[0]["customer_email"])
+	assert.Equal(t, "+573001112233", out.Items[0]["customer_phone"])
 
 	assert.Equal(t, "comp-1", repo.lastFilters.CompanyID)
 	assert.Equal(t, "BIRTHDAY", repo.lastFilters.Type)
 	require.NotNil(t, repo.lastFilters.StartDate)
 	require.NotNil(t, repo.lastFilters.EndDate)
+}
+
+func TestCRMHandler_ListNotifications_NullCustomerEnrichment(t *testing.T) {
+	repo := &fakeNotificationLogRepo{
+		items: []*entity.NotificationLog{
+			{
+				ID:         "n-null",
+				CompanyID:  "comp-1",
+				CustomerID: "",
+				Type:       "SYSTEM",
+				Channel:    "EMAIL",
+				Subject:    "System notice",
+				Body:       "body",
+				SentAt:     time.Date(2026, 4, 30, 10, 0, 0, 0, time.UTC),
+				Status:     "SENT",
+			},
+		},
+		total: 1,
+		types: []string{"SYSTEM"},
+	}
+	uc := appcrm.NewNotificationLogUseCase(repo)
+	h := &CRMHandler{NotificationUC: uc}
+
+	app := fiber.New()
+	app.Use(func(c *fiber.Ctx) error {
+		c.Locals(LocalCompanyID, "comp-1")
+		return c.Next()
+	})
+	app.Get("/api/crm/notifications", h.ListNotifications)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/crm/notifications", nil)
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var out struct {
+		Items []map[string]any `json:"items"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+	require.Len(t, out.Items, 1)
+	assert.Nil(t, out.Items[0]["customer_name"])
+	assert.Nil(t, out.Items[0]["customer_email"])
+	assert.Nil(t, out.Items[0]["customer_phone"])
 }
 
 func TestCRMHandler_ListNotifications_DefaultPaging(t *testing.T) {

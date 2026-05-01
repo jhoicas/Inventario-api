@@ -576,6 +576,9 @@ type NotificationLogResponse struct {
 	ID           string    `json:"id"`
 	CompanyID    string    `json:"company_id"`
 	CustomerID   string    `json:"customer_id"`
+	CustomerName *string   `json:"customer_name"`
+	CustomerEmail *string  `json:"customer_email"`
+	CustomerPhone *string  `json:"customer_phone"`
 	Type         string    `json:"type"`
 	Channel      string    `json:"channel"`
 	Subject      string    `json:"subject"`

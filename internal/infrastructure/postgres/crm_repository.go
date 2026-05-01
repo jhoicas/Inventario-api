@@ -2411,8 +2411,47 @@ func (r *CRMNotificationLogRepo) List(ctx context.Context, filters repository.No
 	}
 
 	query := `
-		SELECT id, company_id, COALESCE(customer_id::text, ''), type, channel, COALESCE(subject, ''), COALESCE(body, ''), sent_at, status, COALESCE(error_message, '')
-	` + where + fmt.Sprintf(" ORDER BY sent_at DESC LIMIT $%d OFFSET $%d", argPos, argPos+1)
+		SELECT
+			nl.id,
+			nl.company_id,
+			COALESCE(nl.customer_id::text, ''),
+			c.name,
+			c.email,
+			c.phone,
+			nl.type,
+			nl.channel,
+			COALESCE(nl.subject, ''),
+			COALESCE(nl.body, ''),
+			nl.sent_at,
+			nl.status,
+			COALESCE(nl.error_message, '')
+		FROM notification_logs nl
+		LEFT JOIN customers c
+			ON c.id = nl.customer_id
+			AND c.company_id = nl.company_id
+		WHERE nl.company_id = $1`
+	if strings.TrimSpace(filters.Type) != "" {
+		query += fmt.Sprintf(" AND UPPER(nl.type) = UPPER($%d)", 2)
+	}
+	// Reusar la cláusula dinámica existente para fechas sin romper paginación ni filtros.
+	if filters.StartDate != nil {
+		startPos := 2
+		if strings.TrimSpace(filters.Type) != "" {
+			startPos = 3
+		}
+		query += fmt.Sprintf(" AND nl.sent_at >= $%d", startPos)
+	}
+	if filters.EndDate != nil {
+		endPos := 2
+		if strings.TrimSpace(filters.Type) != "" {
+			endPos++
+		}
+		if filters.StartDate != nil {
+			endPos++
+		}
+		query += fmt.Sprintf(" AND nl.sent_at <= $%d", endPos)
+	}
+	query += fmt.Sprintf(" ORDER BY nl.sent_at DESC LIMIT $%d OFFSET $%d", argPos, argPos+1)
 	rows, err := r.q.Query(ctx, query, append(args, limit, offset)...)
 	if err != nil {
 		return nil, 0, fmt.Errorf("list notification logs: %w", err)
@@ -2426,6 +2465,9 @@ func (r *CRMNotificationLogRepo) List(ctx context.Context, filters repository.No
 			&item.ID,
 			&item.CompanyID,
 			&item.CustomerID,
+			&item.CustomerName,
+			&item.CustomerEmail,
+			&item.CustomerPhone,
 			&item.Type,
 			&item.Channel,
 			&item.Subject,
